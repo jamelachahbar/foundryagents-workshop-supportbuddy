@@ -1,0 +1,18 @@
+{
+  "properties": {
+    "basePolicyName": "Microsoft.DefaultV2",
+    "mode": "Blocking",
+    "contentFilters": [
+      { "name": "Hate", "source": "Prompt", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Hate", "source": "Completion", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Sexual", "source": "Prompt", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Sexual", "source": "Completion", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Violence", "source": "Prompt", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Violence", "source": "Completion", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Selfharm", "source": "Prompt", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Selfharm", "source": "Completion", "enabled": true, "blocking": true, "severityThreshold": "Medium" },
+      { "name": "Jailbreak", "source": "Prompt", "enabled": true, "blocking": true },
+      { "name": "Indirect Attack", "source": "Prompt", "enabled": true, "blocking": true }
+    ]
+  }
+}

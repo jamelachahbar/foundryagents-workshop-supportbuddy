@@ -1,0 +1,11 @@
+# Dependencies for the Stage 14 hosted agent (installed by Foundry when you run `azd deploy`).
+# Keep in sync with pyproject.toml. Local development uses pyproject.toml through uv.
+agent-framework-core==1.22.0
+agent-framework-foundry==1.15.0
+agent-framework-foundry-hosting==1.0.0b261015
+agent-framework-devui==1.0.0b261015
+azure-ai-projects>=2.7.0,<2.8.0
+azure-identity>=1.26.0
+mcp>=1.24.0,<2
+tenacity>=9.1.4,<9.2.0
+python-dotenv>=1.2.4

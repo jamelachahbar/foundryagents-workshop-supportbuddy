@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Local configuration
+.env
+# Local DevUI access token (generated on first run)
+.devui_token
+# Synthetic handover queue shared by the agent and the operator desk (Stage 7)
+.lab_state/
+# Organisation-specific package index configuration, and locks resolved against it
+uv.toml
+uv.lock
+
+# Stage 14: generated per participant by `azd ai agent init`
+.azure/
+src/azure.yaml
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+Thumbs.db

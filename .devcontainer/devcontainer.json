@@ -1,0 +1,18 @@
+{
+  "name": "POST connectivity agent lab",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
+  "features": {
+    "ghcr.io/devcontainers/features/azure-cli:1": {}
+  },
+  "postCreateCommand": "pip install --user uv && cd src && uv sync",
+  "forwardPorts": [8000, 8090],
+  "portsAttributes": {
+    "8000": { "label": "Synthetic MCP server (Stage 6+)" },
+    "8090": { "label": "DevUI" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-python.vscode-pylance", "charliermarsh.ruff"]
+    }
+  }
+}

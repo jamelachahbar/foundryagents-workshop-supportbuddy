@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" role="img" aria-label="SupportBuddy">
+  <defs>
+    <linearGradient id="sb-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6D5DFC"/>
+      <stop offset="0.55" stop-color="#3B82F6"/>
+      <stop offset="1" stop-color="#06B6D4"/>
+    </linearGradient>
+    <linearGradient id="sb-pulse" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.55"/>
+      <stop offset="0.5" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#A7F3D0"/>
+    </linearGradient>
+  </defs>
+  <rect width="144" height="144" rx="36" fill="url(#sb-bg)"/>
+  <g fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-width="5">
+    <path d="M96 32 a18 18 0 0 1 18 18" stroke-opacity="0.95"/>
+    <path d="M96 20 a30 30 0 0 1 30 30" stroke-opacity="0.55"/>
+  </g>
+  <circle cx="96" cy="50" r="5" fill="#FFFFFF"/>
+  <path d="M30 52 h50 a14 14 0 0 1 14 14 v28 a14 14 0 0 1 -14 14 h-28 l-14 13 v-13 h-8 a14 14 0 0 1 -14 -14 v-28 a14 14 0 0 1 14 -14 z"
+        fill="#FFFFFF" fill-opacity="0.16" stroke="#FFFFFF" stroke-width="4.5" stroke-linejoin="round"/>
+  <polyline points="26,80 40,80 47,68 56,94 64,72 70,80 86,80" fill="none" stroke="url(#sb-pulse)"
+            stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <g stroke="#FFFFFF" stroke-opacity="0.6" stroke-width="2.5">
+    <line x1="108" y1="88" x2="122" y2="76"/>
+    <line x1="108" y1="88" x2="124" y2="102"/>
+    <line x1="108" y1="88" x2="112" y2="118"/>
+  </g>
+  <circle cx="108" cy="88" r="7" fill="#FFFFFF"/>
+  <circle cx="122" cy="76" r="5" fill="#A7F3D0"/>
+  <circle cx="124" cy="102" r="5" fill="#C4B5FD"/>
+  <circle cx="112" cy="118" r="5" fill="#BAE6FD"/>
+</svg>

@@ -1,0 +1,40 @@
+[project]
+name = "post-connectivity-agent-lab"
+version = "0.1.0"
+description = "Hands-on lab: build an enterprise connectivity-support agent with Microsoft Foundry and Microsoft Agent Framework (synthetic backends only)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Pinned to 1.22.0 on purpose: 1.23.0 skips MCP tools that advertise
+    # execution.taskSupport="optional", which is what Foundry IQ knowledge bases
+    # and Foundry Toolbox return (microsoft/agent-framework#9675, fix in #9690).
+    # Move to the first release that contains that fix.
+    "agent-framework-core==1.22.0",
+    "agent-framework-foundry==1.15.0",
+    # FoundryToolbox (Stage 9) and ResponsesHostServer (Stage 13)
+    "agent-framework-foundry-hosting==1.0.0b261015",
+    "agent-framework-devui==1.0.0b261015",
+    # agent-framework-foundry 1.15.0 requires azure-ai-projects <2.8.0
+    "azure-ai-projects>=2.7.0,<2.8.0",
+    "azure-identity>=1.26.0",
+    # MCP support is optional in agent-framework-core 1.22; this matches its "all" extra
+    "mcp>=1.24.0,<2",
+    # Operator desk (Stage 7); already installed with mcp, declared because the lab uses them directly
+    "starlette>=0.40",
+    "uvicorn>=0.30",
+    "tenacity>=9.1.4,<9.2.0",
+    "python-dotenv>=1.2.4",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "anyio>=4.15.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["."]
