@@ -895,7 +895,8 @@ message to the customer quoting the `handover_id` the tool returned (for example
    customer to repeat everything.
 2. On the desk, **Take case**, write a message to the customer and **Send reply and resolve**.
 3. Back in DevUI, as the customer: `Any news on my case HO-9001?` The agent calls `get_handover_status`
-   and relays the advisor's message.
+   and relays the advisor's message. Nothing is pushed to the customer: like a ticket, the reply waits
+   until the customer asks.
 4. Try `Any news on HO-9001?` as `CUST-1001`: the agent finds nothing. The tool only returns a case to the
    customer it belongs to, and answers "not found" in both cases, so it does not reveal that the case
    exists. That rule is in the code, not in the prompt.

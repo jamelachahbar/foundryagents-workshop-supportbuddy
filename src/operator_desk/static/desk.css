@@ -42,3 +42,5 @@ button { padding: 8px 12px; border: 0; border-radius: 8px; background: var(--bra
 button:disabled { opacity: .4; cursor: default; }
 .muted { color: var(--muted); }
 .error { color: #ff8a8a; margin: 0; }
+.notice { color: var(--muted); margin: 0; font-size: 13px; }
+.notice.sent { color: #7ee2a8; }
