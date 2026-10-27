@@ -195,6 +195,21 @@ each at the moment the lab needs it:
 > Stage 10 then asks the question Foundry asks: how far does a prompt agent get without any code? The
 > human handover from Stage 7 is the answer to why you would need more.
 
+### The agents in this lab
+
+You build four agents. Each one has a fixed type, and the name tells you which one you are looking at:
+
+| Agent | Type | Where the agent loop runs | In the Foundry portal | Stages | Talks to |
+| --- | --- | --- | --- | --- | --- |
+| `lab-<alias>-supportbuddy` | **Code-first** (your code calls Foundry) | Your Python process: DevUI, console or contact centre | No (only the model deployment it calls) | 1-9, 11-13 | The customer |
+| `lab-<alias>-supportbuddy-assist` | **Code-first**, in the contact centre | The contact centre process on your laptop | No | 7 onwards | The human advisor only, never the customer |
+| `lab-<alias>-supportbuddy-prompt` | **Prompt agent** | Foundry Agent Service | **Build > Agents**, with versions and a playground | 10 | The customer |
+| `lab-<alias>-supportbuddy-hosted` | **Hosted agent** (your code, run by Foundry) | Foundry Agent Service, in a container with your code | **Build > Agents**, next to the prompt agent | 14 | Any caller of the Responses API |
+
+What is **not** an agent: the contact centre (a web app that routes each conversation to SupportBuddy or to
+a person, with no model), the MCP server, the toolbox and the knowledge base (tools the agents call). The
+agents never call each other: there is no multi-agent orchestration in this lab.
+
 ---
 
 ## Prerequisites
@@ -802,12 +817,29 @@ flowchart LR
 | Contact centre to SupportBuddy | Direct Line / Activity protocol for Copilot Studio agents | **[AG-UI](https://learn.microsoft.com/agent-framework/integrations/by-component/ui/ag-ui/)**, Agent Framework's protocol between agents and user interfaces |
 | `escalate_to_human` | `handoff.initiate` | Transcript + evidence + note for the advisor |
 | Operator desk | The advisor workspace of the hub | Live chat with the customer |
-| Advisor assist agent | Copilot for service representatives | Same tools as SupportBuddy; every action approved by the advisor |
+| Advisor assist agent | Copilot for service representatives | Code-first agent with the same tools as SupportBuddy, kept on the case's customer by code; every action approved by the advisor |
+
+**Keeping the two agents apart.** SupportBuddy and the assist agent are separate agents with separate
+instructions, separate conversation threads and separate approvers. The contact centre keeps them apart:
+
+- **Who answers.** Customer messages reach SupportBuddy only while the conversation is in `agent` mode. After
+  a handover, a person owns the conversation until they hand it back.
+- **Who sees what.** The customer's live feed carries only their own conversation. The assist thread exists
+  only on the desk: the assist agent never writes to the customer, the advisor decides what to send.
+- **What crosses over.** The assist agent receives the handover record and the transcript as *data, not
+  instructions*. SupportBuddy receives a note of what the advisor said and did, so after a hand-back it does
+  not repeat an action.
+- **Which customer.** The contact centre runs one assist agent per customer and sends each case to the
+  agent of the case's customer. Its middleware (`CaseCustomerOnly` in `contact_centre/assist.py`) refuses any
+  tool call that names another customer and withholds any result about one, so `restart_modem` cannot run
+  for the wrong person even if a message in the transcript asks for it. While a case has no identified
+  customer, the assist agent can only identify the customer.
 
 > [!NOTE]
 > The contact centre is a lab construct. It runs on 127.0.0.1, keeps conversations in memory and has no
 > sign-in. A production hub signs in advisors with Microsoft Entra ID, persists conversations, routes by
-> skill and language, and records everything for audit.
+> skill and language, and records everything for audit. Its agent endpoints (`/ag-ui/...`) are reachable by
+> anything on your machine; in production they are private, or the agents run inside the hub's backend.
 
 ### What the code does
 

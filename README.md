@@ -70,6 +70,15 @@ system or record.
 | **Part 3** | **Run your code in Foundry** | |
 | 14 | Hosted agent | the same Agent Framework code, deployed and run by Foundry |
 
+## The agents you build
+
+| Agent | Foundry agent type | Runs in | Stages |
+| --- | --- | --- | --- |
+| `lab-<alias>-supportbuddy` | Code-first: your Agent Framework code calls the model in Foundry | Your Python process | 1-9, 11-13 |
+| `lab-<alias>-supportbuddy-assist` | Code-first, helps the human advisor (never the customer) | The contact centre on your laptop | 7 onwards |
+| `lab-<alias>-supportbuddy-prompt` | Prompt agent: model + instructions + toolbox, no code | Foundry Agent Service | 10 |
+| `lab-<alias>-supportbuddy-hosted` | Hosted agent: your code, deployed to Foundry | Foundry Agent Service | 14 |
+
 ## Repository map
 
 ```text

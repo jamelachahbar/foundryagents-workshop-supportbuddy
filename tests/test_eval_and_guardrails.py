@@ -48,6 +48,45 @@ async def test_guardrail_ignores_tools_without_a_customer_id():
     assert called
 
 
+async def _run_tool(middleware, arguments, returns):
+    """Like _run, but the tool returns a result, parsed the way Agent Framework parses function results."""
+    from agent_framework import FunctionTool
+
+    called = []
+
+    async def call_next():
+        called.append(True)
+        context.result = FunctionTool.parse_result(returns)
+
+    context = _Context(arguments)
+    await middleware.process(context, call_next)
+    return bool(called), context.result
+
+
+@pytest.mark.anyio
+async def test_assist_guard_never_runs_a_tool_for_another_customer():
+    from contact_centre.assist import CaseCustomerOnly
+
+    called, result = await _run_tool(CaseCustomerOnly("CUST-1002"), {"customer_id": "CUST-1001"}, {"restarted": True})
+    assert not called and result["blocked"] is True
+
+
+@pytest.mark.anyio
+async def test_assist_guard_withholds_results_about_another_customer():
+    from contact_centre.assist import BLOCKED, CaseCustomerOnly
+
+    guard = CaseCustomerOnly("CUST-1002")
+    other = {"found": True, "customer": {"customer_id": "CUST-1001"}}
+    called, result = await _run_tool(guard, {"email": "someone@example.com"}, other)
+    assert called and result["blocked"] is True
+    _, result = await _run_tool(guard, {"line_id": "LINE-2001"}, {"found": True, "line": {"customer_id": "CUST-1001"}})
+    assert result["blocked"] is True
+
+    mine = {"found": True, "line": {"line_id": "LINE-2002", "customer_id": "CUST-1002"}}
+    _, result = await _run_tool(guard, {"line_id": "LINE-2002"}, mine)
+    assert result is not BLOCKED and "LINE-2002" in result[0].text
+
+
 def _conversation(*tool_names):
     calls = [Content.from_function_call(call_id=str(i), name=name, arguments="{}") for i, name in enumerate(tool_names)]
     return [Message("user", ["help"]), Message("assistant", calls)]

@@ -35,7 +35,7 @@ from agent_framework_ag_ui import AgentFrameworkAgent, add_agent_framework_fasta
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 
-from contact_centre.centre import ASSIST_PATH, SUPPORTBUDDY_PATH, ContactCentre, http_runner
+from contact_centre.centre import ASSIST_PATH, SUPPORTBUDDY_PATH, UNIDENTIFIED, ContactCentre, http_runner
 from lab_backend import backend
 
 logger = logging.getLogger("contact_centre")
@@ -290,7 +290,9 @@ def main() -> None:
 
     port = int(os.getenv("CONTACT_CENTRE_PORT", "8070"))
     customers = [{"customer_id": c["customer_id"], "name": c["name"]} for c in backend.list_customers()]
-    agents: dict[str, SupportsAgentRun] = {ASSIST_PATH: build_assist_agent()}
+    agents: dict[str, SupportsAgentRun] = {ASSIST_PATH.format(who=UNIDENTIFIED): build_assist_agent(None)}
+    for customer in customers:
+        agents[ASSIST_PATH.format(who=customer["customer_id"])] = build_assist_agent(customer["customer_id"])
     if args.prompt_agent:
         from prompt_agent import connect_prompt_agent, prompt_agent_name
 

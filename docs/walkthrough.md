@@ -22,6 +22,15 @@ All synthetic: customers, lines, incidents, runbooks and the MCP server are lab 
 | [4. Hosted agent](#4-hosted-agent-stage-14) | 14 | Your code, run by Foundry |
 | [5. Clean up](#5-clean-up) | | |
 
+| Agent | Type | You meet it in |
+| --- | --- | --- |
+| `lab-<alias>-supportbuddy` | Code-first agent (runs on your laptop, calls the model in Foundry) | Stages 1-9, 11-13 |
+| `lab-<alias>-supportbuddy-assist` | Code-first agent for the human advisor, in the contact centre | Stage 7 |
+| `lab-<alias>-supportbuddy-prompt` | Prompt agent (runs in Foundry, no code) | Stage 10 |
+| `lab-<alias>-supportbuddy-hosted` | Hosted agent (your code, run by Foundry) | Stage 14 |
+
+Details: [The agents in this lab](workshop.md#the-agents-in-this-lab).
+
 ---
 
 ## 0. Lab environment

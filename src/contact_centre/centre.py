@@ -20,7 +20,8 @@ from lab_backend import backend
 
 HANDOVER_TOOL = "escalate_to_human"
 SUPPORTBUDDY_PATH = "/ag-ui/supportbuddy/{who}"
-ASSIST_PATH = "/ag-ui/assist"
+ASSIST_PATH = "/ag-ui/assist/{who}"
+UNIDENTIFIED = "unidentified"
 
 # What the customer sees while SupportBuddy works, instead of raw tool names.
 PROGRESS = {
@@ -161,7 +162,7 @@ class ContactCentre:
         self.store.add_assist(conversation, "advisor", request, author=advisor)
         # The assist agent gets the case as it is now: the handover record and the live transcript.
         context = {
-            "customer_id": conversation.customer_id or (conversation.identified or {}).get("customer_id"),
+            "customer_id": self.case_customer(conversation),
             "handover": conversation.handover,
             "transcript": [
                 f"{m['role']}: {m['text']}" for m in conversation.transcript if m["role"] in ("customer", "agent", "advisor")
@@ -190,6 +191,19 @@ class ContactCentre:
 
     def supportbuddy_path(self, conversation: Conversation) -> str:
         return SUPPORTBUDDY_PATH.format(who=conversation.customer_id or "guest")
+
+    @staticmethod
+    def case_customer(conversation: Conversation) -> str | None:
+        """The customer the case is about: signed in, identified by SupportBuddy, or named in the handover."""
+        return (
+            conversation.customer_id
+            or (conversation.identified or {}).get("customer_id")
+            or (conversation.handover or {}).get("customer_id")
+        )
+
+    def assist_path(self, conversation: Conversation) -> str:
+        # One assist agent per customer: its middleware keeps it on that customer.
+        return ASSIST_PATH.format(who=self.case_customer(conversation) or UNIDENTIFIED)
 
     async def _run_supportbuddy(self, conversation: Conversation, resume: list[dict[str, Any]] | None) -> None:
         conversation.busy = True
@@ -224,7 +238,7 @@ class ContactCentre:
         try:
             await self._consume(
                 conversation,
-                ASSIST_PATH,
+                self.assist_path(conversation),
                 thread_id=f"{conversation.id}-assist",
                 history_attr="assist_history",
                 add=lambda role, text, **extra: self.store.add_assist(conversation, role, text, **extra),
@@ -280,7 +294,8 @@ class ContactCentre:
                         announced.add(name)
                         add("activity", progress.get(name, f"Running {name}"), tool=name)
                 elif kind == "TOOL_CALL_RESULT" and calls.get(event.get("toolCallId")) == "identify_customer":
-                    if history_attr == "agent_history" and not conversation.customer_id:
+                    # SupportBuddy may refine who the guest is; the assist agent only names a case that has no customer.
+                    if not conversation.customer_id and (history_attr == "agent_history" or not self.case_customer(conversation)):
                         found = (tool_result(event.get("content")) or {}).get("customer") or {}
                         if isinstance(found, dict) and found.get("customer_id"):
                             conversation.identified = {"customer_id": found["customer_id"], "name": found.get("name", "")}

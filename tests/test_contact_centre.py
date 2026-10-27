@@ -200,7 +200,7 @@ def test_assist_works_for_the_advisor_only():
 
     run(centre.assist(conversation, "Lea", "Suggest a reply."))
     path, body = agents.calls[1]
-    assert path == ASSIST_PATH
+    assert path == ASSIST_PATH.format(who="CUST-1005")  # the customer named in the handover
     assert body["threadId"] == f"{conversation.id}-assist"
     assert record["handover_id"] in body["messages"][-1]["content"]
     assert "Nothing loads" in body["messages"][-1]["content"]
@@ -214,6 +214,24 @@ def test_assist_works_for_the_advisor_only():
     # The customer is told about an action on their service, and who took it; SupportBuddy learns it is done.
     assert conversation.transcript[-1]["text"].startswith("Lea restarted your modem remotely.")
     assert "do not run it again" in conversation.agent_history[-1]["content"]
+
+
+def test_assist_identifies_an_unknown_customer_then_works_on_that_customer_only():
+    found = {"found": True, "customer": {"customer_id": "CUST-1004", "name": "Noah Martin"}}
+    agents = ScriptedAgents(
+        tool("c1", "identify_customer", found) + text("m1", "This is CUST-1004.") + [{"type": "RUN_FINISHED"}],
+        text("m2", "Line is up.") + [{"type": "RUN_FINISHED"}],
+    )
+    centre = ContactCentre(agents, signs_in=False, agent_label="test")
+    conversation = centre.start(None)
+    conversation.mode = "advisor"
+
+    run(centre.assist(conversation, "Lea", "Who is this customer?"))
+    assert agents.calls[0][0] == ASSIST_PATH.format(who="unidentified")
+    assert conversation.identified["customer_id"] == "CUST-1004"
+
+    run(centre.assist(conversation, "Lea", "Check again."))
+    assert agents.calls[1][0] == ASSIST_PATH.format(who="CUST-1004")
 
 
 def test_signed_in_conversations_use_one_agent_per_customer():
