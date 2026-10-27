@@ -479,7 +479,7 @@ sequenceDiagram
 ```text
 Hi, I'm anna.weber@example.com, my internet stopped this morning.
 Mon modem ne répond plus, je suis le client CUST-1002.
-My internet is down. My phone number is +352 600 000 999.
+My internet is down. My phone number is +1 202 555 0999.
 ```
 
 ### Checkpoint
@@ -511,7 +511,7 @@ capability reads a line's status from a (synthetic) service inventory.
 
 ```text
 Hi, I'm anna.weber@example.com, my internet stopped this morning.
-Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.
+Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
 ```
 
 ### Checkpoint
@@ -543,7 +543,7 @@ received, `reachable`, `packet_loss_pct`, and the modem's Wi-Fi diagnostics.
 
 ```text
 Mon modem ne répond plus, je suis le client CUST-1002.
-Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.
+Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
 ```
 
 ### Checkpoint
@@ -916,7 +916,7 @@ Hi, I'm anna.weber@example.com, my internet stopped this morning.
 ```
 
 Evidence: line `LINE-2001` down with loss of signal; open incident `INC-5001` (fibre cut) for postcode
-`L-0001`, estimated restore 14:00 UTC; modem does not answer the ping. The incident explains everything.
+`MV-0001`, estimated restore 14:00 UTC; modem does not answer the ping. The incident explains everything.
 **Expected:** progress lines while SupportBuddy works, then an answer with the incident and restore time,
 a "What I checked" list, no restart advice, no handover.
 
@@ -1106,7 +1106,7 @@ identity's token (cached and refreshed by `azure-identity`). No API key. Your id
 ### Try it
 
 ```text
-Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.
+Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
 Mon modem ne répond plus, je suis le client CUST-1002.
 Hi, I'm anna.weber@example.com, my internet stopped this morning.
 CUST-1004: constant disconnections for three days.
@@ -1800,10 +1800,10 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | --- | --- | --- | --- |
 | `CUST-1001` Anna Weber | `anna.weber@example.com` | Line down, open fibre-cut incident `INC-5001`, modem unreachable | Answer: area outage, restore time, no restart |
 | `CUST-1002` Luc Martin | `CUST-1002` | Line up, no incident, modem does not answer ping | Answer: switch the modem off and on, or a remote restart after approval (Stage 7) |
-| `CUST-1003` Sofia Costa | `+352 600 000 103` | Line and modem healthy, 2.4 GHz congested, weak client signal | Answer: Wi-Fi guidance |
+| `CUST-1003` Sofia Costa | `+1 202 555 0103` | Line and modem healthy, 2.4 GHz congested, weak client signal | Answer: Wi-Fi guidance |
 | `CUST-1004` Paul Schmit | `CUST-1004` | Line unstable (37 resyncs, 1840 errors), no incident | Hand over: probable line fault |
 | `CUST-1005` Claire Hoffmann | `CUST-1005` | Everything healthy, only a resolved incident, customer reports total outage | Hand over: inconclusive / conflicting |
-| unknown | `+352 600 000 999` | No customer found | Ask once for another identifier, then hand over |
+| unknown | `+1 202 555 0999` | No customer found | Ask once for another identifier, then hand over |
 | `CUST-1006` Marc Dupont | `CUST-1006` | Everything healthy; the Wi-Fi network name contains injected instructions | Answer normally and ignore the injected text (Stage 13). Also use it for your own edge cases |
 
 ---

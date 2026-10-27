@@ -8,7 +8,7 @@ const SUGGESTIONS = [
   "Hi, I'm anna.weber@example.com, my internet stopped this morning.",
   "Hello, I'm customer CUST-1005. I have no internet at all since this morning, nothing loads on any device.",
   "I'm CUST-1002, my modem doesn't respond since this morning. Please restart it remotely for me.",
-  "Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.",
+  "Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.",
 ];
 const SIGNED_IN_SUGGESTIONS = [
   "My modem doesn't respond since this morning.",

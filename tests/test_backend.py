@@ -17,9 +17,10 @@ def _reset_backend():
     [
         {"customer_id": "cust-1003"},
         {"email": " Sofia.Costa@example.com "},
-        {"phone": "+352 600 000 103"},
-        {"phone": "00352-600-000-103"},
-        {"customer_id": "CUST-1003", "phone": "+352600000103"},
+        {"phone": "+1 202 555 0103"},
+        {"phone": "001-202-555-0103"},
+        {"phone": "(202) 555-0103"},
+        {"customer_id": "CUST-1003", "phone": "+12025550103"},
     ],
 )
 def test_identify_customer_by_any_identifier(kwargs):
@@ -56,7 +57,7 @@ def test_every_response_is_marked_as_mock():
         backend.get_line_status("LINE-0000"),
         backend.check_equipment("CUST-1001"),
         backend.check_equipment("CUST-9999"),
-        backend.get_known_incidents(postcode="L-0001"),
+        backend.get_known_incidents(postcode="MV-0001"),
         backend.get_known_incidents(),
         backend.escalate_to_human("x", [], [], "y", "z"),
     ]
@@ -74,11 +75,11 @@ def test_ping_result_drives_reachability():
 
 
 def test_incident_lookup_by_postcode_or_area():
-    by_postcode = backend.get_known_incidents(postcode="l-0001")
+    by_postcode = backend.get_known_incidents(postcode="mv-0001")
     by_area = backend.get_known_incidents(area="mock-ville north")
     assert [i["incident_id"] for i in by_postcode["incidents"]] == ["INC-5001"]
     assert by_postcode["incidents"] == by_area["incidents"]
-    assert backend.get_known_incidents(postcode="L-0003") == {"found": False, "incidents": [], "source": "mock"}
+    assert backend.get_known_incidents(postcode="MV-0003") == {"found": False, "incidents": [], "source": "mock"}
 
 
 def _evidence(customer_id):

@@ -75,8 +75,9 @@ def _normalise_phone(phone: str) -> str:
     digits = re.sub(r"[^\d+]", "", phone)
     if digits.startswith("00"):
         digits = "+" + digits[2:]
-    if not digits.startswith("+") and digits.startswith("352"):
-        digits = "+" + digits
+    # The lab's fictional numbers are +1 (NANP); accept them written without the country code.
+    if not digits.startswith("+") and len(digits) == 10:
+        digits = "+1" + digits
     return digits
 
 

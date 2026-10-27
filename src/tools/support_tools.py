@@ -50,7 +50,7 @@ def check_equipment(
 
 @tool(approval_mode="never_require")
 def get_known_incidents(
-    postcode: Annotated[str | None, Field(description="Customer postcode, for example L-0001.")] = None,
+    postcode: Annotated[str | None, Field(description="Customer postcode, for example MV-0001.")] = None,
     area: Annotated[str | None, Field(description="Customer area name.")] = None,
 ) -> dict[str, Any]:
     """List known network incidents for a postcode or area from the synthetic operations system (lab capability)."""

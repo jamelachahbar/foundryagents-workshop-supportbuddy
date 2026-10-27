@@ -24,7 +24,7 @@ function whoLabel(message, view) {
   return null;
 }
 
-// Agents answer in Markdown. This renders only **bold**, "- " bullets and "1. " numbered lists, building DOM
+// Agents answer in Markdown. This renders only **bold**, `code`, "- " bullets and "1. " numbered lists, building DOM
 // nodes (no HTML parsing), which is enough for SupportBuddy's answer format.
 function richText(text) {
   const fragment = document.createDocumentFragment();
@@ -46,8 +46,9 @@ function richText(text) {
 function inline(node, text) {
   // Foundry-run knowledge tools cite as 【0:search_idx†Title】; show the title as [Title].
   text = text.replace(/【[^†】]*†([^】]+)】/g, " [$1]");
-  text.split(/(\*\*[^*]+\*\*)/).forEach((part) => {
+  text.split(/(\*\*[^*]+\*\*|`[^`]+`)/).forEach((part) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) node.append(el("strong", null, part.slice(2, -2)));
+    else if (part.startsWith("`") && part.endsWith("`") && part.length > 2) node.append(el("code", null, part.slice(1, -1)));
     else if (part) node.append(document.createTextNode(part));
   });
   return node;

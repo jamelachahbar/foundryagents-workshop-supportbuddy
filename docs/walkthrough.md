@@ -177,13 +177,13 @@ ID, e-mail or phone number. Stop DevUI with `Ctrl+C` before the next stage.
 ```powershell
 Copy-Item solutions/stage_2_identify_customer.py main.py
 Copy-Item solutions/stage_2_identify_customer.instructions.md main.instructions.md
-uv run python main.py "My internet is down. My phone number is +352 600 000 999."
+uv run python main.py "My internet is down. My phone number is +1 202 555 0999."
 ```
 
 With a prompt, `main.py` answers in the console and prints every tool call:
 
 ```text
-  [tool call]   identify_customer {"phone":"+352 600 000 999"}
+  [tool call]   identify_customer {"phone":"+1 202 555 0999"}
   [tool result] {"found": false, "reason": "not_found", "message": "No customer matches the identifier(s) provided.", ...}
 
 Agent: I couldn't find a customer with that phone number.
@@ -200,11 +200,11 @@ asks for another identifier instead of inventing a customer.
 ```powershell
 Copy-Item solutions/stage_3_back_office.py main.py
 Copy-Item solutions/stage_3_back_office.instructions.md main.instructions.md
-uv run python main.py "Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103."
+uv run python main.py "Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103."
 ```
 
 ```text
-  [tool call]   identify_customer {"phone":"+352 600 000 103"}
+  [tool call]   identify_customer {"phone":"+1 202 555 0103"}
   [tool result] {"found": true, "customer": {"customer_id": "CUST-1003", "name": "Sofia Costa", ... "line_ids": ["LINE-2003"]}, ...}
   [tool call]   get_line_status {"line_id":"LINE-2003"}
   [tool result] {"found": true, "line": {"line_id": "LINE-2003", ... "sync": "up", ... "measured_mbps": {"down": 492, "up": 247}, ...
@@ -247,7 +247,7 @@ Copy-Item solutions/stage_5_correlation.instructions.md main.instructions.md
 uv run python main.py
 ```
 
-In DevUI, ask `Hi, I'm anna.weber@example.com, my internet stopped this morning.` The **Traces** panel on
+In DevUI, ask `Hi, I'm anna.weber@example.com, my internet stopped this morning.` The **Events** panel on
 the right shows the four tool calls.
 
 ![Stage 5 in DevUI: four checks, the fibre incident explains the outage, no restart advice](assets/walkthrough/stage-05-devui-correlation.png)
@@ -277,7 +277,7 @@ uv run python main.py "CUST-1004: constant disconnections for three days."
 ```text
   [tool call]   identify_customer {"customer_id":"CUST-1004"}
   [tool call]   get_line_status {"line_id":"LINE-2004"}
-  [tool call]   get_known_incidents {"postcode":"L-0004"}
+  [tool call]   get_known_incidents {"postcode":"MV-0004"}
   [tool call]   check_equipment {"customer_id":"CUST-1004"}
 
 Agent: This looks like a line fault rather than a Wi-Fi issue. Your line is unstable with many resyncs and
@@ -386,7 +386,7 @@ Copy-Item solutions/stage_8_knowledge.instructions.md main.instructions.md
 uv run python main.py
 ```
 
-In DevUI: `Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.`
+In DevUI: `Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.`
 
 ![Stage 8: the answer cites the runbooks it used](assets/walkthrough/stage-08-devui-runbooks.png)
 
@@ -429,7 +429,7 @@ uv run python main.py "Mon modem ne répond plus, je suis le client CUST-1002."
 ```text
   [tool call]   network___identify_customer {"customer_id":"CUST-1002"}
   [tool call]   network___get_line_status {"line_id":"LINE-2002"}
-  [tool call]   network___get_known_incidents {"postcode":"L-0002"}
+  [tool call]   network___get_known_incidents {"postcode":"MV-0002"}
   [tool call]   network___check_equipment {"customer_id":"CUST-1002"}
   [tool call]   runbooks___knowledge_base_retrieve {"query_variants":["modem not responding, line up, no incident", ...]}
 
@@ -461,7 +461,7 @@ Prompt agent 'lab-demo-supportbuddy-prompt' version 1 published.
 
   [tool call, run by Foundry] network___identify_customer {"customer_id":"CUST-1004"}
   [tool call, run by Foundry] network___get_line_status {"line_id":"LINE-2004"}
-  [tool call, run by Foundry] network___get_known_incidents {"postcode":"L-0004"}
+  [tool call, run by Foundry] network___get_known_incidents {"postcode":"MV-0004"}
   [tool call, run by Foundry] network___check_equipment {"customer_id":"CUST-1004"}
   [tool call, run by Foundry] runbooks___knowledge_base_retrieve {...}
 

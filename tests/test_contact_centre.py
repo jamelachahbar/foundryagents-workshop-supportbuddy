@@ -98,7 +98,7 @@ def test_desk_learns_the_customer_supportbuddy_identified():
     )
     centre = ContactCentre(agents, signs_in=False, agent_label="test")
     conversation = centre.start(None)
-    run(centre.customer_message(conversation, "Phone +352 600 000 103"))
+    run(centre.customer_message(conversation, "Phone +1 202 555 0103"))
     assert conversation.identified == {"customer_id": "CUST-1003", "name": "Sofia Costa"}
     assert conversation.summary()["identified"]["customer_id"] == "CUST-1003"
 

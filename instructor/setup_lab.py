@@ -90,6 +90,9 @@ def main() -> int:
         "AZURE_AI_MODEL_DEPLOYMENT_NAME": values["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
         "AZURE_AI_EMBEDDING_DEPLOYMENT_NAME": values["AZURE_AI_EMBEDDING_DEPLOYMENT_NAME"],
         "AZURE_AI_SEARCH_ENDPOINT": values["AZURE_AI_SEARCH_ENDPOINT"],
+        # Set the shared names here so a src/.env left over from another environment cannot override them.
+        "FOUNDRY_KNOWLEDGE_BASE_NAME": "supportbuddy-runbooks",
+        "FOUNDRY_MEMORY_STORE_NAME": "supportbuddy-memory",
         # The lab scripts need a participant prefix; the shared resources do not use it.
         "WORKSHOP_RESOURCE_PREFIX": os.getenv("WORKSHOP_RESOURCE_PREFIX", "lab-setup"),
         "PYTHONIOENCODING": "utf-8",

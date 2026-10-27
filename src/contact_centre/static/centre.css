@@ -112,6 +112,7 @@ ol.md-list { list-style: decimal; }
 .msg.customer .bubble .who { color: rgba(255, 255, 255, .75); }
 .text { white-space: pre-wrap; }
 .md-line { min-height: .5em; white-space: pre-wrap; }
+.bubble code { font-family: "Cascadia Code", Consolas, monospace; font-size: .9em; background: rgba(255, 255, 255, .08); padding: 0 4px; border-radius: 4px; }
 .md-list li { margin: 2px 0; }
 
 .msg.system { justify-content: center; text-align: center; }

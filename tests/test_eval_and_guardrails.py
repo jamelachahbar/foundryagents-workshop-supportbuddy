@@ -88,7 +88,7 @@ def test_every_kind_of_expectation_adds_a_check():
         "expected_tools": ["identify_customer"],
         "expected_decision": "handover",
         "expected_runbooks": ["RB-07"],
-        "must_not_contain": ["+352600000101"],
+        "must_not_contain": ["+12025550101"],
     }
     assert len(evaluate.checks_for(case)) == 4
     assert evaluate.checks_for({}) == []
