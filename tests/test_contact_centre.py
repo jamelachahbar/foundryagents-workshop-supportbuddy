@@ -184,8 +184,9 @@ def test_assist_works_for_the_advisor_only():
     assert conversation.assist_transcript[-1]["role"] == "approval"
     run(centre.assist_approval(conversation, "Lea", "a-1", True))
     assert agents.calls[3][1]["resume"][0]["payload"] == {"approved": True}
-    # The customer is told about an action on their service, and who approved it.
-    assert "Lea approved an action on your service" in conversation.transcript[-1]["text"]
+    # The customer is told about an action on their service, and who took it; SupportBuddy learns it is done.
+    assert conversation.transcript[-1]["text"].startswith("Lea restarted your modem remotely.")
+    assert "do not run it again" in conversation.agent_history[-1]["content"]
 
 
 def test_signed_in_conversations_use_one_agent_per_customer():

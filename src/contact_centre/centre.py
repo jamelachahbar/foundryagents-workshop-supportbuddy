@@ -39,6 +39,11 @@ APPROVAL_TEXT = {
     "restart_modem": "Restart the modem remotely? The connection drops for about 3 minutes.",
 }
 
+# What the customer (and SupportBuddy) are told once an advisor's approved action has run.
+DONE_TEXT = {
+    "restart_modem": "restarted your modem remotely. The connection drops for about 3 minutes, then comes back.",
+}
+
 Runner = Callable[[str, dict[str, Any]], AsyncIterator[dict[str, Any]]]
 
 
@@ -159,9 +164,12 @@ class ContactCentre:
         self.store.publish_assist(conversation, approval)
         if approved:
             # The customer sees every action taken on their service, and who approved it.
-            note = f"{advisor} approved an action on your service: {APPROVAL_TEXT.get(approval['tool'], approval['tool'])}"
-            self.store.add(conversation, "system", note.rstrip("?"))
-            conversation.agent_history.append({"id": uuid.uuid4().hex, "role": "assistant", "content": f"({note})"})
+            done = DONE_TEXT.get(approval["tool"], f"ran {approval['tool']} on your service.")
+            self.store.add(conversation, "system", f"{advisor} {done}")
+            conversation.agent_history.append({
+                "id": uuid.uuid4().hex, "role": "assistant",
+                "content": f"(Human advisor {advisor} {done} This is done; do not run it again.)",
+            })
         resume = [{"interruptId": interrupt_id, "status": "resolved", "payload": {"approved": approved}}]
         await self._run_assist(conversation, resume=resume)
 

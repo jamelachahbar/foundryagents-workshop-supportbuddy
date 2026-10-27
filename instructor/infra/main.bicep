@@ -41,6 +41,9 @@ param resourceTags string = ''
 @description('Optional: URL (ending in /mcp) of a network MCP server that already runs elsewhere, or "none". Either skips Container Apps.')
 param externalNetworkMcpUrl string = ''
 
+@description('Set by azd once the MCP server app exists, so provisioning again keeps the deployed image.')
+param networkMcpExists bool = false
+
 var extraTags = toObject(filter(split(resourceTags, ';'), pair => contains(pair, '=')), pair => trim(split(pair, '=')[0]), pair => trim(substring(pair, indexOf(pair, '=') + 1)))
 var tags = union(extraTags, { 'azd-env-name': environmentName, purpose: 'SupportBuddy workshop (synthetic data)' })
 
@@ -63,6 +66,7 @@ module lab 'resources.bicep' = {
     chatModel: { name: chatModelName, version: chatModelVersion, sku: chatModelSku, capacity: int(chatModelCapacity) }
     embeddingModel: { name: embeddingModelName, version: embeddingModelVersion, sku: embeddingModelSku, capacity: embeddingModelCapacity }
     externalNetworkMcpUrl: externalNetworkMcpUrl
+    networkMcpExists: networkMcpExists
   }
 }
 

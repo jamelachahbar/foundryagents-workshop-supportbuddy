@@ -13,6 +13,7 @@
     "chatModelSku": { "value": "${CHAT_MODEL_SKU=GlobalStandard}" },
     "chatModelCapacity": { "value": "${CHAT_MODEL_CAPACITY=100}" },
     "resourceTags": { "value": "${AZURE_RESOURCE_TAGS=}" },
-    "externalNetworkMcpUrl": { "value": "${EXTERNAL_NETWORK_MCP_URL=}" }
+    "externalNetworkMcpUrl": { "value": "${EXTERNAL_NETWORK_MCP_URL=}" },
+    "networkMcpExists": { "value": "${SERVICE_NETWORK_MCP_RESOURCE_EXISTS=false}" }
   }
 }

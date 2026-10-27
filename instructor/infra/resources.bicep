@@ -8,6 +8,7 @@ param participantsGroupId string
 param chatModel object
 param embeddingModel object
 param externalNetworkMcpUrl string
+param networkMcpExists bool
 
 var suffix = uniqueString(resourceGroup().id)
 var projectName = 'supportbuddy'
@@ -21,6 +22,7 @@ var roles = {
   searchIndexDataContributor: '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
   searchServiceContributor: '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
+  cognitiveServicesOpenAIUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
 }
 
 // ----- Foundry: account, project, models, guardrail -----------------------------------------
@@ -140,6 +142,11 @@ resource containerEnv 'Microsoft.App/managedEnvironments@2024-03-01' = if (hostN
   }
 }
 
+module deployedImage 'current-image.bicep' = if (hostNetworkMcp) {
+  name: 'network-mcp-current-image'
+  params: { exists: networkMcpExists, name: 'supportbuddy-network-mcp' }
+}
+
 resource networkMcp 'Microsoft.App/containerApps@2024-03-01' = if (hostNetworkMcp) {
   name: 'supportbuddy-network-mcp'
   location: location
@@ -156,8 +163,8 @@ resource networkMcp 'Microsoft.App/containerApps@2024-03-01' = if (hostNetworkMc
       containers: [
         {
           name: 'main'
-          // Placeholder until `azd deploy` builds and pushes the MCP server image.
-          image: 'mcr.microsoft.com/k8se/quickstart:latest'
+          // Placeholder until `azd deploy` builds and pushes the MCP server image; kept on later provisions.
+          image: networkMcpExists ? deployedImage!.outputs.image : 'mcr.microsoft.com/k8se/quickstart:latest'
           resources: { cpu: json('0.25'), memory: '0.5Gi' }
         }
       ]
@@ -168,6 +175,30 @@ resource networkMcp 'Microsoft.App/containerApps@2024-03-01' = if (hostNetworkMc
 }
 
 // ----- Role assignments ----------------------------------------------------------------------
+
+// Foundry Memory (Stage 11) and hosted agents (Stage 14) call the model deployments with the project's identity.
+var projectModelRoles = [roles.cognitiveServicesOpenAIUser, roles.foundryUser]
+
+resource projectUsesModels 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in projectModelRoles: {
+  scope: account
+  name: guid(account.id, project.id, role)
+  properties: {
+    principalId: project.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', role)
+  }
+}]
+
+// Foundry Memory also calls the embedding deployment with the Foundry resource's own identity.
+resource accountUsesModels 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: account
+  name: guid(account.id, 'account-identity', roles.cognitiveServicesOpenAIUser)
+  properties: {
+    principalId: account.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.cognitiveServicesOpenAIUser)
+  }
+}
 
 // The toolbox calls the knowledge base with the project's managed identity (Stage 9).
 resource projectReadsSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

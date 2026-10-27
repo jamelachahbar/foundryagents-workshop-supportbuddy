@@ -342,6 +342,7 @@ Agent(
 > ```
 >
 > You can also run a reference directly: `uv run python -m solutions.stage_5_correlation`.
+> [walkthrough.md](walkthrough.md) does exactly this for every stage, with screenshots of what you should see.
 
 ---
 
@@ -945,7 +946,7 @@ Now play the advisor, on the **Operator desk**:
    who decides. When you approve, the customer is told which action was taken on their service, and by
    whom; the restart appears under **Approved actions**.
 5. **Hand back to SupportBuddy**, and as the customer, ask a follow-up question: SupportBuddy answers again,
-   knowing what the advisor said. Or **Close conversation**: the handover record is marked resolved with your
+   knowing what the advisor said and did (it does not restart the modem a second time). Or **Close conversation**: the handover record is marked resolved with your
    last message, which is what `get_handover_status` returns if the customer asks about `HO-...` later.
 
 #### Scenario C: approve an action (customer chat)
@@ -1760,7 +1761,8 @@ The instructions, the toolbox and the handover function do not change.
    ```
 
    `azd deploy` uploads the code (no Docker needed), Foundry installs `requirements.txt` and starts the
-   agent. The first call takes a few seconds longer (cold start).
+   agent. The first call takes a few seconds longer (cold start). `azd ai agent invoke` keeps the
+   conversation between calls: add `--new-conversation` before asking about another customer.
 
 5. In the portal, open **Build > Agents**: your prompt agent and your hosted agent sit side by side. Chat
    with the hosted agent in the playground and hand a case over (`CUST-1004`): the handover works.

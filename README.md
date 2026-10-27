@@ -74,6 +74,7 @@ system or record.
 
 ```text
 docs/workshop.md                  participant guide (start here)
+docs/walkthrough.md               fast click-through of the whole lab with screenshots (dry run, catch-up)
 instructor/setup.md               lab environment setup: `azd up` in any tenant, or by hand (+ guardrail.json)
 instructor/azure.yaml, infra/     the lab environment as code (Bicep) and its post-provision script (setup_lab.py)
 src/main.py                       your agent - you extend it at each stage
