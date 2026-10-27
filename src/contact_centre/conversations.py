@@ -33,6 +33,8 @@ class Conversation:
     busy: bool = False
     advisor: str | None = None
     handover: dict[str, Any] | None = None
+    # Set when SupportBuddy identifies the customer in a chat that did not sign in.
+    identified: dict[str, str] | None = None
     created_at: str = field(default_factory=now)
     # What the customer and the advisor see.
     transcript: list[dict[str, Any]] = field(default_factory=list)
@@ -52,6 +54,7 @@ class Conversation:
             "busy": self.busy,
             "advisor": self.advisor,
             "handover": self.handover,
+            "identified": self.identified,
             "created_at": self.created_at,
             "last_message": last["text"][:140] if last else "",
         }

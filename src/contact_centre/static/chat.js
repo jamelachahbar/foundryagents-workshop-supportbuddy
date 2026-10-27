@@ -1,6 +1,20 @@
 // Customer chat: one conversation, owned by the contact centre.
 const state = { conversation: null, source: null, config: null };
 const STORAGE_KEY = "supportbuddy-conversation";
+const input = composer($("#text"), $("#composer"));
+
+// One click starts a lab scenario; the signed-in channel already knows who the customer is.
+const SUGGESTIONS = [
+  "Hi, I'm anna.weber@example.com, my internet stopped this morning.",
+  "Hello, I'm customer CUST-1005. I have no internet at all since this morning, nothing loads on any device.",
+  "I'm CUST-1002, my modem doesn't respond since this morning. Please restart it remotely for me.",
+  "Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.",
+];
+const SIGNED_IN_SUGGESTIONS = [
+  "My modem doesn't respond since this morning.",
+  "Wi-Fi is very slow upstairs, but cable works.",
+  "I'd like to talk to a person, please.",
+];
 
 async function init() {
   state.config = await (await fetch("/api/config")).json();
@@ -14,11 +28,12 @@ async function init() {
 
 function showStart() {
   $("#start").hidden = false;
-  $("#messages").hidden = $("#composer").hidden = $("#restart").hidden = true;
+  $("#messages").hidden = $("#dock").hidden = $("#new").hidden = true;
   $("#mode").textContent = "";
-  if (state.config.signs_in) {
-    $("#signin").hidden = false;
-    $("#start-help").textContent = "This agent remembers customers, so the channel signs you in first. Pick a lab customer.";
+  const signsIn = state.config.signs_in;
+  $("#signin").hidden = !signsIn;
+  if (signsIn) {
+    $("#start-help").textContent = "This agent remembers customers, so the channel signs you in first. Pick a lab customer, then start.";
     $("#customer").replaceChildren(
       ...state.config.customers.map((c) => {
         const option = el("option", null, `${c.customer_id} - ${c.name}`);
@@ -27,20 +42,32 @@ function showStart() {
       }),
     );
   } else {
-    $("#start-help").textContent = "SupportBuddy will ask who you are. Try CUST-1005 for a handover, or CUST-1002 for a remote restart.";
+    $("#start-help").textContent = "Tell me what's wrong with your connection. I check your line, your area and your modem, and bring in a person when needed.";
   }
+  $("#suggestions").replaceChildren(
+    ...(signsIn ? SIGNED_IN_SUGGESTIONS : SUGGESTIONS).map((text) => {
+      const chip = el("button", "chip", text);
+      chip.type = "button";
+      chip.addEventListener("click", () => begin(text));
+      return chip;
+    }),
+  );
 }
 
-$("#begin").addEventListener("click", async () => {
+async function begin(firstMessage) {
+  $("#start-error").textContent = "";
   try {
     const customer_id = state.config.signs_in ? $("#customer").value : null;
     const conversation = await postJSON("/api/conversations", { customer_id });
     sessionStorage.setItem(STORAGE_KEY, conversation.id);
     connect(conversation.id);
+    if (firstMessage) await postJSON(`/api/conversations/${conversation.id}/messages`, { text: firstMessage });
   } catch (error) {
     $("#start-error").textContent = error.message;
   }
-});
+}
+
+$("#begin").addEventListener("click", () => begin(null));
 
 function connect(id) {
   state.source?.close();
@@ -48,9 +75,10 @@ function connect(id) {
     if (event.type === "snapshot") {
       state.conversation = event.conversation;
       $("#start").hidden = true;
-      $("#messages").hidden = $("#composer").hidden = false;
+      $("#messages").hidden = $("#dock").hidden = $("#new").hidden = false;
       $("#messages").replaceChildren();
       for (const message of event.conversation.transcript) upsertMessage($("#messages"), message, "customer", approve);
+      scrollToEnd($("#messages"));
       renderState();
     } else if (event.type === "message") {
       upsertMessage($("#messages"), event.message, "customer", approve);
@@ -73,9 +101,11 @@ function renderState() {
   const pill = $("#mode");
   pill.className = `pill ${c.mode}`;
   pill.textContent = c.mode === "advisor" ? `${c.advisor} (human advisor)` : MODE_LABEL[c.mode];
-  $("#typing").textContent = c.busy ? "SupportBuddy is working on it..." : "";
+  $("#typing").textContent = c.busy ? "SupportBuddy is working on it" : "";
   const closed = c.mode === "closed";
   $("#text").disabled = $("#send").disabled = closed || c.busy;
+  $("#text").placeholder = c.mode === "waiting" ? "An advisor will join shortly; you can keep writing" : "Write your message";
+  $("#composer").hidden = $("#hint").hidden = closed;
   $("#restart").hidden = !closed;
   if (!c.busy && !closed) $("#text").focus();
 }
@@ -87,16 +117,9 @@ $("#composer").addEventListener("submit", async (event) => {
   $("#error").textContent = "";
   try {
     await postJSON(`/api/conversations/${state.conversation.id}/messages`, { text });
-    $("#text").value = "";
+    input.clear();
   } catch (error) {
     $("#error").textContent = error.message;
-  }
-});
-
-$("#text").addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    $("#composer").requestSubmit();
   }
 });
 
@@ -108,10 +131,13 @@ async function approve(message, approved) {
   }
 }
 
-$("#restart").addEventListener("click", () => {
+function startOver() {
   sessionStorage.removeItem(STORAGE_KEY);
   state.source?.close();
   showStart();
-});
+}
+
+$("#restart").addEventListener("click", startOver);
+$("#new").addEventListener("click", startOver);
 
 init();

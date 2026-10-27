@@ -173,6 +173,10 @@ azd ai connection create supportbuddy-runbooks-kb --kind remote-tool \
 uv run python memory_store.py create
 ```
 
+Foundry Memory calls the embedding and chat deployments with managed identities: grant **Cognitive Services
+OpenAI User** on the Foundry resource to both the **project's** and the **Foundry resource's** managed identity.
+Without it, memory searches and updates fail with `401` and the agent silently remembers nothing.
+
 ### 6. Guardrail (Stage 13)
 
 `guardrail.json` is the default policy plus **Indirect Attack** detection.

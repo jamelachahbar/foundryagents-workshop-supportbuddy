@@ -7,65 +7,91 @@
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/centre.css">
 </head>
-<body>
-  <header>
-    <img src="/icon.svg" alt="" width="32" height="32">
-    <h1>SupportBuddy <span>Operator desk</span></h1>
+<body class="workspace">
+  <header class="topbar">
+    <div class="brand">
+      <img src="/icon.svg" alt="" width="32" height="32">
+      <div>
+        <h1>SupportBuddy <span>Operator desk</span></h1>
+        <small>Training lab: synthetic data. In production advisors sign in with Microsoft Entra ID.</small>
+      </div>
+    </div>
     <label>Advisor <input id="advisor" maxlength="60" value="Lea"></label>
   </header>
-  <p class="banner">Training lab: synthetic customers and systems only. Not a POST system. In production advisors sign in with Microsoft Entra ID.</p>
   <main class="desk">
-    <section>
-      <h2>Conversations</h2>
-      <ul id="queue" class="queue"></ul>
-      <p id="queue-empty" class="empty">No conversations yet. Open the customer chat in another tab.</p>
-      <h3>Approved actions</h3>
-      <ul id="actions" class="actions-log"></ul>
+    <section class="pane" aria-label="Conversations">
+      <div class="pane-head"><h2>Conversations <span id="queue-count" class="pill plain"></span></h2></div>
+      <div class="scroller">
+        <ul id="queue" class="queue"></ul>
+        <p id="queue-empty" class="empty">No conversations yet. Open the customer chat in another tab.</p>
+        <h3 class="section-title">Approved actions</h3>
+        <ul id="actions" class="actions-log"></ul>
+        <p id="actions-empty" class="muted">None yet.</p>
+      </div>
     </section>
-    <section class="conversation">
-      <p id="pick" class="empty">Select a conversation.</p>
+
+    <section class="pane conversation" aria-label="Conversation">
+      <p id="pick" class="empty">Select a conversation on the left.</p>
       <div id="detail" hidden>
-        <h2><span id="title"></span> <span id="mode" class="pill"></span></h2>
-        <div id="handover" class="handover" hidden>
-          <dl>
-            <dt>Handover</dt><dd id="h-id"></dd>
-            <dt>Reported problem</dt><dd id="h-problem"></dd>
-            <dt>Could not determine</dt><dd id="h-unresolved"></dd>
-            <dt>Next investigation</dt><dd id="h-next"></dd>
-            <dt>Preferred contact</dt><dd id="h-contact"></dd>
-          </dl>
-          <h3>Evidence collected by SupportBuddy</h3>
-          <ul id="h-evidence"></ul>
+        <div class="pane-head">
+          <div class="conversation-head">
+            <h2><span id="title"></span> <span id="mode" class="pill"></span></h2>
+            <div class="toolbar">
+              <button id="take" type="button">Take conversation</button>
+              <button id="handback" class="secondary" type="button">Hand back to SupportBuddy</button>
+              <button id="close" class="ghost" type="button">Close</button>
+            </div>
+          </div>
         </div>
-        <h3>Live conversation</h3>
-        <ul id="messages" class="messages"></ul>
-        <form id="composer" class="composer">
-          <textarea id="text" maxlength="2000" placeholder="Write to the customer" aria-label="Message to the customer"></textarea>
-          <button id="send" type="submit">Send</button>
-        </form>
-        <div class="toolbar">
-          <button id="take" type="button">Take conversation</button>
-          <button id="handback" class="secondary" type="button">Hand back to SupportBuddy</button>
-          <button id="close" class="secondary" type="button">Close conversation</button>
+        <div class="scroller" id="conversation-scroller">
+          <details id="handover" class="handover" open hidden>
+            <summary>Handover from SupportBuddy: <span id="h-id"></span></summary>
+            <div class="body">
+              <dl>
+                <dt>Reported problem</dt><dd id="h-problem"></dd>
+                <dt>Could not determine</dt><dd id="h-unresolved"></dd>
+                <dt>Next investigation</dt><dd id="h-next"></dd>
+                <dt>Preferred contact</dt><dd id="h-contact"></dd>
+              </dl>
+              <h3 class="section-title">Evidence collected</h3>
+              <ul id="h-evidence"></ul>
+            </div>
+          </details>
+          <p class="divider">Live conversation</p>
+          <ul id="messages" class="messages" aria-live="polite"></ul>
         </div>
-        <p class="error" id="error" role="alert"></p>
+        <div class="pane-foot">
+          <form id="composer" class="composer">
+            <textarea id="text" rows="1" maxlength="2000" placeholder="Write to the customer" aria-label="Message to the customer"></textarea>
+            <button id="send" type="submit">Send</button>
+          </form>
+          <p class="error" id="error" role="alert"></p>
+        </div>
       </div>
     </section>
-    <section class="assist">
-      <h2>Advisor assist <span class="pill">AI, only you see this</span></h2>
-      <div class="toolbar">
-        <button type="button" class="secondary" data-prompt="Summarise the case.">Summarise</button>
-        <button type="button" class="secondary" data-prompt="Suggest a reply to the customer.">Suggest a reply</button>
-        <button type="button" class="secondary" data-prompt="Check the line, incidents and modem again and tell me what changed.">Check again</button>
-        <button type="button" class="secondary" data-prompt="Restart the customer's modem remotely.">Restart modem</button>
+
+    <section class="pane assist" aria-label="Advisor assist">
+      <div class="pane-head">
+        <h2>Advisor assist <span class="pill plain">AI, only you see this</span></h2>
+        <div class="chips">
+          <button type="button" class="chip" data-prompt="Summarise the case.">Summarise</button>
+          <button type="button" class="chip" data-prompt="Suggest a reply to the customer.">Suggest a reply</button>
+          <button type="button" class="chip" data-prompt="Check the line, incidents and modem again and tell me what changed.">Check again</button>
+          <button type="button" class="chip" data-prompt="Restart the customer's modem remotely.">Restart modem</button>
+        </div>
       </div>
-      <ul id="assist" class="messages"></ul>
-      <p id="assist-typing" class="typing"></p>
-      <form id="assist-form" class="composer">
-        <textarea id="assist-text" maxlength="2000" placeholder="Ask the assist agent" aria-label="Ask the assist agent"></textarea>
-        <button id="assist-send" type="submit">Ask</button>
-      </form>
-      <p class="error" id="assist-error" role="alert"></p>
+      <div class="scroller">
+        <ul id="assist" class="messages"></ul>
+        <p id="assist-empty" class="empty">Select a conversation, then ask for a summary, a reply, a new check or an action.</p>
+      </div>
+      <div class="pane-foot">
+        <p id="assist-typing" class="typing"></p>
+        <form id="assist-form" class="composer">
+          <textarea id="assist-text" rows="1" maxlength="2000" placeholder="Ask the assist agent" aria-label="Ask the assist agent"></textarea>
+          <button id="assist-send" type="submit">Ask</button>
+        </form>
+        <p class="error" id="assist-error" role="alert"></p>
+      </div>
     </section>
   </main>
   <script src="/common.js"></script>

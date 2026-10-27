@@ -2,6 +2,8 @@
 const state = { conversations: new Map(), actions: [], selected: null };
 const ORDER = { waiting: 0, advisor: 1, agent: 2, closed: 3 };
 const advisor = () => $("#advisor").value.trim() || "Advisor";
+const reply = composer($("#text"), $("#composer"));
+const ask = composer($("#assist-text"), $("#assist-form"));
 
 listen("/api/desk/events", (event) => {
   if (event.type === "snapshot") {
@@ -49,15 +51,31 @@ function renderQueue() {
   );
   $("#queue").replaceChildren(
     ...items.map((c) => {
-      const li = el("li", c.mode, `${c.handover?.handover_id ?? "Chat"} - ${c.customer_id ?? c.handover?.customer_id ?? "not identified yet"}`);
-      li.append(el("small", null, `${c.mode === "advisor" ? c.advisor : MODE_LABEL[c.mode]}${c.busy ? " (answering)" : ""}`));
-      li.append(el("small", null, lastMessage(c)));
+      const customer = customerOf(c);
+      const li = el("li", c.mode);
+      li.tabIndex = 0;
+      li.setAttribute("role", "button");
+      li.append(
+        el("span", "avatar", customer ? customer.slice(-4) : "?"),
+        el("span", "title", `${c.identified?.name || customer || "Not identified yet"}${c.handover ? ` · ${c.handover.handover_id}` : ""}`),
+        el("time", null, clock(c.created_at)),
+        el("span", "status", `${c.mode === "advisor" ? `${c.advisor} (human advisor)` : MODE_LABEL[c.mode]}${c.busy ? " · answering" : ""}`),
+        el("span", "preview", lastMessage(c)),
+      );
       li.classList.toggle("selected", c.id === state.selected);
-      li.addEventListener("click", () => { state.selected = c.id; renderQueue(); renderDetail(); });
+      const open = () => { state.selected = c.id; renderQueue(); renderDetail(); };
+      li.addEventListener("click", open);
+      li.addEventListener("keydown", (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } });
       return li;
     }),
   );
   $("#queue-empty").hidden = items.length > 0;
+  const waiting = items.filter((c) => c.mode === "waiting").length;
+  $("#queue-count").textContent = waiting ? `${waiting} waiting` : items.length ? `${items.length}` : "";
+}
+
+function customerOf(c) {
+  return c.customer_id ?? c.identified?.customer_id ?? c.handover?.customer_id ?? null;
 }
 
 function lastMessage(c) {
@@ -69,10 +87,11 @@ function renderActions() {
   $("#actions").replaceChildren(
     ...state.actions.map((a) => {
       const li = el("li", null, `${a.action} - ${a.customer_id} (${a.equipment_id})`);
-      li.append(el("small", null, `approved and run at ${a.requested_at}`));
+      li.append(el("small", null, `approved and run at ${clock(a.requested_at)}`));
       return li;
     }),
   );
+  $("#actions-empty").hidden = state.actions.length > 0;
 }
 
 function renderDetail() {
@@ -81,6 +100,7 @@ function renderDetail() {
   $("#detail").hidden = !c;
   if (!c) {
     $("#assist").replaceChildren();
+    $("#assist-empty").hidden = false;
     return;
   }
   $("#messages").replaceChildren();
@@ -88,19 +108,22 @@ function renderDetail() {
   $("#assist").replaceChildren();
   for (const message of c.assist) addAssist(message);
   renderControls();
+  scrollToEnd($("#messages"));
+  scrollToEnd($("#assist"));
 }
 
 function renderControls() {
   const c = state.conversations.get(state.selected);
   if (!c) return;
-  $("#title").textContent = `${c.handover?.handover_id ?? "Conversation"} - ${c.customer_id ?? c.handover?.customer_id ?? "customer not identified yet"}`;
+  const who = customerOf(c);
+  $("#title").textContent = `${c.handover?.handover_id ?? "Conversation"} - ${who ? `${who}${c.identified?.name ? ` (${c.identified.name})` : ""}` : "customer not identified yet"}`;
   const pill = $("#mode");
   pill.className = `pill ${c.mode}`;
   pill.textContent = c.mode === "advisor" ? `${c.advisor} (human advisor)` : MODE_LABEL[c.mode];
   const h = c.handover;
   $("#handover").hidden = !h;
   if (h) {
-    $("#h-id").textContent = `${h.handover_id} (created by SupportBuddy at ${h.created_at})`;
+    $("#h-id").textContent = `${h.handover_id}, ${clock(h.created_at)}`;
     $("#h-problem").textContent = h.reported_problem;
     $("#h-unresolved").textContent = h.unresolved_issue;
     $("#h-next").textContent = h.recommended_next_investigation;
@@ -114,21 +137,25 @@ function renderControls() {
   $("#text").disabled = $("#send").disabled = !mine;
   $("#text").placeholder = mine ? "Write to the customer" : "Take the conversation to write to the customer";
   const assistOff = c.assist_busy || c.mode === "closed";
-  for (const b of document.querySelectorAll(".assist button")) b.disabled = assistOff;
-  $("#assist-typing").textContent = c.assist_busy ? "The assist agent is working..." : "";
+  for (const b of document.querySelectorAll(".assist .chips button, #assist-send")) b.disabled = assistOff;
+  $("#assist-text").disabled = assistOff;
+  $("#assist-typing").textContent = c.assist_busy ? "The assist agent is working" : "";
+  $("#assist-empty").hidden = c.assist.length > 0;
 }
 
 function addAssist(message) {
+  $("#assist-empty").hidden = true;
   upsertMessage($("#assist"), message, "assist", approveAssist);
   // A suggested reply can be copied into the reply box; the advisor still decides what to send.
   if (message.role === "agent" && message.text.includes("Suggested reply:")) {
-    const node = $(`#assist [data-id="${CSS.escape(message.id)}"]`);
+    const bubble = $(`#assist [data-id="${CSS.escape(message.id)}"] .bubble`);
     const use = el("button", "secondary", "Use as reply");
     use.addEventListener("click", () => {
       $("#text").value = message.text.split("Suggested reply:").pop().trim();
+      reply.fit();
       $("#text").focus();
     });
-    node.append(el("div"), use);
+    bubble.append(use);
   }
 }
 
@@ -150,14 +177,7 @@ $("#close").addEventListener("click", () => act("close"));
 $("#composer").addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = $("#text").value.trim();
-  if (text && (await act("messages", { text }))) $("#text").value = "";
-});
-
-$("#text").addEventListener("keydown", (event) => {
-  if (event.key === "Enter" && !event.shiftKey) {
-    event.preventDefault();
-    $("#composer").requestSubmit();
-  }
+  if (text && (await act("messages", { text }))) reply.clear();
 });
 
 async function askAssist(text) {
@@ -178,7 +198,7 @@ for (const button of document.querySelectorAll("[data-prompt]")) {
 $("#assist-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = $("#assist-text").value.trim();
-  if (text && (await askAssist(text))) $("#assist-text").value = "";
+  if (text && (await askAssist(text))) ask.clear();
 });
 
 async function approveAssist(message, approved) {

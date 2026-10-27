@@ -905,7 +905,8 @@ From now on you work with three terminals, all in `src`:
 3. Start the contact centre in the third terminal and open http://127.0.0.1:8070. Open the **Customer
    chat** and the **Operator desk** in two browser tabs, side by side.
 
-The synthetic data is fixed, so these always produce the same evidence.
+The synthetic data is fixed, so these always produce the same evidence. The customer chat offers each
+scenario as a suggestion: click it, or type the message yourself.
 
 ### Try it
 
@@ -922,7 +923,7 @@ a "What I checked" list, no restart advice, no handover.
 
 #### Scenario B: a live handover
 
-Click **Start a new conversation** if needed, then:
+Click **New conversation** (top right of the customer chat), then:
 
 ```text
 Hello, I'm customer CUST-1005. I have no internet at all since this morning, nothing loads on any device.
@@ -946,7 +947,7 @@ Now play the advisor, on the **Operator desk**:
    who decides. When you approve, the customer is told which action was taken on their service, and by
    whom; the restart appears under **Approved actions**.
 5. **Hand back to SupportBuddy**, and as the customer, ask a follow-up question: SupportBuddy answers again,
-   knowing what the advisor said and did (it does not restart the modem a second time). Or **Close conversation**: the handover record is marked resolved with your
+   knowing what the advisor said and did (it does not restart the modem a second time). Or **Close**: the handover record is marked resolved with your
    last message, which is what `get_handover_status` returns if the customer asks about `HO-...` later.
 
 #### Scenario C: approve an action (customer chat)
@@ -1835,6 +1836,7 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | Authentication or `401`/`403` from Foundry | Run `az login` again; check you have the **Foundry User** role on the project. |
 | `429 Too Many Requests` | The shared model hit its rate limit. Wait a minute and retry. |
 | `reasoning` ... `not supported with this model` | Your chat model has no reasoning support: set `SUPPORTBUDDY_REASONING_EFFORT=off` in `.env`. |
+| `AzureCliCredential.get_token failed: Timed out waiting for Azure CLI` | The Azure CLI took too long to answer (slow or busy laptop). Run `az account get-access-token -o none` once, then try again. `Please run 'az login'` means your sign-in expired: `az login --tenant <tenant>`. |
 | DevUI shows **Authentication Required** | Paste the token from the banner at the top of the terminal output (also in `src/.devui_token`). |
 | `No module named 'mcp_server'` (or `solutions`, `lab_agent`) | Run the command from the `src` folder: `cd src`. |
 | Port 8090 or 8000 already in use | Stop the previous run (`Ctrl+C`), or set `DEVUI_PORT` / `MCP_PORT`. |
@@ -1845,7 +1847,7 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | Stage 11: the customer chat asks who is signed in | Memory stages need a signed-in customer; pick one. That is the channel signing the customer in. |
 | Stage 10: `prompt_agent.py ask` fails with `not found` | Publish it first: `uv run python prompt_agent.py create`. |
 | Stage 11: `This stage simulates a signed-in customer` | Add `--customer CUST-1002` (any lab customer ID). |
-| Stage 11: the agent does not remember anything | Memory extraction runs in the background; wait a minute and start a new conversation. Check with `uv run python memory_store.py show <customer>`. |
+| Stage 11: the agent does not remember anything | Memory extraction runs in the background; wait a minute and start a new conversation. Check with `uv run python memory_store.py show <customer>`. `Failed to search contextual memories ... 401`: the project's or Foundry resource's identity lacks model access (see `instructor/setup.md`), or new role assignments are still propagating. |
 | Stage 7: the agent asks "do you approve?" instead of showing an approval card | Re-read the **Remote modem restart** instructions: the agent must call `restart_modem` and let the platform ask. |
 | Stage 7: the console run ends without asking for approval | Approval needs an interactive terminal; in a pipe, the request is rejected. |
 | Stage 8: `Missing AZURE_AI_SEARCH_ENDPOINT` | Add the Azure AI Search endpoint your instructor gave you to `.env`. |

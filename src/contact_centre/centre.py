@@ -8,7 +8,6 @@ agent's events into what the customer and the advisor see.
 
 from __future__ import annotations
 
-import contextlib
 import json
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -50,6 +49,20 @@ Runner = Callable[[str, dict[str, Any]], AsyncIterator[dict[str, Any]]]
 def tool_name(name: str) -> str:
     """Toolbox tools carry a prefix (network___check_equipment); the contact centre ignores it."""
     return name.split("___")[-1]
+
+
+def tool_result(content: Any) -> dict[str, Any] | None:
+    """A tool result as a dict: plain JSON from a local tool, or an MCP result whose content holds the JSON text."""
+    try:
+        value = json.loads(content) if isinstance(content, str) else content
+        if isinstance(value, dict) and isinstance(value.get("content"), list) and "_meta" in value:
+            texts = [item.get("text") for item in value["content"] if isinstance(item, dict) and item.get("text")]
+            value = json.loads(texts[0]) if texts else value.get("structuredContent")
+        if isinstance(value, list) and value and isinstance(value[0], dict) and "text" in value[0]:
+            value = json.loads(value[0]["text"])
+    except (ValueError, TypeError):
+        return None
+    return value if isinstance(value, dict) else None
 
 
 def http_runner(base_url: str) -> Runner:
@@ -148,7 +161,7 @@ class ContactCentre:
         self.store.add_assist(conversation, "advisor", request, author=advisor)
         # The assist agent gets the case as it is now: the handover record and the live transcript.
         context = {
-            "customer_id": conversation.customer_id,
+            "customer_id": conversation.customer_id or (conversation.identified or {}).get("customer_id"),
             "handover": conversation.handover,
             "transcript": [
                 f"{m['role']}: {m['text']}" for m in conversation.transcript if m["role"] in ("customer", "agent", "advisor")
@@ -247,6 +260,7 @@ class ContactCentre:
             body["resume"] = resume
         texts: dict[str, dict[str, Any]] = {}
         calls: dict[str, str] = {}
+        announced: set[str] = set()
         handover: dict[str, Any] | None = None
         try:
             async for event in self.runner(path, body):
@@ -261,12 +275,20 @@ class ContactCentre:
                 elif kind == "TOOL_CALL_START":
                     name = tool_name(event.get("toolCallName", ""))
                     calls[event["toolCallId"]] = name
-                    add("activity", progress.get(name, f"Running {name}"), tool=name)
+                    # One progress line per kind of check, even if the agent repeats a lookup.
+                    if name not in announced:
+                        announced.add(name)
+                        add("activity", progress.get(name, f"Running {name}"), tool=name)
+                elif kind == "TOOL_CALL_RESULT" and calls.get(event.get("toolCallId")) == "identify_customer":
+                    if history_attr == "agent_history" and not conversation.customer_id:
+                        found = (tool_result(event.get("content")) or {}).get("customer") or {}
+                        if isinstance(found, dict) and found.get("customer_id"):
+                            conversation.identified = {"customer_id": found["customer_id"], "name": found.get("name", "")}
+                            self.store.publish_state(conversation)
                 elif kind == "TOOL_CALL_RESULT" and calls.get(event.get("toolCallId")) == HANDOVER_TOOL:
-                    with contextlib.suppress(ValueError, TypeError):
-                        result = json.loads(event.get("content") or "")
-                        if isinstance(result, dict) and result.get("handover_id"):
-                            handover = result
+                    result = tool_result(event.get("content"))
+                    if result and result.get("handover_id"):
+                        handover = result
                 elif kind == "MESSAGES_SNAPSHOT":
                     setattr(conversation, history_attr, event["messages"])
                 elif kind == "RUN_FINISHED":

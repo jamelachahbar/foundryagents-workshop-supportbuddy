@@ -8,20 +8,33 @@
   <link rel="stylesheet" href="/centre.css">
 </head>
 <body>
-  <header>
-    <img src="/icon.svg" alt="" width="32" height="32">
-    <h1>SupportBuddy <span>Contact centre</span></h1>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/icon.svg" alt="" width="32" height="32">
+      <div>
+        <h1>SupportBuddy <span>Contact centre</span></h1>
+        <small>Training lab: synthetic customers and systems only. Not a POST system.</small>
+      </div>
+    </div>
   </header>
-  <p class="banner">Training lab: synthetic customers and systems only. Not a POST system.</p>
-  <div class="landing">
-    <a href="/chat" target="_blank" rel="noopener"><section>
-      <h2>Customer chat</h2>
-      <p class="muted">Play the customer. SupportBuddy answers first; if it hands over, a human advisor joins this same chat.</p>
-    </section></a>
-    <a href="/desk" target="_blank" rel="noopener"><section>
-      <h2>Operator desk</h2>
-      <p class="muted">Play the human advisor. Take handed-over conversations, chat with the customer, and let the assist agent work for you.</p>
-    </section></a>
-  </div>
+  <main class="landing">
+    <div class="intro">
+      <h2>One conversation, two seats</h2>
+      <p class="muted">Open both pages side by side. The customer talks to SupportBuddy; when it hands over, you take the
+        conversation on the desk, with an assist agent working for you.</p>
+    </div>
+    <div class="cards">
+      <a class="card" href="/chat" target="_blank" rel="noopener">
+        <span class="icon" aria-hidden="true">&#128172;</span>
+        <h2>Customer chat</h2>
+        <p>Play the customer. SupportBuddy answers first; if it hands over, a human advisor joins this same chat.</p>
+      </a>
+      <a class="card" href="/desk" target="_blank" rel="noopener">
+        <span class="icon" aria-hidden="true">&#127911;</span>
+        <h2>Operator desk</h2>
+        <p>Play the human advisor. Take handed-over conversations, chat with the customer, and let the assist agent work for you.</p>
+      </a>
+    </div>
+  </main>
 </body>
 </html>

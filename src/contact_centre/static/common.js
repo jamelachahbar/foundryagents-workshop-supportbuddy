@@ -24,16 +24,17 @@ function whoLabel(message, view) {
   return null;
 }
 
-// Agents answer in Markdown. This renders only **bold** and "- " bullets, building DOM nodes
-// (no HTML parsing), which is enough for SupportBuddy's answer format.
+// Agents answer in Markdown. This renders only **bold**, "- " bullets and "1. " numbered lists, building DOM
+// nodes (no HTML parsing), which is enough for SupportBuddy's answer format.
 function richText(text) {
   const fragment = document.createDocumentFragment();
   let list = null;
   for (const line of text.split("\n")) {
-    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
-    if (bullet) {
-      list ??= fragment.appendChild(el("ul", "md-list"));
-      list.append(inline(el("li"), bullet[1]));
+    const item = line.match(/^\s*(?:([-*])|\d+[.)])\s+(.*)$/);
+    if (item) {
+      const tag = item[1] ? "ul" : "ol";
+      if (list?.tagName.toLowerCase() !== tag) list = fragment.appendChild(el(tag, "md-list"));
+      list.append(inline(el("li"), item[2]));
       continue;
     }
     list = null;
@@ -57,12 +58,20 @@ function renderMessage(message, view, onApproval) {
   const role = view === "assist" && message.role === "agent" ? "assist" : message.role;
   const node = el("li", `msg ${role}`);
   node.dataset.id = message.id;
+  const avatar = avatarFor(message, view);
+  if (avatar) node.append(avatar);
+  const bubble = el("div", "bubble");
   const who = whoLabel(message, view);
-  if (who) node.append(el("span", "who", who));
-  node.append(["agent", "advisor"].includes(message.role) ? richText(message.text) : document.createTextNode(message.text));
+  if (who) {
+    const head = el("span", "who", who);
+    if (message.at) head.append(el("time", null, clock(message.at)));
+    bubble.append(head);
+  }
   if (message.role === "approval") {
+    bubble.append(el("div", "title", "Approval needed"));
+    bubble.append(el("div", "text", message.text));
     const args = Object.entries(message.arguments ?? {}).map(([k, v]) => `${k}: ${v}`).join(", ");
-    if (args) node.append(el("div", "args", `${message.tool}(${args})`));
+    if (args) bubble.append(el("div", "args", `${message.tool}(${args})`));
     if (message.status === "pending" && onApproval) {
       const buttons = el("div", "buttons");
       const yes = el("button", "ok", "Approve");
@@ -70,22 +79,70 @@ function renderMessage(message, view, onApproval) {
       yes.addEventListener("click", () => { yes.disabled = no.disabled = true; onApproval(message, true); });
       no.addEventListener("click", () => { yes.disabled = no.disabled = true; onApproval(message, false); });
       buttons.append(yes, no);
-      node.append(buttons);
+      bubble.append(buttons);
     } else {
-      node.append(el("div", "args", message.status === "pending" ? "Waiting for approval" : `Decision: ${message.status}`));
+      const label = message.status === "pending" ? "Waiting for approval" : `Decision: ${message.status}`;
+      bubble.append(el("div", `decision ${message.status}`, label));
     }
+  } else if (["agent", "advisor"].includes(message.role)) {
+    bubble.append(richText(message.text));
+  } else {
+    bubble.append(el("div", "text", message.text));
   }
+  node.append(bubble);
   return node;
 }
 
-// Adds or replaces a message in a list, keeping the list scrolled to the bottom.
+function avatarFor(message, view) {
+  if (message.role === "agent") {
+    const avatar = el("span", "avatar");
+    const img = el("img");
+    img.src = "/icon.svg";
+    img.alt = "";
+    avatar.append(img);
+    return avatar;
+  }
+  if (message.role === "advisor") return el("span", "avatar", initials(message.author ?? "Advisor"));
+  if (message.role === "customer" && view !== "customer") return el("span", "avatar", "C");
+  return null;
+}
+
+const initials = (name) => name.split(/\s+/).filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("");
+const clock = (iso) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+// The element that scrolls a list: its pane (.scroller) on the desk, the page in the customer chat.
+const scrollerOf = (list) => list.closest(".scroller") ?? document.scrollingElement;
+
+function scrollToEnd(list) {
+  const scroller = scrollerOf(list);
+  scroller.scrollTop = scroller.scrollHeight;
+}
+
+// Adds or replaces a message in a list. Follows new messages only if the reader is already at the end.
 function upsertMessage(list, message, view, onApproval) {
   const node = renderMessage(message, view, onApproval);
   const existing = list.querySelector(`[data-id="${CSS.escape(message.id)}"]`);
-  const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
+  const scroller = scrollerOf(list);
+  const atEnd = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 120;
   if (existing) existing.replaceWith(node);
   else list.append(node);
-  if (atBottom || !existing) list.scrollTop = list.scrollHeight;
+  if (atEnd) scrollToEnd(list);
+}
+
+// Grows a textarea with its content (up to its CSS max-height) and sends on Enter.
+function composer(textarea, form) {
+  const fit = () => {
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+  textarea.addEventListener("input", fit);
+  textarea.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
+  return { clear() { textarea.value = ""; fit(); }, fit };
 }
 
 async function postJSON(url, body) {

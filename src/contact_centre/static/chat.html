@@ -8,30 +8,40 @@
   <link rel="stylesheet" href="/centre.css">
 </head>
 <body>
-  <header>
-    <img src="/icon.svg" alt="" width="32" height="32">
-    <h1>SupportBuddy <span>Customer chat</span></h1>
+  <header class="topbar">
+    <div class="brand">
+      <img src="/icon.svg" alt="" width="32" height="32">
+      <div>
+        <h1>SupportBuddy <span>Customer chat</span></h1>
+        <small>Training lab: synthetic customers and systems only. Not a POST system.</small>
+      </div>
+    </div>
     <span id="mode" class="pill"></span>
+    <button id="new" class="ghost" type="button" hidden>New conversation</button>
   </header>
-  <p class="banner">Training lab: synthetic customers and systems only. Not a POST system.</p>
   <main class="chat">
-    <section id="start" class="start" hidden>
-      <h2>Start a conversation</h2>
+    <section id="start" class="welcome" hidden>
+      <img src="/icon.svg" alt="">
+      <h2>Hi, I'm SupportBuddy</h2>
       <p class="muted" id="start-help"></p>
       <label id="signin" hidden>Signed in as
         <select id="customer"></select>
       </label>
+      <div id="suggestions" class="suggestions" aria-label="Suggested messages"></div>
       <button id="begin" type="button">Start chatting</button>
       <p class="error" id="start-error" role="alert"></p>
     </section>
     <ul id="messages" class="messages" aria-live="polite" hidden></ul>
-    <p id="typing" class="typing"></p>
-    <form id="composer" class="composer" hidden>
-      <textarea id="text" maxlength="2000" placeholder="Write your message" aria-label="Message"></textarea>
-      <button id="send" type="submit">Send</button>
-    </form>
-    <p class="error" id="error" role="alert"></p>
-    <p><button id="restart" class="secondary" type="button" hidden>Start a new conversation</button></p>
+    <div class="dock" id="dock" hidden>
+      <p id="typing" class="typing"></p>
+      <form id="composer" class="composer">
+        <textarea id="text" rows="1" maxlength="2000" placeholder="Write your message" aria-label="Message"></textarea>
+        <button id="send" type="submit">Send</button>
+      </form>
+      <p class="error" id="error" role="alert"></p>
+      <p class="hint" id="hint">Enter to send, Shift+Enter for a new line. You can ask for a person at any time.</p>
+      <button id="restart" class="secondary" type="button" hidden>Start a new conversation</button>
+    </div>
   </main>
   <script src="/common.js"></script>
   <script src="/chat.js"></script>

@@ -303,13 +303,17 @@ Open http://127.0.0.1:8070, then the **Customer chat** and the **Operator desk**
 
 ![Contact centre start page](assets/walkthrough/stage-07-home.png)
 
-**Scenario A, the agent answers.** In the customer chat, click **Start chatting** and write
-`Hi, I'm anna.weber@example.com, my internet stopped this morning.` Progress lines appear while SupportBuddy
-works, then the answer.
+The customer chat opens with the lab scenarios as suggestions:
+
+![Customer chat: suggested scenarios](assets/walkthrough/stage-07-chat-start.png)
+
+**Scenario A, the agent answers.** In the customer chat, click the suggestion
+`Hi, I'm anna.weber@example.com, my internet stopped this morning.` (or type it). A tick appears for each
+check while SupportBuddy works, then the answer.
 
 ![Scenario A: progress lines, then the incident and restore time](assets/walkthrough/stage-07-chat-scenario-a.png)
 
-**Scenario B, a live handover.** Click **Start a new conversation** and write
+**Scenario B, a live handover.** Click **New conversation** (top right), then the suggestion
 `Hello, I'm customer CUST-1005. I have no internet at all since this morning, nothing loads on any device.`
 SupportBuddy hands over with a `HO-...` reference. Then write `Is someone there?`: the message waits for the
 advisor; SupportBuddy stays silent.
@@ -339,7 +343,7 @@ SupportBuddy continues with the whole history, and does not restart the modem a 
 
 ![After the hand-back: SupportBuddy knows what the advisor did](assets/walkthrough/stage-07-chat-after-handback.png)
 
-**Scenario C, the customer approves.** Start a new conversation and write
+**Scenario C, the customer approves.** Click **New conversation**, then the suggestion
 `I'm CUST-1002, my modem doesn't respond since this morning. Please restart it remotely for me.`
 The approval card appears in the **customer** chat.
 
@@ -493,11 +497,14 @@ uv run python memory_store.py show CUST-1002
 
 ```text
 4 memories in scope 'post-demo_CUST-1002':
-  [user_profile] The user prefers to be contacted by SMS.
-  [user_profile] The user communicates in French.
-  [user_profile] The user has an active modem connectivity issue reported on October 27, 2026, described as the modem not responding since that morning.
-  [chat_summary] The user explicitly stated a contact preference in French: the user prefers to be contacted by SMS. ...
+  [user_profile] L'utilisateur préfère être contacté par SMS.
+  [chat_summary] Le 27 octobre 2026, l'utilisateur a indiqué en français une préférence de contact par SMS. ...
+  [user_profile] L'utilisateur communique en français.
+  [user_profile] L'utilisateur a eu un modem qui ne répondait plus le 27 octobre 2026 au matin, ...
 ```
+
+Memories are written in the language of the conversation. If `show` still lists nothing after a minute, run
+the conversation again: right after `azd up`, new role assignments can make the first memory update fail.
 
 A new process is a new conversation, with no chat history:
 

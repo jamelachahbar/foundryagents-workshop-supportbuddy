@@ -64,6 +64,7 @@ def run(coroutine):
 def test_supportbuddy_answers_with_progress_and_streamed_text():
     agents = ScriptedAgents(
         tool("c1", "network___identify_customer", {"found": True})
+        + tool("c2", "identify_customer", {"found": True})
         + text("m1", "Your modem ", "is not responding.")
         + snapshot({"id": "x", "role": "user", "content": "hi"})
         + [{"type": "RUN_FINISHED"}]
@@ -84,6 +85,32 @@ def test_supportbuddy_answers_with_progress_and_streamed_text():
     ]
     assert conversation.agent_history == [{"id": "x", "role": "user", "content": "hi"}]
     assert conversation.mode == "agent" and not conversation.busy
+    # The desk learns who the anonymous customer is, also from MCP-wrapped toolbox results.
+    assert conversation.identified is None
+
+
+def test_desk_learns_the_customer_supportbuddy_identified():
+    found = {"found": True, "customer": {"customer_id": "CUST-1003", "name": "Sofia Costa"}}
+    agents = ScriptedAgents(
+        [{"type": "TOOL_CALL_START", "toolCallId": "c1", "toolCallName": "network___identify_customer"},
+         {"type": "TOOL_CALL_RESULT", "toolCallId": "c1", "content": json.dumps([{"type": "text", "text": json.dumps(found)}])}]
+        + text("m1", "Found you.") + [{"type": "RUN_FINISHED"}]
+    )
+    centre = ContactCentre(agents, signs_in=False, agent_label="test")
+    conversation = centre.start(None)
+    run(centre.customer_message(conversation, "Phone +352 600 000 103"))
+    assert conversation.identified == {"customer_id": "CUST-1003", "name": "Sofia Costa"}
+    assert conversation.summary()["identified"]["customer_id"] == "CUST-1003"
+
+
+def test_tool_results_are_read_from_local_tools_and_from_the_foundry_toolbox():
+    from contact_centre.centre import tool_result
+
+    data = {"found": True, "customer": {"customer_id": "CUST-1001"}}
+    toolbox = {"_meta": {"tool_configuration": {"type": "mcp"}}, "content": [{"type": "text", "text": json.dumps(data)}]}
+    assert tool_result(json.dumps(data)) == data
+    assert tool_result(json.dumps(toolbox)) == data
+    assert tool_result("not json") is None
 
 
 def test_handover_moves_the_conversation_to_a_human_advisor_and_back():
