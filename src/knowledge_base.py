@@ -6,7 +6,7 @@ Run from the src folder:
 
 A Foundry IQ knowledge base lives in Azure AI Search: an index holds the runbooks, a knowledge
 source points at the index, and the knowledge base exposes retrieval as an MCP endpoint that the
-agent calls. Every runbook is fictional training content, not a POST procedure.
+agent calls. Every runbook is fictional training content, not a real operator procedure.
 """
 
 from __future__ import annotations

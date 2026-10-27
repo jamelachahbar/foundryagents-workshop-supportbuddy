@@ -91,24 +91,24 @@ def main() -> int:
         "AZURE_AI_EMBEDDING_DEPLOYMENT_NAME": values["AZURE_AI_EMBEDDING_DEPLOYMENT_NAME"],
         "AZURE_AI_SEARCH_ENDPOINT": values["AZURE_AI_SEARCH_ENDPOINT"],
         # The lab scripts need a participant prefix; the shared resources do not use it.
-        "WORKSHOP_RESOURCE_PREFIX": os.getenv("WORKSHOP_RESOURCE_PREFIX", "post-setup"),
+        "WORKSHOP_RESOURCE_PREFIX": os.getenv("WORKSHOP_RESOURCE_PREFIX", "lab-setup"),
         "PYTHONIOENCODING": "utf-8",
     }
 
     print("SupportBuddy lab: finishing the setup")
     create_connections(values)
     run_lab_script(["knowledge_base.py", "create"], env, "knowledge base supportbuddy-runbooks")
-    run_lab_script(["memory_store.py", "create"], env, "memory store post-lab-memory")
+    run_lab_script(["memory_store.py", "create"], env, "memory store supportbuddy-memory")
 
     print(
         "\nGive the participants these lines for src/.env (each adds their own WORKSHOP_RESOURCE_PREFIX):\n\n"
         f"AZURE_AI_PROJECT_ENDPOINT={values['AZURE_AI_PROJECT_ENDPOINT']}\n"
         f"AZURE_AI_MODEL_DEPLOYMENT_NAME={values['AZURE_AI_MODEL_DEPLOYMENT_NAME']}\n"
-        "POST_MOCK_MCP_URL=http://127.0.0.1:8000/mcp\n"
+        "MOCK_MCP_URL=http://127.0.0.1:8000/mcp\n"
         f"AZURE_AI_SEARCH_ENDPOINT={values['AZURE_AI_SEARCH_ENDPOINT']}\n"
         "FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks\n"
         f"AZURE_AI_EMBEDDING_DEPLOYMENT_NAME={values['AZURE_AI_EMBEDDING_DEPLOYMENT_NAME']}\n"
-        "FOUNDRY_MEMORY_STORE_NAME=post-lab-memory\n"
+        "FOUNDRY_MEMORY_STORE_NAME=supportbuddy-memory\n"
         + ("" if values.get("NETWORK_MCP_URL") else "NETWORK_TOOLS=local\n")
         + f"\nStage 13 guardrail ID:\n{values['SUPPORTBUDDY_GUARDRAIL_ID']}\n"
         f"\nStage 14 project resource ID (azd ai agent init --project-id):\n{values['FOUNDRY_PROJECT_ID']}\n"

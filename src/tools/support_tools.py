@@ -5,7 +5,7 @@ LAB CONSTRUCT: each tool is a thin wrapper around the synthetic back-office in
 relies on; in a real deployment the same contract would be backed by an
 enterprise API instead of a JSON file, without changing the agent.
 
-None of these tools call a real POST system.
+None of these tools call a real system.
 """
 
 from __future__ import annotations

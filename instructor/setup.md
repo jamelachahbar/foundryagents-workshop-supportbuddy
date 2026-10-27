@@ -192,6 +192,6 @@ Give participants the policy's full resource ID: `<foundry account resource ID>/
 ### 7. Participant roles and clean up
 
 Assign the roles in the table under Option A. Each participant creates, in the shared project: a toolbox
-`post-<alias>-supportbuddy-tools`, a prompt agent `post-<alias>-supportbuddy-prompt`, a hosted agent
-`post-<alias>-supportbuddy-hosted`, memories in scopes `post-<alias>_CUST-*`, and evaluation runs.
+`lab-<alias>-supportbuddy-tools`, a prompt agent `lab-<alias>-supportbuddy-prompt`, a hosted agent
+`lab-<alias>-supportbuddy-hosted`, memories in scopes `lab-<alias>_CUST-*`, and evaluation runs.
 Delete them, or delete the project, after the workshop.

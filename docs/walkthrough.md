@@ -11,7 +11,7 @@ This guide takes the **fast path**: at each stage you copy the reference solutio
 of writing the change yourself. The concepts, the code walkthroughs and the "Your task" exercises are in the
 participant guide, [workshop.md](workshop.md); each stage below links to its section.
 
-All synthetic: customers, lines, incidents, runbooks and the MCP server are lab constructs, not POST systems.
+All synthetic: customers, lines, incidents, runbooks and the MCP server are lab constructs, not real systems.
 
 | Part | Stages | Runs where |
 | --- | --- | --- |
@@ -62,17 +62,17 @@ SupportBuddy lab: finishing the setup
   connection supportbuddy-runbooks-kb: ok
   connection supportbuddy-network-mcp: ok
   knowledge base supportbuddy-runbooks: ok
-  memory store post-lab-memory: ok
+  memory store supportbuddy-memory: ok
 
 Give the participants these lines for src/.env (each adds their own WORKSHOP_RESOURCE_PREFIX):
 
 AZURE_AI_PROJECT_ENDPOINT=https://sb-foundry-<suffix>.services.ai.azure.com/api/projects/supportbuddy
 AZURE_AI_MODEL_DEPLOYMENT_NAME=supportbuddy-chat
-POST_MOCK_MCP_URL=http://127.0.0.1:8000/mcp
+MOCK_MCP_URL=http://127.0.0.1:8000/mcp
 AZURE_AI_SEARCH_ENDPOINT=https://sb-search-<suffix>.search.windows.net
 FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks
 AZURE_AI_EMBEDDING_DEPLOYMENT_NAME=supportbuddy-embedding
-FOUNDRY_MEMORY_STORE_NAME=post-lab-memory
+FOUNDRY_MEMORY_STORE_NAME=supportbuddy-memory
 
 Stage 13 guardrail ID:
 /subscriptions/<sub>/resourceGroups/rg-supportbuddy-lab/providers/Microsoft.CognitiveServices/accounts/sb-foundry-<suffix>/raiPolicies/supportbuddy-guardrail
@@ -111,7 +111,7 @@ Copy-Item .env.template .env      # macOS / Linux: cp .env.template .env
 Open `src/.env` and paste the values from the lab environment. Set your own prefix:
 
 ```text
-WORKSHOP_RESOURCE_PREFIX=post-<alias>      # 2-8 lowercase letters or digits, for example post-jdoe
+WORKSHOP_RESOURCE_PREFIX=lab-<alias>      # 2-8 lowercase letters or digits, for example lab-jdoe
 ```
 
 Sign in and check everything:
@@ -123,7 +123,7 @@ uv run python preflight.py
 
 ```text
 [OK] Python 3.12 or later
-[OK] src/.env settings (prefix post-demo)
+[OK] src/.env settings (prefix lab-demo)
 [OK] Azure CLI sign-in (keyless)
 [OK] Foundry project reachable and model deployment answers
 
@@ -405,8 +405,8 @@ uv run python toolbox.py show
 ```
 
 ```text
-Toolbox 'post-demo-supportbuddy-tools' version 1 is now the default.
-Tools served at https://sb-foundry-<suffix>.services.ai.azure.com/api/projects/supportbuddy/toolboxes/post-demo-supportbuddy-tools/mcp?api-version=v1:
+Toolbox 'lab-demo-supportbuddy-tools' version 1 is now the default.
+Tools served at https://sb-foundry-<suffix>.services.ai.azure.com/api/projects/supportbuddy/toolboxes/lab-demo-supportbuddy-tools/mcp?api-version=v1:
   - network___check_equipment
   - network___get_known_incidents
   - network___get_line_status
@@ -457,7 +457,7 @@ uv run python prompt_agent.py ask "Bonjour, je suis CUST-1004, ma connexion coup
 ```
 
 ```text
-Prompt agent 'post-demo-supportbuddy-prompt' version 1 published.
+Prompt agent 'lab-demo-supportbuddy-prompt' version 1 published.
 
   [tool call, run by Foundry] network___identify_customer {"customer_id":"CUST-1004"}
   [tool call, run by Foundry] network___get_line_status {"line_id":"LINE-2004"}
@@ -472,7 +472,7 @@ The tool calls now say **run by Foundry**: the agent loop runs in Foundry Agent 
 And the line-fault case **cannot hand over**: the prompt agent has no `escalate_to_human`, so it tells the
 customer to contact support.
 
-In the portal, **Build > Agents** lists `post-demo-supportbuddy-prompt`. Open it and chat in the playground:
+In the portal, **Build > Agents** lists `lab-demo-supportbuddy-prompt`. Open it and chat in the playground:
 
 ![The prompt agent in the Foundry playground, with runbook citations](assets/walkthrough/portal-prompt-agent-playground.png)
 
@@ -496,7 +496,7 @@ uv run python memory_store.py show CUST-1002
 ```
 
 ```text
-4 memories in scope 'post-demo_CUST-1002':
+4 memories in scope 'lab-demo_CUST-1002':
   [user_profile] L'utilisateur préfère être contacté par SMS.
   [chat_summary] Le 27 octobre 2026, l'utilisateur a indiqué en français une préférence de contact par SMS. ...
   [user_profile] L'utilisateur communique en français.
@@ -586,7 +586,7 @@ Copy-Item solutions/stage_13_guardrails.instructions.md main.instructions.md
 ```
 
 ```text
-Toolbox 'post-demo-supportbuddy-tools' version 2 is now the default.
+Toolbox 'lab-demo-supportbuddy-tools' version 2 is now the default.
 The guardrail now screens tool inputs and outputs through this toolbox.
 ```
 
@@ -632,11 +632,11 @@ resource ID from the lab environment:
 ```powershell
 azd ai agent init --no-prompt --project-id "<project resource ID>" --model-deployment supportbuddy-chat `
   --deploy-mode code --runtime python_3_13 --entry-point hosted_agent.py `
-  --agent-name post-<alias>-supportbuddy-hosted --protocol responses
+  --agent-name lab-<alias>-supportbuddy-hosted --protocol responses
 ```
 
 ```text
-Added agent 'post-demo-supportbuddy-hosted' to azure.yaml.
+Added agent 'lab-demo-supportbuddy-hosted' to azure.yaml.
 ```
 
 Open `src/azure.yaml` and add your prefix under the agent's `env:`:
@@ -644,26 +644,26 @@ Open `src/azure.yaml` and add your prefix under the agent's `env:`:
 ```yaml
         env:
             AZURE_AI_MODEL_DEPLOYMENT_NAME: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
-            WORKSHOP_RESOURCE_PREFIX: post-<alias>
+            WORKSHOP_RESOURCE_PREFIX: lab-<alias>
 ```
 
 Deploy (no Docker: the code is uploaded and Foundry installs `requirements.txt`) and call it:
 
 ```powershell
 azd deploy
-azd ai agent invoke post-<alias>-supportbuddy-hosted "Hi, I'm CUST-1002, my internet is down since this morning."
-azd ai agent invoke post-<alias>-supportbuddy-hosted --new-conversation "CUST-1004: constant disconnections for three days."
+azd ai agent invoke lab-<alias>-supportbuddy-hosted "Hi, I'm CUST-1002, my internet is down since this morning."
+azd ai agent invoke lab-<alias>-supportbuddy-hosted --new-conversation "CUST-1004: constant disconnections for three days."
 ```
 
 ```text
 SUCCESS: Your application was deployed to Azure in 2 minutes 56 seconds.
 
-[post-demo-supportbuddy-hosted] Your line is up and there's no known incident in your area, but your modem isn't
+[lab-demo-supportbuddy-hosted] Your line is up and there's no known incident in your area, but your modem isn't
 reachable. That points to the modem rather than the network line.
 ...
 Platform latency (cold): response headers 8642 ms
 
-[post-demo-supportbuddy-hosted] I've handed this over to a human advisor. Your reference is HO-9001.
+[lab-demo-supportbuddy-hosted] I've handed this over to a human advisor. Your reference is HO-9001.
 ...
 Platform latency (warm): response headers 340 ms
 ```

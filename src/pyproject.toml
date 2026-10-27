@@ -1,5 +1,5 @@
 [project]
-name = "post-connectivity-agent-lab"
+name = "supportbuddy-agent-lab"
 version = "0.1.0"
 description = "Hands-on lab: build an enterprise connectivity-support agent with Microsoft Foundry and Microsoft Agent Framework (synthetic backends only)."
 readme = "README.md"

@@ -5,7 +5,7 @@ at ``<search endpoint>/knowledgebases/<name>/mcp``. The agent connects to it exa
 connected to the network MCP server in Stage 6. The only new thing is authentication: Azure AI
 Search wants a Microsoft Entra token, so every request carries your identity's bearer token.
 
-The knowledge base holds synthetic troubleshooting runbooks (LAB CONSTRUCT, not POST procedures).
+The knowledge base holds synthetic troubleshooting runbooks (LAB CONSTRUCT, not real operator procedures).
 """
 
 from __future__ import annotations

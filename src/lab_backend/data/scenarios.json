@@ -1,5 +1,5 @@
 {
-  "_notice": "LAB CONSTRUCT. Every record in this file is synthetic training data created for this lab. No real POST Luxembourg customer, line, device, incident, system or API is represented. Names, e-mails, phone numbers, postcodes, areas, device models (MockBox) and identifiers are fictional.",
+  "_notice": "LAB CONSTRUCT. Every record in this file is synthetic training data created for this lab. No real company's customer, line, device, incident, system or API is represented. Names, e-mails, phone numbers, postcodes, areas, device models (MockBox) and identifiers are fictional.",
   "customers": [
     {
       "customer_id": "CUST-1001",

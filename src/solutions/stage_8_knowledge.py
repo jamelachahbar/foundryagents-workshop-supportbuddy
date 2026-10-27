@@ -29,8 +29,8 @@ def tools() -> list:
     knowledge = knowledge_settings()
     return [
         MCPStreamableHTTPTool(
-            name="post_network",
-            url=os.getenv("POST_MOCK_MCP_URL", DEFAULT_MCP_URL),
+            name="network",
+            url=os.getenv("MOCK_MCP_URL", DEFAULT_MCP_URL),
             approval_mode="never_require",
             load_prompts=False,
         ),

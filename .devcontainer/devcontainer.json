@@ -1,5 +1,5 @@
 {
-  "name": "POST connectivity agent lab",
+  "name": "SupportBuddy connectivity agent lab",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "features": {
     "ghcr.io/devcontainers/features/azure-cli:1": {}

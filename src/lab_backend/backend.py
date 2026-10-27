@@ -1,9 +1,9 @@
-"""Synthetic back-office systems for the POST connectivity-support lab.
+"""Synthetic back-office systems for the SupportBuddy connectivity-support lab.
 
 LAB CONSTRUCT: these functions simulate the kind of enterprise capabilities a
 support agent needs (customer lookup, service/line status, an equipment ping,
-known incidents and a human handover queue). They are NOT POST systems or
-APIs; POST has not supplied its production interfaces. All data comes from
+known incidents and a human handover queue). They are not real systems or
+APIs of any company. All data comes from
 ``data/scenarios.json`` and is fictional.
 
 The functions are deterministic so every participant (and every evaluation
@@ -216,7 +216,7 @@ def escalate_to_human(
         **copy.deepcopy(handover),
         "note": (
             "Synthetic lab handover record only. A human advisor picks it up in the lab contact centre; "
-            "no real POST ticket, queue, channel or person was contacted."
+            "no real ticket, queue, channel or person was contacted."
         ),
         "source": SOURCE,
     }

@@ -132,7 +132,7 @@ def test_handover_ids_are_deterministic_and_never_claim_a_real_ticket():
     assert (first["handover_id"], second["handover_id"]) == ("HO-9001", "HO-9002")
     assert first["customer_id"] == "CUST-1005"
     assert first["status"] == "waiting_for_advisor"
-    assert "no real POST ticket" in first["note"]
+    assert "no real ticket" in first["note"]
     assert [h["handover_id"] for h in backend.recorded_handovers()] == ["HO-9001", "HO-9002"]
 
 

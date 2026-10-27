@@ -42,10 +42,10 @@ from dotenv import load_dotenv
 from devui_branding import serve_branded
 
 AGENT_BASE_NAME = "supportbuddy"
-PREFIX_PATTERN = re.compile(r"^post-[a-z0-9]{2,8}$")
+PREFIX_PATTERN = re.compile(r"^lab-[a-z0-9]{2,8}$")
 DEVUI_TOKEN_FILE = Path(__file__).parent / ".devui_token"
 CUSTOMER_ID_PATTERN = re.compile(r"^CUST-\d{4}$")
-DEFAULT_MEMORY_STORE_NAME = "post-lab-memory"
+DEFAULT_MEMORY_STORE_NAME = "supportbuddy-memory"
 DEFAULT_KNOWLEDGE_BASE_NAME = "supportbuddy-runbooks"
 REQUIRED_SETTINGS = (
     "AZURE_AI_PROJECT_ENDPOINT",
@@ -62,7 +62,7 @@ def load_settings() -> dict[str, str]:
         sys.exit(f"Missing settings in src/.env: {', '.join(missing)}. Copy .env.template to .env first.")
     prefix = os.environ["WORKSHOP_RESOURCE_PREFIX"]
     if not PREFIX_PATTERN.match(prefix):
-        sys.exit(f"WORKSHOP_RESOURCE_PREFIX={prefix!r} must look like post-<alias> (2-8 lowercase letters/digits).")
+        sys.exit(f"WORKSHOP_RESOURCE_PREFIX={prefix!r} must look like lab-<alias> (2-8 lowercase letters/digits).")
     return {name: os.environ[name] for name in REQUIRED_SETTINGS}
 
 

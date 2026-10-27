@@ -78,7 +78,7 @@ def running_server():
 @pytest.mark.anyio
 async def test_agent_framework_reaches_the_server_over_streamable_http(running_server):
     """Same client the Stage 6 agent uses, over real HTTP, without a model in the loop."""
-    async with MCPStreamableHTTPTool(name="post_network", url=running_server, load_prompts=False) as tool:
+    async with MCPStreamableHTTPTool(name="network", url=running_server, load_prompts=False) as tool:
         assert sorted(f.name for f in tool.functions) == sorted(DIAGNOSTIC_TOOLS)
         result = await tool.call_tool("identify_customer", email="anna.weber@example.com")
 

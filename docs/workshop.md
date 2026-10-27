@@ -73,10 +73,9 @@ The boxes mean:
 
 ## The use case and the boundary of this lab
 
-### What POST described
+### The scenario
 
-During the workshop scoping call on **12 October 2026**, POST described the following example. A
-customer contacts support and says, in essence:
+A customer contacts their connectivity provider's support and says, in essence:
 
 > "I have a problem with my internet connection."
 
@@ -92,29 +91,29 @@ flowchart LR
     C -->|not enough| H([Hand over<br/>to a human])
 ```
 
-POST explicitly mentioned checking or "pinging" the customer's equipment as an example of the
-technical diagnostic step, and described human-in-the-loop as an important part of the wider agent
-architecture.
+Checking or "pinging" the customer's equipment is the typical technical diagnostic step, and
+human-in-the-loop is an essential part of the architecture: some cases need a person, and some actions
+need a person's approval.
 
 ### What this lab invents (and why)
 
-POST has **not** supplied the production systems, APIs, customer databases, network-management
-platforms, incident-management systems, equipment types or support processes that a production
-version would use. This lab therefore uses **synthetic equivalents, purely for education**:
+The lab does not use any real company's production systems, APIs, customer databases, network-management
+platforms, incident-management systems, equipment types or support processes. It uses **synthetic
+equivalents, purely for education**, so it works the same for every organisation:
 
-| Lab construct | Stands in for | Is it a POST API or system? |
+| Lab construct | Stands in for | Is it a real API or system? |
 | --- | --- | --- |
 | `identify_customer` | a customer system | **No** - lab construct |
 | `get_line_status` | a service / line inventory | **No** - lab construct |
 | `check_equipment` (simulated ping) | a network diagnostic platform | **No** - lab construct |
 | `get_known_incidents` | an operations / incident system | **No** - lab construct |
-| `escalate_to_human` and `HO-xxxx` references | a human handover channel | **No** - lab construct. POST's real channel is not defined. |
+| `escalate_to_human` and `HO-xxxx` references | a human handover channel | **No** - lab construct |
 | Contact centre (`src/contact_centre/`): customer chat, operator desk, advisor assist agent | an engagement hub such as Dynamics 365 Contact Center, used by customers and human advisors | **No** - lab construct |
 | `get_handover_status` | a case-status lookup in a ticketing tool | **No** - lab construct |
 | `restart_modem` (simulated remote restart, Stage 7) | a network action that changes the customer's service | **No** - lab construct. Nothing is restarted. |
-| `post-network-mock` MCP server (local in Stage 6, shared on Azure Container Apps from Stage 9) | an MCP server owned by a backend team | **No** - lab construct |
+| `network-mock` MCP server (local in Stage 6, shared on Azure Container Apps from Stage 9) | an MCP server owned by a backend team | **No** - lab construct |
 | Runbooks `RB-01`...`RB-12` (Stage 8) | a support team's troubleshooting procedures | **No** - synthetic lab content |
-| Signed-in customer (`--customer CUST-xxxx`, or the picker in the customer chat, Stage 11) | a support channel that authenticates the customer | **No** - lab construct. POST's channel and authentication are not defined. |
+| Signed-in customer (`--customer CUST-xxxx`, or the picker in the customer chat, Stage 11) | a support channel that authenticates the customer | **No** - lab construct |
 | The Wi-Fi network name of `CUST-1006` that contains instructions (Stage 13) | untrusted data a customer controls | **No** - a deliberate test case |
 | Customers `CUST-1001`...`CUST-1006`, lines `LINE-2xxx`, `MockBox` modems, `Mock-Ville` areas, incidents `INC-5xxx` | real customers and network data | **No** - fictional training data |
 
@@ -124,7 +123,7 @@ version would use. This lab therefore uses **synthetic equivalents, purely for e
 
 | Layer | Provided by |
 | --- | --- |
-| The use-case pattern | POST |
+| The use-case pattern | A common connectivity-support scenario |
 | The systems behind the tools | This lab (synthetic) |
 | The agent platform | Microsoft Foundry |
 | The development model | Microsoft Agent Framework |
@@ -271,16 +270,16 @@ and fill in the values.
 ```text
 AZURE_AI_PROJECT_ENDPOINT=https://<your-foundry-resource>.services.ai.azure.com/api/projects/<your-project>
 AZURE_AI_MODEL_DEPLOYMENT_NAME=<your-model-deployment>
-WORKSHOP_RESOURCE_PREFIX=post-<alias>
-POST_MOCK_MCP_URL=http://127.0.0.1:8000/mcp
+WORKSHOP_RESOURCE_PREFIX=lab-<alias>
+MOCK_MCP_URL=http://127.0.0.1:8000/mcp
 AZURE_AI_SEARCH_ENDPOINT=https://<your-search-service>.search.windows.net
 FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks
 AZURE_AI_EMBEDDING_DEPLOYMENT_NAME=<your-embedding-deployment>
-FOUNDRY_MEMORY_STORE_NAME=post-lab-memory
+FOUNDRY_MEMORY_STORE_NAME=supportbuddy-memory
 ```
 
 `WORKSHOP_RESOURCE_PREFIX` keeps your agent separate from other participants' agents in a shared
-project. Use `post-` followed by 2-8 lowercase letters or digits, for example `post-jdoe`.
+project. Use `lab-` followed by 2-8 lowercase letters or digits, for example `lab-jdoe`.
 
 Sign in and run the preflight check:
 
@@ -305,7 +304,7 @@ All commands run from the `src` folder.
 DevUI is your developer view for every stage: it shows each tool call, its arguments and its result. The
 contact centre shows what the customer and the human advisor would see. Both run the same agent.
 
-Each run builds a **code-first** agent named `post-<alias>-supportbuddy`: the agent loop, its tools and
+Each run builds a **code-first** agent named `lab-<alias>-supportbuddy`: the agent loop, its tools and
 its memory run in your Python process on your laptop, and only the model runs in Foundry. Nothing is
 published to the Foundry agent catalogue until Stage 10.
 
@@ -316,7 +315,7 @@ and its `.instructions.md`. The shared plumbing lives in `src/lab_agent.py`:
 
 ```python
 Agent(
-    name=agent_name(),                       # post-<alias>-supportbuddy
+    name=agent_name(),                       # lab-<alias>-supportbuddy
     client=FoundryChatClient(                # the model, in your Foundry project
         project_endpoint=..., model=..., credential=AzureCliCredential(),
     ),
@@ -530,7 +529,7 @@ Internet works on cable but Wi-Fi is very slow upstairs. Phone +352 600 000 103.
 > **You change:** `main.py`, `main.instructions.md` \
 > **Reference:** `solutions/stage_4_diagnostic.*`
 
-This stage mirrors the diagnostic example POST gave: checking or pinging the equipment the customer
+This stage is the typical diagnostic step: checking or pinging the equipment the customer
 uses. `check_equipment` returns a **simulated** ping (no real equipment is contacted): packets sent and
 received, `reachable`, `packet_loss_pct`, and the modem's Wi-Fi diagnostics.
 
@@ -642,7 +641,7 @@ flowchart LR
         A1[Agent] --> F1["4 Python functions"]
     end
     subgraph After["Stage 6: two processes"]
-        A2[Agent<br/>MCP client] -- "tools/list, tools/call<br/>over HTTP" --> S2["MCP server<br/>post-network-mock"]
+        A2[Agent<br/>MCP client] -- "tools/list, tools/call<br/>over HTTP" --> S2["MCP server<br/>network-mock"]
         S2 --> F2["same 4 capabilities"]
     end
 ```
@@ -658,7 +657,7 @@ descriptions**, delegating to the same synthetic back-office (simplified here):
 ```python
 from mcp.server.fastmcp import FastMCP
 
-mcp = FastMCP("post-network-mock", instructions="Synthetic network-operations capabilities for a training lab.",
+mcp = FastMCP("network-mock", instructions="Synthetic network-operations capabilities for a training lab.",
               host="127.0.0.1", port=8000, stateless_http=True)
 
 
@@ -703,8 +702,8 @@ def tools() -> list:
     load_settings()
     return [
         MCPStreamableHTTPTool(
-            name="post_network",
-            url=os.getenv("POST_MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
+            name="network",
+            url=os.getenv("MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
             approval_mode="never_require",
             load_prompts=False,
         ),
@@ -766,7 +765,7 @@ Run the Stage 5 prompts again.
 | **Act** | A system action would fix it (remote modem restart) | A person **approves** the action before it runs |
 | **Hand over** | The evidence is insufficient or contradictory | A human **advisor** takes over the live conversation |
 
-POST described human-in-the-loop as an important part of the agent architecture. This stage builds both
+Human-in-the-loop is an essential part of an enterprise agent architecture. This stage builds both
 patterns, and you will play every role: the customer, the human advisor, and the person who approves.
 
 ### How a handover works in production
@@ -1028,7 +1027,7 @@ comes from **runbooks** retrieved from a **Foundry IQ knowledge base**, and ever
 ### How it works
 
 - `src/knowledge/runbooks/` holds 12 synthetic runbooks (`RB-01` ... `RB-12`): Markdown files with
-  symptoms, steps and an escalation condition. They are lab content, not POST procedures.
+  symptoms, steps and an escalation condition. They are lab content, not real operator procedures.
 - `src/knowledge_base.py create` loads them into an Azure AI Search index, adds a **knowledge source**
   on that index, and creates a **knowledge base** on top. That knowledge base is what Foundry IQ calls
   a knowledge base: a reusable, permission-aware retrieval layer that any agent can use.
@@ -1156,7 +1155,7 @@ uses what. A **Foundry Toolbox** solves this
 
 ```mermaid
 flowchart LR
-    A[Your agent] -- "one MCP endpoint<br/>your Entra token" --> T["Your toolbox<br/>post-alias-supportbuddy-tools"]
+    A[Your agent] -- "one MCP endpoint<br/>your Entra token" --> T["Your toolbox<br/>lab-alias-supportbuddy-tools"]
     T -- "network___*<br/>connection supportbuddy-network-mcp" --> N["Shared MCP server<br/>Azure Container Apps"]
     T -- "runbooks___*<br/>connection supportbuddy-runbooks-kb<br/>(project managed identity)" --> K["Foundry IQ<br/>knowledge base"]
 ```
@@ -1255,14 +1254,14 @@ definition = PromptAgentDefinition(
     reasoning=Reasoning(effort="medium"),
     tools=[MCPTool(server_label="supportbuddy_tools", server_url=toolbox_endpoint, require_approval="never")],
 )
-project.agents.create_version(agent_name="post-<alias>-supportbuddy-prompt", definition=definition)
+project.agents.create_version(agent_name="lab-<alias>-supportbuddy-prompt", definition=definition)
 ```
 
 The tool is your Stage 9 toolbox: Foundry connects to it with the agent's own identity. Then Agent
 Framework connects to the published agent with `FoundryAgent`, which behaves like any other agent:
 
 ```python
-agent = FoundryAgent(project_endpoint=..., agent_name="post-<alias>-supportbuddy-prompt", agent_version=latest,
+agent = FoundryAgent(project_endpoint=..., agent_name="lab-<alias>-supportbuddy-prompt", agent_version=latest,
                      credential=AzureCliCredential())
 ```
 
@@ -1281,7 +1280,7 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 
 2. Chat with it in DevUI (`uv run python prompt_agent.py chat`) and in the contact centre
    (`uv run python -m contact_centre --prompt-agent`).
-3. Open the Foundry portal, **Build > Agents**, find `post-<alias>-supportbuddy-prompt`, and chat with it in
+3. Open the Foundry portal, **Build > Agents**, find `lab-<alias>-supportbuddy-prompt`, and chat with it in
    the playground. Change a sentence of its instructions in the portal and save: that is a new version.
 4. Measure it with the same dataset as your code-first agent (you will learn more about this in Stage 12):
 
@@ -1730,7 +1729,7 @@ The instructions, the toolbox and the handover function do not change.
    ```bash
    azd ai agent init --no-prompt --project-id "<project resource ID>" --model-deployment <deployment> \
      --deploy-mode code --runtime python_3_13 --entry-point hosted_agent.py \
-     --agent-name post-<alias>-supportbuddy-hosted --protocol responses
+     --agent-name lab-<alias>-supportbuddy-hosted --protocol responses
    ```
 
    This writes `azure.yaml` (the deployment description), `.azure/` (your azd environment) and
@@ -1741,7 +1740,7 @@ The instructions, the toolbox and the handover function do not change.
 2. Your `.env` is not uploaded, so give the agent its prefix. Under the agent's `env:` in `azure.yaml`, add:
 
    ```yaml
-   WORKSHOP_RESOURCE_PREFIX: post-<alias>
+   WORKSHOP_RESOURCE_PREFIX: lab-<alias>
    ```
 
 3. Run it locally and call it, in two terminals:
@@ -1758,7 +1757,7 @@ The instructions, the toolbox and the handover function do not change.
 
    ```bash
    azd deploy
-   azd ai agent invoke post-<alias>-supportbuddy-hosted "Hi, I'm CUST-1002, my internet is down since this morning."
+   azd ai agent invoke lab-<alias>-supportbuddy-hosted "Hi, I'm CUST-1002, my internet is down since this morning."
    ```
 
    `azd deploy` uploads the code (no Docker needed), Foundry installs `requirements.txt` and starts the
@@ -1816,7 +1815,7 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 - **Handover as a governed tool** - expose `escalate_to_human` and `get_handover_status` as an MCP or
   OpenAPI tool in the toolbox, backed by a real ticketing system, so every agent (including the prompt
   agent) hands over to the same place.
-- **Hosted agent behind the contact centre** - `FoundryAgent(agent_name="post-<alias>-supportbuddy-hosted")`
+- **Hosted agent behind the contact centre** - `FoundryAgent(agent_name="lab-<alias>-supportbuddy-hosted")`
   connects Agent Framework to your hosted agent; serve it over AG-UI like the laptop agent.
 - **A real engagement hub** - connect SupportBuddy to Dynamics 365 Contact Center or Azure Communication
   Services chat instead of the lab contact centre.
@@ -1832,7 +1831,7 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | Symptom | Fix |
 | --- | --- |
 | `Missing settings in src/.env` | Copy `.env.template` to `.env` and fill it in. |
-| `WORKSHOP_RESOURCE_PREFIX ... must look like post-<alias>` | Use `post-` plus 2-8 lowercase letters or digits. |
+| `WORKSHOP_RESOURCE_PREFIX ... must look like lab-<alias>` | Use `lab-` plus 2-8 lowercase letters or digits. |
 | Authentication or `401`/`403` from Foundry | Run `az login` again; check you have the **Foundry User** role on the project. |
 | `429 Too Many Requests` | The shared model hit its rate limit. Wait a minute and retry. |
 | `reasoning` ... `not supported with this model` | Your chat model has no reasoning support: set `SUPPORTBUDDY_REASONING_EFFORT=off` in `.env`. |

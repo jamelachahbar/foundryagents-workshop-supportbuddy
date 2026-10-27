@@ -5,7 +5,7 @@ local Python functions in Stages 2-5, now behind the Model Context Protocol.
 The tool contracts (names, parameters, return shapes) are unchanged, so the
 agent's instructions do not change either - only where the capability lives.
 
-This is not a POST system. It reads the same synthetic data as
+This is not a production system. It reads the same synthetic data as
 ``lab_backend`` and has no authentication. On a laptop it binds to 127.0.0.1.
 From Stage 9 the instructor also runs one shared copy on Azure Container Apps
 so Foundry (Toolbox, prompt agents, hosted agents) can reach it; that copy only
@@ -31,10 +31,10 @@ from pydantic import Field
 from lab_backend import backend
 
 mcp = FastMCP(
-    "post-network-mock",
+    "network-mock",
     instructions=(
         "Synthetic network-operations capabilities for a training lab. "
-        "All data is fictional; this is not a POST system."
+        "All data is fictional; this is not a production system."
     ),
     host=os.getenv("MCP_HOST", "127.0.0.1"),
     port=int(os.getenv("MCP_PORT", "8000")),

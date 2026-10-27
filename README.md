@@ -7,7 +7,7 @@
 
 # Build an enterprise connectivity-support agent with Microsoft Foundry
 
-Hands-on lab for the POST Luxembourg workshop. You build one agent, **SupportBuddy**, with
+Hands-on lab and workshop. You build one agent, **SupportBuddy**, with
 [Microsoft Agent Framework](https://learn.microsoft.com/agent-framework/) and
 [Microsoft Foundry](https://learn.microsoft.com/azure/foundry/), and grow it stage by stage from a
 chatbot into an enterprise support agent that collects evidence from several capabilities, uses MCP,
@@ -17,9 +17,9 @@ and hands the case to a human when it cannot resolve it.
 
 ## The use case, and what is synthetic
 
-During the workshop scoping call on 12 October 2026, POST described this example: a customer contacts
-support and says *"I have a problem with my internet connection."* The agent should progressively
-help with the investigation:
+The scenario is one that every connectivity provider knows: a customer contacts support and says
+*"I have a problem with my internet connection."* The agent should progressively help with the
+investigation:
 
 ```text
 Customer reports a connectivity problem
@@ -31,13 +31,13 @@ Customer reports a connectivity problem
   -> hand over to a human when the agent cannot resolve the request
 ```
 
-POST has **not** supplied its production systems, APIs, customer data, network platforms, incident or
-ticketing tools, equipment types or support processes. This lab does not describe them and does not
-connect to them.
+The lab does not use or describe any real company's production systems, APIs, customer data, network
+platforms, incident or ticketing tools, equipment types or support processes. Everything the agent touches
+is synthetic, so the same lab works for any organisation.
 
 | Layer | Provided by |
 | --- | --- |
-| The use-case pattern | POST (scoping call, 12 October 2026) |
+| The use-case pattern | A common connectivity-support scenario |
 | Customer, service, equipment, incident and handover systems | **This lab: synthetic, fictional, for training only** |
 | Agent platform (models, agent registry, portal) | Microsoft Foundry |
 | Development model (agent, tools, MCP client) | Microsoft Agent Framework (Python) |
@@ -45,7 +45,7 @@ connect to them.
 
 Every tool name (`identify_customer`, `get_line_status`, `check_equipment`, `get_known_incidents`,
 `escalate_to_human`, `get_handover_status`, `restart_modem`), every customer (`CUST-1001` ...), line, device (`MockBox`), place (`Mock-Ville`),
-incident and handover reference (`HO-9001` ...), and the contact centre, is a **lab construct**. None of them is a POST API,
+incident and handover reference (`HO-9001` ...), and the contact centre, is a **lab construct**. None of them is a real API,
 system or record.
 
 ## Stages
@@ -103,7 +103,7 @@ tests/                            offline tests (no Azure needed)
 ```bash
 cd src
 uv sync
-cp .env.template .env      # then edit: project endpoint, model deployment, your post-<alias> prefix
+cp .env.template .env      # then edit: project endpoint, model deployment, your lab-<alias> prefix
 az login
 uv run python preflight.py
 uv run python main.py      # opens DevUI

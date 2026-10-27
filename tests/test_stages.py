@@ -8,7 +8,7 @@ import pytest
 SRC = Path(__file__).resolve().parents[1] / "src"
 LOCAL_DIAGNOSTICS = ["identify_customer", "get_line_status", "get_known_incidents", "check_equipment"]
 
-TOOLBOX = "post-test-supportbuddy-tools"
+TOOLBOX = "lab-test-supportbuddy-tools"
 
 HUMAN_IN_THE_LOOP = ["escalate_to_human", "get_handover_status", "restart_modem"]
 
@@ -18,9 +18,9 @@ EXPECTED_TOOLS = {
     "stage_3_back_office": ["identify_customer", "get_line_status"],
     "stage_4_diagnostic": ["identify_customer", "get_line_status", "check_equipment"],
     "stage_5_correlation": LOCAL_DIAGNOSTICS,
-    "stage_6_mcp": ["post_network"],
-    "stage_7_answer_or_handoff": ["post_network", *HUMAN_IN_THE_LOOP],
-    "stage_8_knowledge": ["post_network", "runbooks", *HUMAN_IN_THE_LOOP],
+    "stage_6_mcp": ["network"],
+    "stage_7_answer_or_handoff": ["network", *HUMAN_IN_THE_LOOP],
+    "stage_8_knowledge": ["network", "runbooks", *HUMAN_IN_THE_LOOP],
     "stage_9_toolbox": [TOOLBOX, *HUMAN_IN_THE_LOOP],
     "stage_11_memory": [TOOLBOX, *HUMAN_IN_THE_LOOP],
     "stage_13_guardrails": [TOOLBOX, *HUMAN_IN_THE_LOOP],
@@ -31,8 +31,8 @@ EXPECTED_TOOLS = {
 def _lab_settings(monkeypatch):
     monkeypatch.setenv("AZURE_AI_PROJECT_ENDPOINT", "https://example.services.ai.azure.com/api/projects/lab")
     monkeypatch.setenv("AZURE_AI_MODEL_DEPLOYMENT_NAME", "lab-model")
-    monkeypatch.setenv("WORKSHOP_RESOURCE_PREFIX", "post-test")
-    monkeypatch.setenv("POST_MOCK_MCP_URL", "http://127.0.0.1:8000/mcp")
+    monkeypatch.setenv("WORKSHOP_RESOURCE_PREFIX", "lab-test")
+    monkeypatch.setenv("MOCK_MCP_URL", "http://127.0.0.1:8000/mcp")
     monkeypatch.setenv("AZURE_AI_EMBEDDING_DEPLOYMENT_NAME", "lab-embedding")
     monkeypatch.setenv("AZURE_AI_SEARCH_ENDPOINT", "https://example.search.windows.net")
     monkeypatch.delenv("FOUNDRY_KNOWLEDGE_BASE_NAME", raising=False)
@@ -83,11 +83,11 @@ def test_stage_11_memory_is_scoped_to_participant_and_signed_in_customer():
     assert isinstance(signed_in, SignedInCustomer)
     assert signed_in.customer_id == "CUST-1002"
     assert isinstance(memory, FoundryMemoryProvider)
-    assert memory.memory_store_name == "post-lab-memory"
-    assert memory.scope == "post-test_CUST-1002"
+    assert memory.memory_store_name == "supportbuddy-memory"
+    assert memory.scope == "lab-test_CUST-1002"
 
 
-@pytest.mark.parametrize("customer_id", ["", "CUST-1002 OR 1=1", "post-other_CUST-1002", "cust-12"])
+@pytest.mark.parametrize("customer_id", ["", "CUST-1002 OR 1=1", "lab-other_CUST-1002", "cust-12"])
 def test_memory_scope_only_accepts_a_customer_id(customer_id):
     from lab_agent import memory_scope
 
@@ -117,7 +117,7 @@ def test_toolbox_is_named_per_participant_and_served_at_the_consumer_endpoint():
 def test_without_a_network_mcp_server_on_azure_the_network_tools_stay_local(monkeypatch, stage):
     monkeypatch.setenv("NETWORK_TOOLS", "local")
     module = importlib.import_module(f"solutions.{stage}")
-    assert [t.name for t in module.tools()] == [TOOLBOX, *HUMAN_IN_THE_LOOP, "post_network"]
+    assert [t.name for t in module.tools()] == [TOOLBOX, *HUMAN_IN_THE_LOOP, "network"]
 
 
 def test_network_tools_setting_is_validated(monkeypatch):
@@ -158,7 +158,7 @@ def test_contact_centre_builds_any_stage_agent(stage, signs_in):
         with pytest.raises(ValueError):
             stage_agent(stage)
     agent = stage_agent(stage, "CUST-1002" if signs_in else None)
-    assert agent.name == "post-test-supportbuddy"
+    assert agent.name == "lab-test-supportbuddy"
 
 
 def test_only_the_remote_restart_needs_approval():
@@ -185,7 +185,7 @@ def test_prompt_agent_definition_uses_the_toolbox():
     prompt_agent.create(project, "lab-model", "https://toolbox.example/mcp", with_functions=True)
 
     (name, default), (_, experiment) = published
-    assert name == "post-test-supportbuddy-prompt"
+    assert name == "lab-test-supportbuddy-prompt"
     assert default.model == "lab-model"
     (toolbox,) = default.tools
     assert toolbox.server_url == "https://toolbox.example/mcp"
@@ -201,7 +201,7 @@ def test_hosted_agent_uses_the_toolbox_and_the_local_handover_function(monkeypat
     import hosted_agent
 
     assert [t.name for t in hosted_agent.tools()] == [TOOLBOX, *HUMAN_IN_THE_LOOP]
-    assert hosted_agent.create_agent().name == "post-test-supportbuddy"
+    assert hosted_agent.create_agent().name == "lab-test-supportbuddy"
 
 
 def test_hosted_agent_requirements_match_the_pinned_agent_framework():

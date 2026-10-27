@@ -38,8 +38,8 @@ def tools() -> list:
     ]
     if toolbox["NETWORK_TOOLS"] == "local":
         tools.append(MCPStreamableHTTPTool(
-            name="post_network",
-            url=os.getenv("POST_MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
+            name="network",
+            url=os.getenv("MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
             approval_mode="never_require",
             load_prompts=False,
         ))
