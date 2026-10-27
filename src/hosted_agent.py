@@ -1,6 +1,6 @@
 """Stage 14 - SupportBuddy as a Foundry hosted agent.
 
-Same Agent Framework code as Stages 9 and 12, served over the Responses protocol by
+Same Agent Framework code as Stages 9 and 13, served over the Responses protocol by
 ResponsesHostServer. Locally it listens on http://localhost:8088. Deployed with
 `azd deploy`, Foundry runs this code for you: it builds it, gives it a managed identity
 and an endpoint, scales it, and shows it in the portal next to your prompt agent.

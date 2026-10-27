@@ -212,10 +212,11 @@ each at the moment the lab needs it:
 - For Stage 8 (knowledge): the **Search Index Data Reader** role on the Azure AI Search service behind
   the runbook knowledge base.
 - For Stage 14 (hosted agent): the **Foundry Project Manager** role on the project, to deploy a hosted agent.
-- Shared resources your instructor creates once (see [instructor/setup.md](../instructor/setup.md)): the
+- Shared resources created once for the group (see [instructor/setup.md](../instructor/setup.md)): the
   runbook knowledge base, the network MCP server on Azure Container Apps, the two project connections
   used by the toolbox, the Foundry Memory store (preview) with an embedding deployment, and the lab
-  guardrail.
+  guardrail. The instructor, an organizer, or you yourself create all of it in any subscription with one
+  command: `cd instructor; azd up`.
 - No keys: the lab signs in with your identity through the Azure CLI.
 
 **Your laptop**
@@ -1849,7 +1850,7 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | Stage 8: `401`/`403` from the knowledge base | You need the **Search Index Data Reader** role on the search service (role assignments can take a few minutes). |
 | Stage 8: `404` from the knowledge base | The knowledge base does not exist yet: `uv run python knowledge_base.py create`, and check `FOUNDRY_KNOWLEDGE_BASE_NAME`. |
 | Stage 8/9: the agent never calls `knowledge_base_retrieve` | Check `agent-framework-core` is 1.22.0 (`uv sync`). 1.23 skips that tool (see *Versions*). |
-| Stage 9: `toolbox.py create` fails with a connection not found | The instructor has not created the project connections yet (`instructor/setup.md`). |
+| Stage 9: `toolbox.py create` fails with a connection not found | The instructor has not created the project connections yet (`instructor/setup.md`). If the lab environment has no network MCP server on Azure, set `NETWORK_TOOLS=local` in `.env`. |
 | Stage 9: `toolbox.py show` lists no `network___` tools | The shared MCP server is not reachable from Foundry; ask your instructor. |
 | Stage 11: memory store not found | Run `uv run python memory_store.py create`, and check `AZURE_AI_EMBEDDING_DEPLOYMENT_NAME` in `.env`. |
 | Stage 13: `RAI policy name must be a fully qualified ... ARM resource ID` | Pass the guardrail's full resource ID to `--guardrail`, not its name. |

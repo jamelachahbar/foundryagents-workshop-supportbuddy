@@ -5,9 +5,10 @@
     "ghcr.io/devcontainers/features/azure-cli:1": {}
   },
   "postCreateCommand": "pip install --user uv && cd src && uv sync",
-  "forwardPorts": [8000, 8090],
+  "forwardPorts": [8000, 8070, 8090],
   "portsAttributes": {
     "8000": { "label": "Synthetic MCP server (Stage 6+)" },
+    "8070": { "label": "Contact centre (Stage 7+)" },
     "8090": { "label": "DevUI" }
   },
   "customizations": {

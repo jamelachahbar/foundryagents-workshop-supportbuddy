@@ -12,8 +12,14 @@ One-time setup (from the src folder):  uv run python toolbox.py create
 Then run (no local MCP server needed any more):
     uv run python -m solutions.stage_9_toolbox ["prompt"]
     uv run python -m contact_centre solutions.stage_9_toolbox
+
+With NETWORK_TOOLS=local in .env (no network MCP server on Azure), the toolbox holds only the
+runbooks and the agent still connects to the network MCP server on your laptop, as in Stage 6.
 """
 
+import os
+
+from agent_framework import MCPStreamableHTTPTool
 from agent_framework.foundry import FoundryToolbox
 from azure.identity.aio import AzureCliCredential
 
@@ -23,13 +29,21 @@ from tools.support_tools import escalate_to_human, get_handover_status, restart_
 
 def tools() -> list:
     toolbox = toolbox_settings()
-    return [
+    tools = [
         # One MCP connection for every Foundry-managed tool. Token scope: https://ai.azure.com/.default
         FoundryToolbox(AzureCliCredential(), url=toolbox["TOOLBOX_ENDPOINT"]),
         escalate_to_human,
         get_handover_status,
         restart_modem,
     ]
+    if toolbox["NETWORK_TOOLS"] == "local":
+        tools.append(MCPStreamableHTTPTool(
+            name="post_network",
+            url=os.getenv("POST_MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
+            approval_mode="never_require",
+            load_prompts=False,
+        ))
+    return tools
 
 
 if __name__ == "__main__":

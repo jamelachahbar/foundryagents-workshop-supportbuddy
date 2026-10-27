@@ -96,7 +96,11 @@ def toolbox_settings() -> dict[str, str]:
     name = f"{settings['WORKSHOP_RESOURCE_PREFIX']}-{AGENT_BASE_NAME}-tools"
     # The consumer endpoint always serves the toolbox's default version.
     endpoint = f"{settings['AZURE_AI_PROJECT_ENDPOINT'].rstrip('/')}/toolboxes/{name}/mcp?api-version=v1"
-    return {"TOOLBOX_NAME": name, "TOOLBOX_ENDPOINT": endpoint}
+    # "local" when the lab environment has no network MCP server on Azure: those tools then stay on your laptop.
+    network_tools = os.getenv("NETWORK_TOOLS", "toolbox").strip().lower()
+    if network_tools not in ("toolbox", "local"):
+        sys.exit(f"NETWORK_TOOLS={network_tools!r} must be 'toolbox' or 'local'.")
+    return {"TOOLBOX_NAME": name, "TOOLBOX_ENDPOINT": endpoint, "NETWORK_TOOLS": network_tools}
 
 
 def memory_scope(customer_id: str) -> str:

@@ -19,7 +19,7 @@ dependencies = [
     "azure-identity>=1.26.0",
     # MCP support is optional in agent-framework-core 1.22; this matches its "all" extra
     "mcp>=1.24.0,<2",
-    # Operator desk (Stage 7); already installed with mcp, declared because the lab uses them directly
+    # Contact centre web server (Stage 7); already installed with mcp, declared because the lab uses them directly
     "starlette>=0.40",
     "uvicorn>=0.30",
     # Contact centre (Stage 7): serves the agents over the AG-UI protocol

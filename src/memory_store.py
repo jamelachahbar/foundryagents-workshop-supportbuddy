@@ -1,4 +1,4 @@
-"""Create and inspect the Foundry Memory store used in Stage 9.
+"""Create and inspect the Foundry Memory store used in Stage 11.
 
 Run from the src folder:
     uv run python memory_store.py create              # once per workshop (idempotent)

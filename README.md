@@ -74,7 +74,8 @@ system or record.
 
 ```text
 docs/workshop.md                  participant guide (start here)
-instructor/setup.md               shared resources the instructor creates once (+ guardrail.json)
+instructor/setup.md               lab environment setup: `azd up` in any tenant, or by hand (+ guardrail.json)
+instructor/azure.yaml, infra/     the lab environment as code (Bicep) and its post-provision script (setup_lab.py)
 src/main.py                       your agent - you extend it at each stage
 src/main.instructions.md          your agent's instructions
 src/lab_agent.py                  shared plumbing: settings, Foundry connection, DevUI / console runner
@@ -91,7 +92,7 @@ src/hosted_agent.py               SupportBuddy as a Foundry hosted agent (Stage 
 src/lab_backend/                  synthetic back-office + data/scenarios.json (fictional data)
 src/contact_centre/               customer chat, operator desk and advisor assist agent, over AG-UI (Stage 7)
 src/mcp_server/                   synthetic MCP server (Stage 6) and its Dockerfile (shared copy, Stage 9)
-src/solutions/                    complete, runnable reference for every stage
+src/solutions/                    runnable reference for each stage that changes the agent code (10, 12 and 14 use the scripts above)
 src/preflight.py                  checks your environment before the workshop
 tests/                            offline tests (no Azure needed)
 ```
@@ -108,3 +109,6 @@ uv run python main.py      # opens DevUI
 ```
 
 Run the offline tests with `uv run pytest` from `src`.
+
+No lab environment yet? `cd instructor; azd up` creates all of it in your own subscription; see
+[instructor/setup.md](instructor/setup.md).

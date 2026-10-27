@@ -1,0 +1,28 @@
+# SupportBuddy lab environment: every shared Azure resource for the workshop.
+# From this folder: `azd up` (see setup.md). The participants' own agents use src/azure.yaml instead.
+name: supportbuddy-lab-environment
+metadata:
+  template: supportbuddy-lab-environment
+infra:
+  provider: bicep
+  path: infra
+services:
+  network-mcp:
+    project: ../src
+    host: containerapp
+    language: python
+    docker:
+      path: mcp_server/Dockerfile
+      context: .
+      # Built in Azure Container Registry: Docker is not needed on your machine.
+      remoteBuild: true
+hooks:
+  postprovision:
+    windows:
+      shell: pwsh
+      run: uv run --project ../src python setup_lab.py
+      continueOnError: false
+    posix:
+      shell: sh
+      run: uv run --project ../src python setup_lab.py
+      continueOnError: false

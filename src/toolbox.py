@@ -24,6 +24,7 @@ import sys
 
 from azure.ai.projects import AIProjectClient
 from azure.ai.projects.models import MCPToolboxTool, RaiConfig, ToolboxPolicies
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import AzureCliCredential
 
 from lab_agent import load_settings, toolbox_settings
@@ -36,17 +37,10 @@ GUARDRAIL_ID = re.compile(
 )
 
 
-def toolbox_tools(project: AIProjectClient) -> list[MCPToolboxTool]:
+def toolbox_tools(project: AIProjectClient, include_network: bool = True) -> list[MCPToolboxTool]:
     """The tools in the toolbox. server_label becomes the prefix of each tool name."""
-    network = project.connections.get(NETWORK_CONNECTION)
     knowledge = project.connections.get(KNOWLEDGE_CONNECTION)
-    return [
-        MCPToolboxTool(
-            server_label="network",
-            server_url=network.target,
-            project_connection_id=NETWORK_CONNECTION,
-            require_approval="never",  # read-only diagnostics
-        ),
+    tools = [
         MCPToolboxTool(
             server_label="runbooks",
             server_url=knowledge.target,
@@ -55,20 +49,35 @@ def toolbox_tools(project: AIProjectClient) -> list[MCPToolboxTool]:
             allowed_tools=["knowledge_base_retrieve"],
         ),
     ]
+    if include_network:
+        try:
+            network = project.connections.get(NETWORK_CONNECTION)
+        except ResourceNotFoundError:
+            sys.exit(f"The project has no '{NETWORK_CONNECTION}' connection. Without a network MCP server on Azure, "
+                     "set NETWORK_TOOLS=local in src/.env and run this again.")
+        tools.insert(0, MCPToolboxTool(
+            server_label="network",
+            server_url=network.target,
+            project_connection_id=NETWORK_CONNECTION,
+            require_approval="never",  # read-only diagnostics
+        ))
+    return tools
 
 
-def create(project: AIProjectClient, name: str, guardrail: str | None) -> None:
+def create(project: AIProjectClient, name: str, guardrail: str | None, include_network: bool = True) -> None:
     if guardrail and not GUARDRAIL_ID.match(guardrail):
         sys.exit("--guardrail needs the full resource ID: /subscriptions/.../accounts/<account>/raiPolicies/<name>")
     version = project.toolboxes.create_version(
         name=name,
         description="SupportBuddy lab tools: synthetic network diagnostics and runbooks (training data only).",
-        tools=toolbox_tools(project),
+        tools=toolbox_tools(project, include_network),
         policies=ToolboxPolicies(rai_config=RaiConfig(rai_policy_name=guardrail)) if guardrail else None,
     )
     # A new version is not served until it is the default: promote it explicitly.
     project.toolboxes.update(name, default_version=version.version)
     print(f"Toolbox '{name}' version {version.version} is now the default.")
+    if not include_network:
+        print("NETWORK_TOOLS=local: the toolbox holds the runbooks; the network tools stay on your laptop.")
     if guardrail:
         print("The guardrail now screens tool inputs and outputs through this toolbox.")
 
@@ -95,7 +104,7 @@ def main() -> int:
         asyncio.run(show(toolbox["TOOLBOX_ENDPOINT"]))
         return 0
     with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=AzureCliCredential()) as project:
-        create(project, toolbox["TOOLBOX_NAME"], args.guardrail)
+        create(project, toolbox["TOOLBOX_NAME"], args.guardrail, include_network=toolbox["NETWORK_TOOLS"] == "toolbox")
     return 0
 
 

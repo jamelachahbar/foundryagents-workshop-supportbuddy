@@ -37,6 +37,7 @@ def _lab_settings(monkeypatch):
     monkeypatch.setenv("AZURE_AI_SEARCH_ENDPOINT", "https://example.search.windows.net")
     monkeypatch.delenv("FOUNDRY_KNOWLEDGE_BASE_NAME", raising=False)
     monkeypatch.delenv("FOUNDRY_MEMORY_STORE_NAME", raising=False)
+    monkeypatch.delenv("NETWORK_TOOLS", raising=False)
 
 
 @pytest.mark.parametrize(("stage", "expected"), EXPECTED_TOOLS.items())
@@ -110,6 +111,21 @@ def test_toolbox_is_named_per_participant_and_served_at_the_consumer_endpoint():
     assert toolbox["TOOLBOX_ENDPOINT"] == (
         f"https://example.services.ai.azure.com/api/projects/lab/toolboxes/{TOOLBOX}/mcp?api-version=v1"
     )
+
+
+@pytest.mark.parametrize("stage", ["stage_9_toolbox", "stage_11_memory", "stage_13_guardrails"])
+def test_without_a_network_mcp_server_on_azure_the_network_tools_stay_local(monkeypatch, stage):
+    monkeypatch.setenv("NETWORK_TOOLS", "local")
+    module = importlib.import_module(f"solutions.{stage}")
+    assert [t.name for t in module.tools()] == [TOOLBOX, *HUMAN_IN_THE_LOOP, "post_network"]
+
+
+def test_network_tools_setting_is_validated(monkeypatch):
+    from lab_agent import toolbox_settings
+
+    monkeypatch.setenv("NETWORK_TOOLS", "laptop")
+    with pytest.raises(SystemExit):
+        toolbox_settings()
 
 
 def test_toolbox_stages_tell_the_model_about_the_tool_prefix():
