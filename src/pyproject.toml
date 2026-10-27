@@ -11,7 +11,7 @@ dependencies = [
     # Move to the first release that contains that fix.
     "agent-framework-core==1.22.0",
     "agent-framework-foundry==1.15.0",
-    # FoundryToolbox (Stage 9) and ResponsesHostServer (Stage 13)
+    # FoundryToolbox (Stage 9) and ResponsesHostServer (Stage 14)
     "agent-framework-foundry-hosting==1.0.0b261015",
     "agent-framework-devui==1.0.0b261015",
     # agent-framework-foundry 1.15.0 requires azure-ai-projects <2.8.0
@@ -22,6 +22,9 @@ dependencies = [
     # Operator desk (Stage 7); already installed with mcp, declared because the lab uses them directly
     "starlette>=0.40",
     "uvicorn>=0.30",
+    # Contact centre (Stage 7): serves the agents over the AG-UI protocol
+    "agent-framework-ag-ui==1.6.0",
+    "httpx>=0.28",
     "tenacity>=9.1.4,<9.2.0",
     "python-dotenv>=1.2.4",
 ]

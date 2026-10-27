@@ -45,7 +45,7 @@ connect to them.
 
 Every tool name (`identify_customer`, `get_line_status`, `check_equipment`, `get_known_incidents`,
 `escalate_to_human`, `get_handover_status`, `restart_modem`), every customer (`CUST-1001` ...), line, device (`MockBox`), place (`Mock-Ville`),
-incident and handover reference (`HO-9001` ...), and the operator desk, is a **lab construct**. None of them is a POST API,
+incident and handover reference (`HO-9001` ...), and the contact centre, is a **lab construct**. None of them is a POST API,
 system or record.
 
 ## Stages
@@ -59,15 +59,15 @@ system or record.
 | 4 | `check_equipment` (simulated ping) | ... -> equipment -> technical check |
 | 5 | `get_known_incidents` + correlation rules | evidence from independent capabilities -> conclusion |
 | 6 | Diagnostics moved behind an MCP server | Python function -> enterprise capability -> MCP server -> agent |
-| 7 | `escalate_to_human`, operator desk, `restart_modem` with approval | answer, act after a person approves, or hand over to a human advisor |
+| 7 | `escalate_to_human`, `restart_modem` with approval, the contact centre | answer, act after a person approves, or hand the live conversation to a human advisor |
 | **Part 2** | **Make it enterprise-ready with Foundry** | |
 | 8 | Foundry IQ knowledge base, consumed over MCP | tools say what is wrong, runbooks say what to do - cited `[RB-xx]` |
 | 9 | Foundry Toolbox | one governed, versioned MCP endpoint; credentials in project connections |
-| 10 | Foundry Memory + signed-in customer | remember preferences and past problems, outside the runtime |
-| 11 | Evaluation: rule-based checks + Foundry evaluators | measure decisions, tool use, citations and safety |
-| 12 | Guardrails: Foundry guardrail + code middleware | layered defence against jailbreaks and poisoned tool data |
-| **Part 3** | **Run it in Foundry** | |
-| 13 | Prompt agent | declarative agent run by Foundry: what it can and cannot do |
+| 10 | Prompt agent | Foundry's recommended starting point: the same agent with no code - how far does it get? |
+| 11 | Foundry Memory + signed-in customer | remember preferences and past problems, outside the runtime |
+| 12 | Evaluation: rule-based checks + Foundry evaluators | measure decisions, tool use, citations and safety |
+| 13 | Guardrails: Foundry guardrail + code middleware | layered defence against jailbreaks and poisoned tool data |
+| **Part 3** | **Run your code in Foundry** | |
 | 14 | Hosted agent | the same Agent Framework code, deployed and run by Foundry |
 
 ## Repository map
@@ -83,13 +83,13 @@ src/tools/support_tools.py        agent tools (lab constructs) over the syntheti
 src/tools/knowledge_tools.py      the Foundry IQ knowledge base as an MCP tool (Stage 8)
 src/knowledge/runbooks/           12 synthetic troubleshooting runbooks (RB-01 ... RB-12)
 src/knowledge_base.py             create / query the Foundry IQ knowledge base (Stage 8)
-src/toolbox.py                    create / inspect your Foundry Toolbox (Stages 9, 12)
-src/memory_store.py               create / inspect / forget the Foundry Memory store (Stage 10)
-src/evaluate.py, src/evals/       evaluation dataset and runner (Stage 11)
-src/prompt_agent.py               SupportBuddy as a Foundry prompt agent (Stage 13)
+src/toolbox.py                    create / inspect your Foundry Toolbox (Stages 9, 13)
+src/memory_store.py               create / inspect / forget the Foundry Memory store (Stage 11)
+src/evaluate.py, src/evals/       evaluation dataset and runner (Stage 12)
+src/prompt_agent.py               SupportBuddy as a Foundry prompt agent (Stage 10)
 src/hosted_agent.py               SupportBuddy as a Foundry hosted agent (Stage 14)
 src/lab_backend/                  synthetic back-office + data/scenarios.json (fictional data)
-src/operator_desk/                web app where a human advisor works the handover queue (Stage 7)
+src/contact_centre/               customer chat, operator desk and advisor assist agent, over AG-UI (Stage 7)
 src/mcp_server/                   synthetic MCP server (Stage 6) and its Dockerfile (shared copy, Stage 9)
 src/solutions/                    complete, runnable reference for every stage
 src/preflight.py                  checks your environment before the workshop

@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import copy
 import functools
+import importlib
 import json
 import logging
 import os
@@ -78,7 +79,7 @@ def knowledge_settings() -> dict[str, str]:
 
 
 def memory_settings() -> dict[str, str]:
-    """Read the Foundry Memory settings used from Stage 10."""
+    """Read the Foundry Memory settings used from Stage 11."""
     load_settings()
     embedding = os.getenv("AZURE_AI_EMBEDDING_DEPLOYMENT_NAME")
     if not embedding:
@@ -139,23 +140,40 @@ def agent_name() -> str:
     return f"{load_settings()['WORKSHOP_RESOURCE_PREFIX']}-{AGENT_BASE_NAME}"
 
 
+def stage_signs_in(module_name: str) -> bool:
+    """Stage 11 and later need a signed-in customer: they define ``context_providers(customer_id)``."""
+    return hasattr(importlib.import_module(module_name), "context_providers")
+
+
+def stage_agent(module_name: str, customer_id: str | None = None) -> Agent:
+    """Build the agent of a stage file (``main`` or ``solutions.stage_N_...``), as its ``__main__`` block does."""
+    module = importlib.import_module(module_name)
+    if not stage_signs_in(module_name):
+        return build_agent(module.__file__, module.tools())
+    if not customer_id:
+        raise ValueError(f"{module_name} needs a signed-in customer.")
+    middleware = module.middleware(customer_id) if hasattr(module, "middleware") else ()
+    return build_agent(module.__file__, module.tools(), module.context_providers(customer_id), middleware=middleware)
+
+
 def build_agent(
     script_file: str,
     tools: Sequence[Any] = (),
     context_providers: Sequence[Any] = (),
     credential: Any = None,
     middleware: Sequence[Any] = (),
+    name: str | None = None,
 ) -> Agent:
     """Create the SupportBuddy agent for a stage.
 
     This is a code-first agent: the agent loop (instructions, tool calls, memory) runs in this
-    Python process, and only the model runs in Microsoft Foundry. Stage 13 compares it with a
+    Python process, and only the model runs in Microsoft Foundry. Stage 10 compares it with a
     prompt agent, and Stage 14 runs this same code in Foundry as a hosted agent.
     """
     settings = load_settings()
     effort = os.getenv("SUPPORTBUDDY_REASONING_EFFORT", "medium")
     return Agent(
-        name=agent_name(),
+        name=name or agent_name(),
         client=FoundryChatClient(
             project_endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"],
             model=settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
@@ -235,7 +253,7 @@ def _async_providers(agent: Agent) -> list[Any]:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run the SupportBuddy lab agent.")
     parser.add_argument("prompt", nargs="?", help="Answer this prompt in the console instead of opening DevUI.")
-    parser.add_argument("--customer", help="Stage 10+: the customer signed in to the support channel, e.g. CUST-1002.")
+    parser.add_argument("--customer", help="Stage 11+: the customer signed in to the support channel, e.g. CUST-1002.")
     return parser.parse_args()
 
 
@@ -288,6 +306,8 @@ def _print_tool_activity(response: Any) -> None:
         for content in message.contents:
             if content.type == "function_call":
                 print(f"  [tool call]   {content.name} {_compact(content.arguments)}")
+            elif content.type == "mcp_server_tool_call":
+                print(f"  [tool call, run by Foundry] {content.tool_name} {_compact(content.arguments)}")
             elif content.type == "function_result":
                 print(f"  [tool result] {_compact(content.result)}")
 

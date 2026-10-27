@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SupportBuddy - Customer chat</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/centre.css">
+</head>
+<body>
+  <header>
+    <img src="/icon.svg" alt="" width="32" height="32">
+    <h1>SupportBuddy <span>Customer chat</span></h1>
+    <span id="mode" class="pill"></span>
+  </header>
+  <p class="banner">Training lab: synthetic customers and systems only. Not a POST system.</p>
+  <main class="chat">
+    <section id="start" class="start" hidden>
+      <h2>Start a conversation</h2>
+      <p class="muted" id="start-help"></p>
+      <label id="signin" hidden>Signed in as
+        <select id="customer"></select>
+      </label>
+      <button id="begin" type="button">Start chatting</button>
+      <p class="error" id="start-error" role="alert"></p>
+    </section>
+    <ul id="messages" class="messages" aria-live="polite" hidden></ul>
+    <p id="typing" class="typing"></p>
+    <form id="composer" class="composer" hidden>
+      <textarea id="text" maxlength="2000" placeholder="Write your message" aria-label="Message"></textarea>
+      <button id="send" type="submit">Send</button>
+    </form>
+    <p class="error" id="error" role="alert"></p>
+    <p><button id="restart" class="secondary" type="button" hidden>Start a new conversation</button></p>
+  </main>
+  <script src="/common.js"></script>
+  <script src="/chat.js"></script>
+</body>
+</html>

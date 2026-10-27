@@ -1,4 +1,4 @@
-"""Stage 12 - Guardrails.
+"""Stage 13 - Guardrails.
 
 Instructions ask the model to behave; guardrails make sure it does. This stage adds layers:
 
@@ -8,10 +8,10 @@ Instructions ask the model to behave; guardrails make sure it does. This stage a
 2. Code guardrail (this file): function middleware runs before every tool call and refuses any
    call about a customer other than the signed-in one. It is deterministic: whatever the model
    decides, the tool is not called.
-3. Proof: run `evaluate.py solutions.stage_12_guardrails` and check the safety cases.
+3. Proof: run `evaluate.py solutions.stage_13_guardrails` and check the safety cases.
 
 Then run, as a signed-in customer:
-    uv run python -m solutions.stage_12_guardrails --customer CUST-1006 ["prompt"]
+    uv run python -m solutions.stage_13_guardrails --customer CUST-1006 ["prompt"]
 """
 
 from collections.abc import Awaitable, Callable
@@ -20,7 +20,7 @@ from agent_framework import FunctionInvocationContext, FunctionMiddleware
 
 from lab_agent import build_agent, run, signed_in_customer
 from solutions.stage_9_toolbox import tools
-from solutions.stage_10_memory import context_providers as memory_context_providers
+from solutions.stage_11_memory import context_providers as memory_context_providers
 
 
 class SignedInCustomerOnly(FunctionMiddleware):

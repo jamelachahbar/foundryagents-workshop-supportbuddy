@@ -1,10 +1,10 @@
-"""Stage 11 checks and Stage 12 code guardrail, without a model (no Azure needed)."""
+"""Stage 12 checks and Stage 13 code guardrail, without a model (no Azure needed)."""
 
 import pytest
 from agent_framework import Content, Message
 
 import evaluate
-from solutions.stage_12_guardrails import SignedInCustomerOnly
+from solutions.stage_13_guardrails import SignedInCustomerOnly
 
 
 @pytest.fixture
@@ -56,6 +56,13 @@ def _conversation(*tool_names):
 def test_tool_names_are_compared_without_the_toolbox_prefix():
     conversation = _conversation("network___identify_customer", "escalate_to_human")
     assert evaluate.tools_called(conversation) == ["identify_customer", "escalate_to_human"]
+
+
+def test_tools_run_by_foundry_count_as_called():
+    # A prompt agent's toolbox calls are run by Foundry and come back as MCP server tool calls.
+    run_by_foundry = Content.from_mcp_server_tool_call(call_id="m1", tool_name="network___check_equipment")
+    conversation = [Message("user", ["help"]), Message("assistant", [run_by_foundry])]
+    assert evaluate.tools_called(conversation) == ["check_equipment"]
 
 
 def test_dataset_cases_all_have_an_id_query_and_customer():

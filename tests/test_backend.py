@@ -170,11 +170,11 @@ def test_unknown_handover_status_is_rejected():
 
 def test_remote_modem_restart_is_simulated_and_logged():
     result = backend.restart_modem("cust-1002")
-    assert result["accepted"] is True
+    assert result["restart_sent"] is True
     assert result["equipment_id"] == "EQ-3002"
     assert result["source"] == "mock"
     assert [a["customer_id"] for a in backend.list_actions()] == ["CUST-1002"]
-    assert backend.restart_modem("CUST-9999")["accepted"] is False
+    assert backend.restart_modem("CUST-9999")["restart_sent"] is False
 
 
 def test_backend_returns_copies_not_its_own_data():

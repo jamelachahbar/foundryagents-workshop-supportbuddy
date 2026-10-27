@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SupportBuddy - Operator desk</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/centre.css">
+</head>
+<body>
+  <header>
+    <img src="/icon.svg" alt="" width="32" height="32">
+    <h1>SupportBuddy <span>Operator desk</span></h1>
+    <label>Advisor <input id="advisor" maxlength="60" value="Lea"></label>
+  </header>
+  <p class="banner">Training lab: synthetic customers and systems only. Not a POST system. In production advisors sign in with Microsoft Entra ID.</p>
+  <main class="desk">
+    <section>
+      <h2>Conversations</h2>
+      <ul id="queue" class="queue"></ul>
+      <p id="queue-empty" class="empty">No conversations yet. Open the customer chat in another tab.</p>
+      <h3>Approved actions</h3>
+      <ul id="actions" class="actions-log"></ul>
+    </section>
+    <section class="conversation">
+      <p id="pick" class="empty">Select a conversation.</p>
+      <div id="detail" hidden>
+        <h2><span id="title"></span> <span id="mode" class="pill"></span></h2>
+        <div id="handover" class="handover" hidden>
+          <dl>
+            <dt>Handover</dt><dd id="h-id"></dd>
+            <dt>Reported problem</dt><dd id="h-problem"></dd>
+            <dt>Could not determine</dt><dd id="h-unresolved"></dd>
+            <dt>Next investigation</dt><dd id="h-next"></dd>
+            <dt>Preferred contact</dt><dd id="h-contact"></dd>
+          </dl>
+          <h3>Evidence collected by SupportBuddy</h3>
+          <ul id="h-evidence"></ul>
+        </div>
+        <h3>Live conversation</h3>
+        <ul id="messages" class="messages"></ul>
+        <form id="composer" class="composer">
+          <textarea id="text" maxlength="2000" placeholder="Write to the customer" aria-label="Message to the customer"></textarea>
+          <button id="send" type="submit">Send</button>
+        </form>
+        <div class="toolbar">
+          <button id="take" type="button">Take conversation</button>
+          <button id="handback" class="secondary" type="button">Hand back to SupportBuddy</button>
+          <button id="close" class="secondary" type="button">Close conversation</button>
+        </div>
+        <p class="error" id="error" role="alert"></p>
+      </div>
+    </section>
+    <section class="assist">
+      <h2>Advisor assist <span class="pill">AI, only you see this</span></h2>
+      <div class="toolbar">
+        <button type="button" class="secondary" data-prompt="Summarise the case.">Summarise</button>
+        <button type="button" class="secondary" data-prompt="Suggest a reply to the customer.">Suggest a reply</button>
+        <button type="button" class="secondary" data-prompt="Check the line, incidents and modem again and tell me what changed.">Check again</button>
+        <button type="button" class="secondary" data-prompt="Restart the customer's modem remotely.">Restart modem</button>
+      </div>
+      <ul id="assist" class="messages"></ul>
+      <p id="assist-typing" class="typing"></p>
+      <form id="assist-form" class="composer">
+        <textarea id="assist-text" maxlength="2000" placeholder="Ask the assist agent" aria-label="Ask the assist agent"></textarea>
+        <button id="assist-send" type="submit">Ask</button>
+      </form>
+      <p class="error" id="assist-error" role="alert"></p>
+    </section>
+  </main>
+  <script src="/common.js"></script>
+  <script src="/desk.js"></script>
+</body>
+</html>

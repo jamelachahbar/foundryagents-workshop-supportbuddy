@@ -17,6 +17,7 @@ import copy
 import json
 import os
 import re
+import tempfile
 import threading
 from datetime import UTC, datetime
 from functools import cache
@@ -27,13 +28,22 @@ SOURCE = "mock"
 DATA_FILE = Path(__file__).parent / "data" / "scenarios.json"
 FIRST_HANDOVER_NUMBER = 9001
 
-# The handover queue and the action log are shared with the operator desk (another process),
-# so they live in a small JSON file instead of in memory.
+# The handover queue and the action log are shared by every process that runs the agent's tools
+# (contact centre, DevUI, console), so they live in a small JSON file instead of in memory.
 _state_lock = threading.Lock()
 
 
 def state_file() -> Path:
-    directory = Path(os.getenv("LAB_STATE_DIR") or Path(__file__).resolve().parents[1] / ".lab_state")
+    if os.getenv("LAB_STATE_DIR"):
+        return Path(os.environ["LAB_STATE_DIR"]) / "handovers.json"
+    directory = Path(__file__).resolve().parents[1] / ".lab_state"
+    try:
+        directory.mkdir(exist_ok=True)
+    except OSError:
+        pass
+    if not os.access(directory, os.W_OK):
+        # A hosted agent's code folder can be read-only; the container's temp folder is not.
+        directory = Path(tempfile.gettempdir()) / "supportbuddy_lab_state"
     return directory / "handovers.json"
 
 
@@ -205,7 +215,7 @@ def escalate_to_human(
     return {
         **copy.deepcopy(handover),
         "note": (
-            "Synthetic lab handover record only. It appears on the lab operator desk; "
+            "Synthetic lab handover record only. A human advisor picks it up in the lab contact centre; "
             "no real POST ticket, queue, channel or person was contacted."
         ),
         "source": SOURCE,
@@ -236,7 +246,7 @@ def restart_modem(customer_id: str) -> dict[str, Any]:
     wanted = customer_id.strip().upper()
     modems = [e for e in _data()["equipment"] if e["customer_id"] == wanted and e["type"] == "modem"]
     if not modems:
-        return {"accepted": False, "reason": "no_modem_found", "customer_id": wanted, "source": SOURCE}
+        return {"restart_sent": False, "reason": "no_modem_found", "customer_id": wanted, "source": SOURCE}
     action = {
         "action": "remote_modem_restart",
         "customer_id": wanted,
@@ -247,8 +257,9 @@ def restart_modem(customer_id: str) -> dict[str, Any]:
         state = _load_state()
         state["actions"].append(action)
         _save_state(state)
+    # Not named "accepted": AG-UI reads a tool result with that key as an approval decision.
     return {
-        "accepted": True,
+        "restart_sent": True,
         **action,
         "expected_back_in_minutes": 3,
         "note": "Simulated command. No real equipment was contacted. The customer's connection drops while it restarts.",
@@ -257,19 +268,24 @@ def restart_modem(customer_id: str) -> dict[str, Any]:
 
 
 def list_handovers() -> list[dict[str, Any]]:
-    """All handovers, newest first (operator desk)."""
+    """All handovers, newest first."""
     return list(reversed(_load_state()["handovers"]))
 
 
 def list_actions() -> list[dict[str, Any]]:
-    """All actions agents executed after approval, newest first (operator desk)."""
+    """All actions agents executed after approval, newest first (contact centre desk)."""
     return list(reversed(_load_state()["actions"]))
+
+
+def list_customers() -> list[dict[str, Any]]:
+    """The fictional lab customers (contact centre sign-in picker)."""
+    return [_public_customer(c) for c in _data()["customers"]]
 
 
 def update_handover(
     handover_id: str, *, status: str, advisor: str, advisor_message: str | None = None
 ) -> dict[str, Any] | None:
-    """An advisor takes or resolves a handover (operator desk)."""
+    """An advisor takes or resolves a handover (contact centre desk)."""
     if status not in ("in_progress", "resolved"):
         raise ValueError(f"Unknown status {status!r}")
     with _state_lock:

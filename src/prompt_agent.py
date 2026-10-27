@@ -1,15 +1,20 @@
-"""Create and chat with SupportBuddy as a Foundry prompt agent (Stage 13).
+"""Publish SupportBuddy as a Foundry prompt agent, and talk to it (Stage 10).
 
 Run from the src folder:
     uv run python prompt_agent.py create                  # publish a new version of the prompt agent
     uv run python prompt_agent.py ask "I'm CUST-1003, my Wi-Fi is slow upstairs"
+    uv run python prompt_agent.py chat                    # the same agent in DevUI
+    uv run python -m contact_centre --prompt-agent        # customer chat + operator desk
 
 A prompt agent is declarative: a definition (model + instructions + tools) stored in Foundry.
-There is no code of yours running. When someone talks to it, Foundry Agent Service runs the
-agent loop and calls the tools itself. That has consequences you will see in this stage:
-  - only tools Foundry can call itself work (MCP, toolbox, knowledge, web search, ...);
-  - your local Python functions (escalate_to_human) and middleware cannot be used;
-  - everything is visible and editable in the Foundry portal (Build > Agents).
+Foundry Agent Service runs the agent loop and calls the toolbox itself; nothing of yours runs.
+Agent Framework's FoundryAgent connects to it like to any other agent, so DevUI, the console and
+the contact centre work with it unchanged.
+
+Optional experiment: `create --with-functions` also declares your three Python functions
+(escalate_to_human, get_handover_status, restart_modem) as function tools. Foundry knows their name
+and parameters, but it cannot run your code: the run returns each call to the application, and
+FoundryAgent runs the function and sends the result back. The Foundry portal playground cannot.
 """
 
 from __future__ import annotations
@@ -18,64 +23,82 @@ import argparse
 import sys
 from pathlib import Path
 
+from agent_framework.foundry import FoundryAgent
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import MCPTool, PromptAgentDefinition
+from azure.ai.projects.models import FunctionTool, MCPTool, PromptAgentDefinition, Reasoning
 from azure.identity import AzureCliCredential
+from azure.identity.aio import AzureCliCredential as AsyncAzureCliCredential
 
-from lab_agent import agent_name, load_settings, toolbox_settings
+from lab_agent import agent_name, load_settings, run, toolbox_settings
+from tools.support_tools import escalate_to_human, get_handover_status, restart_modem
 
-INSTRUCTIONS = Path(__file__).parent / "solutions" / "stage_13_prompt_agent.instructions.md"
+INSTRUCTIONS = Path(__file__).parent / "solutions" / "stage_10_prompt_agent.instructions.md"
+INSTRUCTIONS_WITH_FUNCTIONS = Path(__file__).parent / "solutions" / "stage_10_prompt_agent_functions.instructions.md"
+# Your Python functions: declared in the definition, run by the application (never by Foundry).
+LOCAL_FUNCTIONS = [escalate_to_human, get_handover_status, restart_modem]
 
 
 def prompt_agent_name() -> str:
     return f"{agent_name()}-prompt"
 
 
-def create(project: AIProjectClient, model: str, toolbox_endpoint: str) -> None:
+def function_declaration(function) -> FunctionTool:  # noqa: ANN001
+    """The name, description and JSON schema of a local function, without its code."""
+    spec = function.to_json_schema_spec()["function"]
+    return FunctionTool(name=spec["name"], description=spec["description"], parameters=spec["parameters"], strict=False)
+
+
+def create(project: AIProjectClient, model: str, toolbox_endpoint: str, with_functions: bool = False) -> None:
+    tools = [
+        # The same toolbox as Stage 9, but now Foundry (not your laptop) connects to it.
+        MCPTool(server_label="supportbuddy_tools", server_url=toolbox_endpoint, require_approval="never"),
+    ]
+    if with_functions:
+        tools += [function_declaration(f) for f in LOCAL_FUNCTIONS]
     definition = PromptAgentDefinition(
         model=model,
-        instructions=INSTRUCTIONS.read_text(encoding="utf-8"),
-        tools=[
-            # The same toolbox as Stage 9, but now Foundry (not your laptop) connects to it.
-            MCPTool(
-                server_label="supportbuddy_tools",
-                server_url=toolbox_endpoint,
-                require_approval="never",
-            )
-        ],
+        instructions=(INSTRUCTIONS_WITH_FUNCTIONS if with_functions else INSTRUCTIONS).read_text(encoding="utf-8"),
+        reasoning=Reasoning(effort="medium"),
+        tools=tools,
     )
     version = project.agents.create_version(agent_name=prompt_agent_name(), definition=definition)
     print(f"Prompt agent '{version.name}' version {version.version} published.")
     print("Open it in the Foundry portal: Build > Agents, then use the playground.")
 
 
-def ask(project: AIProjectClient, question: str) -> None:
-    openai = project.get_openai_client()
-    response = openai.responses.create(
-        input=question,
-        extra_body={"agent_reference": {"name": prompt_agent_name(), "type": "agent_reference"}},
+def connect_prompt_agent() -> FoundryAgent:
+    """Agent Framework's client for your prompt agent (latest version). It runs the functions the agent declares."""
+    settings = load_settings()
+    with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=AzureCliCredential()) as project:
+        latest = project.agents.get(agent_name=prompt_agent_name()).versions.latest
+    declared = {tool.get("name") for tool in latest.definition.get("tools", []) if tool.get("type") == "function"}
+    return FoundryAgent(
+        project_endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"],
+        agent_name=latest.name,
+        agent_version=latest.version,
+        credential=AsyncAzureCliCredential(),
+        tools=[f for f in LOCAL_FUNCTIONS if f.name in declared] or None,
     )
-    for item in response.output:
-        if item.type == "mcp_call":
-            print(f"  [tool call, run by Foundry] {item.name}")
-    print(f"\nAgent: {response.output_text}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="SupportBuddy as a Foundry prompt agent.")
-    parser.add_argument("action", choices=["create", "ask"])
+    parser.add_argument("action", choices=["create", "ask", "chat"])
     parser.add_argument("question", nargs="?")
+    parser.add_argument("--with-functions", action="store_true", help="Experiment: also declare your Python functions.")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
 
     settings = load_settings()
-    with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=AzureCliCredential()) as project:
-        if args.action == "create":
-            create(project, settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"], toolbox_settings()["TOOLBOX_ENDPOINT"])
-        else:
-            if not args.question:
-                parser.error('ask needs a question, for example "I\'m CUST-1003, my Wi-Fi is slow"')
-            ask(project, args.question)
+    if args.action == "create":
+        with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=AzureCliCredential()) as project:
+            create(project, settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"], toolbox_settings()["TOOLBOX_ENDPOINT"], args.with_functions)
+        return 0
+    if args.action == "ask" and not args.question:
+        parser.error('ask needs a question, for example "I\'m CUST-1003, my Wi-Fi is slow"')
+    # lab_agent.run reads the prompt from the command line: DevUI without one, the console with one.
+    sys.argv = [sys.argv[0], *([args.question] if args.action == "ask" else [])]
+    run(connect_prompt_agent())
     return 0
 
 

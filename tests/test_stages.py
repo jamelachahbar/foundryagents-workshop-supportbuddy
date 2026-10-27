@@ -22,8 +22,8 @@ EXPECTED_TOOLS = {
     "stage_7_answer_or_handoff": ["post_network", *HUMAN_IN_THE_LOOP],
     "stage_8_knowledge": ["post_network", "runbooks", *HUMAN_IN_THE_LOOP],
     "stage_9_toolbox": [TOOLBOX, *HUMAN_IN_THE_LOOP],
-    "stage_10_memory": [TOOLBOX, *HUMAN_IN_THE_LOOP],
-    "stage_12_guardrails": [TOOLBOX, *HUMAN_IN_THE_LOOP],
+    "stage_11_memory": [TOOLBOX, *HUMAN_IN_THE_LOOP],
+    "stage_13_guardrails": [TOOLBOX, *HUMAN_IN_THE_LOOP],
 }
 
 
@@ -72,11 +72,11 @@ def test_invalid_prefix_is_rejected(monkeypatch):
         load_settings()
 
 
-def test_stage_10_memory_is_scoped_to_participant_and_signed_in_customer():
+def test_stage_11_memory_is_scoped_to_participant_and_signed_in_customer():
     from agent_framework.foundry import FoundryMemoryProvider
 
     from lab_agent import SignedInCustomer
-    from solutions.stage_10_memory import context_providers
+    from solutions.stage_11_memory import context_providers
 
     signed_in, memory = context_providers("CUST-1002")
     assert isinstance(signed_in, SignedInCustomer)
@@ -113,15 +113,36 @@ def test_toolbox_is_named_per_participant_and_served_at_the_consumer_endpoint():
 
 
 def test_toolbox_stages_tell_the_model_about_the_tool_prefix():
-    for name in ("stage_9_toolbox", "stage_10_memory", "stage_12_guardrails", "stage_13_prompt_agent"):
+    for name in ("stage_9_toolbox", "stage_10_prompt_agent", "stage_10_prompt_agent_functions", "stage_11_memory",
+                 "stage_13_guardrails"):
         text = (SRC / "solutions" / f"{name}.instructions.md").read_text(encoding="utf-8")
         assert "network___" in text and "runbooks___" in text, name
 
 
-def test_prompt_agent_has_no_handover_tool_and_says_so():
-    text = (SRC / "solutions" / "stage_13_prompt_agent.instructions.md").read_text(encoding="utf-8")
-    assert "escalate_to_human" not in text
-    assert "You have no handover tool" in text
+def test_prompt_agent_instructions_are_honest_about_the_handover():
+    default = (SRC / "solutions" / "stage_10_prompt_agent.instructions.md").read_text(encoding="utf-8")
+    assert "You have no handover tool" in default
+    assert "escalate_to_human" not in default
+    with_functions = (SRC / "solutions" / "stage_10_prompt_agent_functions.instructions.md").read_text(encoding="utf-8")
+    assert "run by the application" in with_functions
+    for text in (default, with_functions):
+        assert "Never invent" in text and "French or English" in text
+
+
+@pytest.mark.parametrize(
+    ("stage", "signs_in"),
+    [("solutions.stage_7_answer_or_handoff", False), ("solutions.stage_9_toolbox", False),
+     ("solutions.stage_11_memory", True), ("solutions.stage_13_guardrails", True)],
+)
+def test_contact_centre_builds_any_stage_agent(stage, signs_in):
+    from lab_agent import stage_agent, stage_signs_in
+
+    assert stage_signs_in(stage) is signs_in
+    if signs_in:
+        with pytest.raises(ValueError):
+            stage_agent(stage)
+    agent = stage_agent(stage, "CUST-1002" if signs_in else None)
+    assert agent.name == "post-test-supportbuddy"
 
 
 def test_only_the_remote_restart_needs_approval():
@@ -136,20 +157,26 @@ def test_only_the_remote_restart_needs_approval():
 def test_prompt_agent_definition_uses_the_toolbox():
     import prompt_agent
 
-    published = {}
+    published = []
 
     class FakeAgents:
         def create_version(self, agent_name, definition):
-            published.update(name=agent_name, definition=definition)
+            published.append((agent_name, definition))
             return type("Version", (), {"name": agent_name, "version": "1"})()
 
     project = type("Project", (), {"agents": FakeAgents()})()
     prompt_agent.create(project, "lab-model", "https://toolbox.example/mcp")
+    prompt_agent.create(project, "lab-model", "https://toolbox.example/mcp", with_functions=True)
 
-    assert published["name"] == "post-test-supportbuddy-prompt"
-    (tool,) = published["definition"].tools
-    assert tool.server_url == "https://toolbox.example/mcp"
-    assert published["definition"].model == "lab-model"
+    (name, default), (_, experiment) = published
+    assert name == "post-test-supportbuddy-prompt"
+    assert default.model == "lab-model"
+    (toolbox,) = default.tools
+    assert toolbox.server_url == "https://toolbox.example/mcp"
+    assert "You have no handover tool" in default.instructions
+    # The experiment declares the Python functions (name + JSON schema); the application runs them.
+    assert [t.name for t in experiment.tools[1:]] == HUMAN_IN_THE_LOOP
+    assert all(t.parameters["type"] == "object" for t in experiment.tools[1:])
 
 
 def test_hosted_agent_uses_the_toolbox_and_the_local_handover_function(monkeypatch):

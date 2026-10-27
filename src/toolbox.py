@@ -2,7 +2,7 @@
 
 Run from the src folder:
     uv run python toolbox.py create                       # new toolbox version, made the default
-    uv run python toolbox.py create --guardrail <policy-id>  # Stage 12: same tools, with a guardrail
+    uv run python toolbox.py create --guardrail <policy-id>  # Stage 13: same tools, with a guardrail
     uv run python toolbox.py show                         # list the tools an agent will see
 
 A toolbox is a named, versioned bundle of tools that lives in your Foundry project and is
@@ -86,7 +86,7 @@ async def show(endpoint: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Manage your SupportBuddy Foundry Toolbox.")
     parser.add_argument("action", choices=["create", "show"])
-    parser.add_argument("--guardrail", help="Stage 12: resource ID of a guardrail (RAI policy) to apply to the tools.")
+    parser.add_argument("--guardrail", help="Stage 13: resource ID of a guardrail (RAI policy) to apply to the tools.")
     args = parser.parse_args()
 
     settings = load_settings()

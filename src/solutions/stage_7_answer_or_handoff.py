@@ -2,14 +2,15 @@
 
 Sufficient evidence -> evidence-grounded answer.
 A state-changing action (remote modem restart) -> runs only after a person approves it.
-Insufficient or conflicting evidence -> structured handover to a human advisor, who works the
-case on the operator desk and replies; the agent relays the reply with get_handover_status.
+Insufficient or conflicting evidence -> structured handover: in the contact centre, a human advisor
+takes over the live conversation; get_handover_status answers follow-up questions about the case.
 
-Start the MCP server and the operator desk first, each in its own terminal, from the src folder:
+Start the MCP server first, in its own terminal, from the src folder:
     uv run python -m mcp_server.server
-    uv run python -m operator_desk
-Then run:
+Then run the agent in DevUI or the console:
     uv run python -m solutions.stage_7_answer_or_handoff ["prompt"]
+or in the contact centre (customer chat + operator desk):
+    uv run python -m contact_centre solutions.stage_7_answer_or_handoff
 """
 
 import os

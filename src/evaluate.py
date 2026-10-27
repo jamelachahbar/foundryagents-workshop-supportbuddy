@@ -1,10 +1,11 @@
-"""Evaluate SupportBuddy on a fixed set of scenarios (Stage 11).
+"""Evaluate SupportBuddy on a fixed set of scenarios (Stage 12).
 
 Run from the src folder (the agent module defaults to your own main.py):
     uv run python evaluate.py                                   # local checks: fast, deterministic, free
     uv run python evaluate.py solutions.stage_9_toolbox         # evaluate a reference stage
     uv run python evaluate.py --repeat 3                        # run every case 3 times: is it consistent?
     uv run python evaluate.py --foundry                         # add Foundry's AI-assisted evaluators
+    uv run python evaluate.py --prompt-agent                    # evaluate your Foundry prompt agent (Stage 10)
 
 Two kinds of evaluators, both from Agent Framework:
   - LocalEvaluator with @evaluator checks written in Python. They test what you can state as a rule:
@@ -19,9 +20,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import importlib
 import json
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -30,7 +31,7 @@ from agent_framework.foundry import FoundryChatClient, FoundryEvals
 from agent_framework_openai import OpenAIContentFilterException
 from azure.identity import AzureCliCredential
 
-from lab_agent import build_agent, load_settings, open_agent
+from lab_agent import load_settings, open_agent, stage_agent, stage_signs_in
 
 DATASET = Path(__file__).parent / "evals" / "dataset.jsonl"
 HANDOVER_TOOL = "escalate_to_human"
@@ -41,13 +42,18 @@ def load_cases(path: Path = DATASET) -> list[dict[str, Any]]:
 
 
 def tools_called(conversation: list[Message]) -> list[str]:
-    """Tool names the agent called, without the toolbox prefix ("network___check_equipment" -> "check_equipment")."""
-    return [
-        content.name.split("___")[-1]
-        for message in conversation
-        for content in message.contents
-        if content.type == "function_call"
-    ]
+    """Tool names the agent called, without the toolbox prefix ("network___check_equipment" -> "check_equipment").
+
+    Function calls are run by your code; MCP calls of a prompt agent are run by Foundry. Both count.
+    """
+    names = []
+    for message in conversation:
+        for content in message.contents:
+            if content.type == "function_call":
+                names.append(content.name)
+            elif content.type == "mcp_server_tool_call":
+                names.append(content.tool_name)
+    return [name.split("___")[-1] for name in names]
 
 
 def checks_for(case: dict[str, Any]) -> list[Any]:
@@ -105,24 +111,26 @@ async def _run_rejecting_approvals(agent: Any, case: dict[str, Any]) -> AgentRes
     return AgentResponse(messages=messages)
 
 
-def agent_for(module: Any, case: dict[str, Any]) -> Any:
-    """Build the agent under test. Stages with a signed-in customer get the case's customer."""
-    if not hasattr(module, "context_providers"):
-        return build_agent(module.__file__, module.tools())
-    customer = case["customer"]
-    middleware = module.middleware(customer) if hasattr(module, "middleware") else ()
-    return build_agent(module.__file__, module.tools(), module.context_providers(customer), middleware=middleware)
+def agent_factory(module_name: str, prompt_agent: bool) -> Callable[[dict[str, Any]], Any]:
+    """How to build the agent under test for one case. Stages with a signed-in customer get the case's customer."""
+    if prompt_agent:
+        from prompt_agent import connect_prompt_agent
+
+        return lambda case: connect_prompt_agent()
+    if stage_signs_in(module_name):
+        return lambda case: stage_agent(module_name, case["customer"])
+    return lambda case: stage_agent(module_name)
 
 
-async def run_case(module: Any, case: dict[str, Any], repeat: int) -> tuple[Any, list[AgentResponse], Any]:
-    agent = agent_for(module, case)
+async def run_case(make_agent: Callable[[dict[str, Any]], Any], case: dict[str, Any], repeat: int) -> tuple[Any, list[AgentResponse], Any]:
+    agent = make_agent(case)
     responses = []
     async with open_agent(agent):
         for _ in range(repeat):
             try:
                 responses.append(await _run_rejecting_approvals(agent, case))
             except OpenAIContentFilterException as blocked:
-                # A guardrail (Stage 12) blocked the request before the model answered. Record it as the reply.
+                # A guardrail (Stage 13) blocked the request before the model answered. Record it as the reply.
                 print(f"         ({case['id']}: blocked by a guardrail)")
                 responses.append(AgentResponse(messages=[Message("assistant", [f"[blocked by guardrail] {blocked}"])]))
     result = (
@@ -137,15 +145,18 @@ async def run_case(module: Any, case: dict[str, Any], repeat: int) -> tuple[Any,
     return agent, responses, result
 
 
-async def main_async(module_name: str, repeat: int, use_foundry: bool, only: list[str] | None = None) -> int:
+async def main_async(
+    module_name: str, repeat: int, use_foundry: bool, only: list[str] | None = None, prompt_agent: bool = False
+) -> int:
     settings = load_settings()
-    module = importlib.import_module(module_name)
+    make_agent = agent_factory(module_name, prompt_agent)
+    label = "prompt_agent" if prompt_agent else module_name
     cases = [c for c in load_cases() if not only or c["id"] in only]
     all_queries, all_responses, last_agent, failures = [], [], None, 0
 
-    print(f"Evaluating {module_name} on {len(cases)} cases x {repeat} run(s)\n")
+    print(f"Evaluating {label} on {len(cases)} cases x {repeat} run(s)\n")
     for case in cases:
-        last_agent, responses, result = await run_case(module, case, repeat)
+        last_agent, responses, result = await run_case(make_agent, case, repeat)
         all_queries += [case["query"]] * repeat
         all_responses += responses
         status = "PASS" if result.all_passed else "FAIL"
@@ -178,7 +189,7 @@ async def main_async(module_name: str, repeat: int, use_foundry: bool, only: lis
             queries=all_queries,
             responses=all_responses,
             evaluators=foundry,
-            eval_name=f"{settings['WORKSHOP_RESOURCE_PREFIX']}-supportbuddy-{module_name.split('.')[-1]}",
+            eval_name=f"{settings['WORKSHOP_RESOURCE_PREFIX']}-supportbuddy-{label.split('.')[-1]}",
         ):
             print(f"Foundry: {result.status}, {result.passed}/{result.total} items passed")
             for name, counts in (result.per_evaluator or {}).items():
@@ -194,9 +205,10 @@ def main() -> int:
     parser.add_argument("--repeat", type=int, default=1, help="Runs per case, to measure consistency.")
     parser.add_argument("--foundry", action="store_true", help="Also run Foundry's AI-assisted evaluators.")
     parser.add_argument("--case", action="append", help="Only run this case ID (repeatable).")
+    parser.add_argument("--prompt-agent", action="store_true", help="Evaluate your Foundry prompt agent (Stage 10).")
     args = parser.parse_args()
     sys.stdout.reconfigure(encoding="utf-8")
-    return asyncio.run(main_async(args.module, args.repeat, args.foundry, args.case))
+    return asyncio.run(main_async(args.module, args.repeat, args.foundry, args.case, args.prompt_agent))
 
 
 if __name__ == "__main__":

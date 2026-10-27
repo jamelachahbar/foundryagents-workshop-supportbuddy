@@ -9,8 +9,9 @@ only needs the toolbox endpoint and your Entra identity.
 The human-in-the-loop tools stay local Python functions: they are part of this agent's own code.
 
 One-time setup (from the src folder):  uv run python toolbox.py create
-Then run (no local MCP server needed any more; keep the operator desk running):
+Then run (no local MCP server needed any more):
     uv run python -m solutions.stage_9_toolbox ["prompt"]
+    uv run python -m contact_centre solutions.stage_9_toolbox
 """
 
 from agent_framework.foundry import FoundryToolbox

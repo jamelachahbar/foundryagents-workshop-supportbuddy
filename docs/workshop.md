@@ -30,15 +30,15 @@ case to a human.
 | 4 | [Technical diagnostic](#stage-4-technical-diagnostic) | Simulated ping |
 | 5 | [Correlation](#stage-5-correlation) | Evidence from four sources, decision rules |
 | 6 | [MCP](#stage-6-mcp) | Move the capabilities behind an MCP server |
-| 7 | [Answer, act or hand over](#stage-7-answer-act-or-hand-over) | Human approval and handover to an advisor |
+| 7 | [Answer, act or hand over](#stage-7-answer-act-or-hand-over) | Approvals, and a live handover to a human advisor in the contact centre |
 | **Part 2** | [**Make it enterprise-ready**](#part-2-make-it-enterprise-ready) | Platform services in Foundry |
 | 8 | [Knowledge (Foundry IQ)](#stage-8-knowledge-foundry-iq) | Cited runbooks over MCP |
 | 9 | [Foundry Toolbox](#stage-9-foundry-toolbox) | One governed tool endpoint |
-| 10 | [Memory](#stage-10-memory) | Remember the customer across conversations |
-| 11 | [Evaluation](#stage-11-evaluation) | Measure decisions, citations and safety |
-| 12 | [Guardrails](#stage-12-guardrails) | Layered defence |
-| **Part 3** | [**Run it in Foundry**](#part-3-run-it-in-foundry) | Let Foundry run the agent |
-| 13 | [Prompt agent](#stage-13-prompt-agent) | Declarative agent |
+| 10 | [Prompt agent](#stage-10-prompt-agent) | The same agent with no code: how far does it get? |
+| 11 | [Memory](#stage-11-memory) | Remember the customer across conversations |
+| 12 | [Evaluation](#stage-12-evaluation) | Measure decisions, citations and safety |
+| 13 | [Guardrails](#stage-13-guardrails) | Layered defence |
+| **Part 3** | [**Run your code in Foundry**](#part-3-run-your-code-in-foundry) | Let Foundry host your agent |
 | 14 | [Hosted agent](#stage-14-hosted-agent) | Your code, hosted by Foundry |
 | | [Scenario reference](#scenario-reference) · [Going further](#going-further-optional) · [Troubleshooting](#troubleshooting) | |
 
@@ -109,12 +109,13 @@ version would use. This lab therefore uses **synthetic equivalents, purely for e
 | `check_equipment` (simulated ping) | a network diagnostic platform | **No** - lab construct |
 | `get_known_incidents` | an operations / incident system | **No** - lab construct |
 | `escalate_to_human` and `HO-xxxx` references | a human handover channel | **No** - lab construct. POST's real channel is not defined. |
-| Operator desk (`src/operator_desk/`) and `get_handover_status` | a contact-centre / ticketing tool used by human advisors | **No** - lab construct |
+| Contact centre (`src/contact_centre/`): customer chat, operator desk, advisor assist agent | an engagement hub such as Dynamics 365 Contact Center, used by customers and human advisors | **No** - lab construct |
+| `get_handover_status` | a case-status lookup in a ticketing tool | **No** - lab construct |
 | `restart_modem` (simulated remote restart, Stage 7) | a network action that changes the customer's service | **No** - lab construct. Nothing is restarted. |
 | `post-network-mock` MCP server (local in Stage 6, shared on Azure Container Apps from Stage 9) | an MCP server owned by a backend team | **No** - lab construct |
 | Runbooks `RB-01`...`RB-12` (Stage 8) | a support team's troubleshooting procedures | **No** - synthetic lab content |
-| `--customer CUST-xxxx` (signed-in customer, Stage 10) | a support channel that authenticates the customer | **No** - lab construct. POST's channel and authentication are not defined. |
-| The Wi-Fi network name of `CUST-1006` that contains instructions (Stage 12) | untrusted data a customer controls | **No** - a deliberate test case |
+| Signed-in customer (`--customer CUST-xxxx`, or the picker in the customer chat, Stage 11) | a support channel that authenticates the customer | **No** - lab construct. POST's channel and authentication are not defined. |
+| The Wi-Fi network name of `CUST-1006` that contains instructions (Stage 13) | untrusted data a customer controls | **No** - a deliberate test case |
 | Customers `CUST-1001`...`CUST-1006`, lines `LINE-2xxx`, `MockBox` modems, `Mock-Ville` areas, incidents `INC-5xxx` | real customers and network data | **No** - fictional training data |
 
 > [!NOTE]
@@ -140,11 +141,11 @@ By the end of the lab your agent will:
 5. perform a simple technical diagnostic;
 6. combine evidence from multiple capabilities;
 7. generate an evidence-grounded response;
-8. hand the case to a human when appropriate, and let a person approve actions before they run.
+8. hand the case to a human advisor who takes over the live conversation, and let a person approve
+   actions before they run.
 
-Then you make it enterprise-ready with Microsoft Foundry: knowledge, a governed toolbox, memory,
-evaluation and guardrails, and you run it the two ways Foundry runs agents: as a **prompt agent** and as
-a **hosted agent**.
+Then you make it enterprise-ready with Microsoft Foundry: knowledge, a governed toolbox, a no-code
+**prompt agent**, memory, evaluation and guardrails. Finally you deploy your own code as a **hosted agent**.
 
 ### The map
 
@@ -157,35 +158,43 @@ flowchart LR
     end
     subgraph P2["Part 2 - Enterprise-ready (Foundry services)"]
         direction TB
-        S8[8 Knowledge] --> S9[9 Toolbox] --> S10[10 Memory] --> S11[11 Evaluation] --> S12[12 Guardrails]
+        S8[8 Knowledge] --> S9[9 Toolbox] --> S10[10 Prompt agent] --> S11[11 Memory]
+        S11 --> S12[12 Evaluation] --> S13[13 Guardrails]
     end
-    subgraph P3["Part 3 - Run it in Foundry"]
+    subgraph P3["Part 3 - Run your code in Foundry"]
         direction TB
-        S13[13 Prompt agent] --> S14[14 Hosted agent]
+        S14[14 Hosted agent]
     end
     P1 --> P2 --> P3
 ```
 
 | Part | Stages | Where the agent runs | What you add |
 | --- | --- | --- | --- |
-| **1. Build the agent** | 1-7 | Your laptop (Agent Framework); the model runs in Foundry | Instructions, function tools, MCP, correlation, approval and handover to a human advisor |
-| **2. Make it enterprise-ready** | 8-12 | Your laptop; knowledge, tools, memory, evaluations and guardrails live in Foundry | Foundry IQ, Foundry Toolbox, Foundry Memory, evaluation, guardrails |
-| **3. Run it in Foundry** | 13-14 | Foundry Agent Service | The same agent as a prompt agent, then as a hosted agent |
+| **1. Build the agent** | 1-7 | Your laptop (Agent Framework); the model runs in Foundry | Instructions, function tools, MCP, correlation, approvals, live handover to a human advisor |
+| **2. Make it enterprise-ready** | 8-13 | Your laptop; knowledge, tools, memory, evaluations and guardrails live in Foundry. Stage 10 also runs the agent *in* Foundry, with no code | Foundry IQ, Foundry Toolbox, prompt agent, Foundry Memory, evaluation, guardrails |
+| **3. Run your code in Foundry** | 14 | Foundry Agent Service, with your code | Hosted agent |
 
 Each stage builds on the previous one, and every stage has a runnable reference in `src/solutions/`.
 
-### Three ways an agent can run
+### Three ways to build an agent on Foundry
 
-You will meet three kinds of agent. Keep this table in mind; Stage 13 comes back to it.
+Foundry Agent Service supports three ways to build an agent
+([overview](https://learn.microsoft.com/azure/foundry/agents/overview#choose-how-to-build)). You meet all three,
+each at the moment the lab needs it:
 
-| | Code-first agent (Stages 1-12) | Prompt agent (Stage 13) | Hosted agent (Stage 14) |
+| | Your code calls Foundry (Stages 1-13) | Prompt agent (Stage 10) | Hosted agent (Stage 14) |
 | --- | --- | --- | --- |
-| What it is | Your Agent Framework code, running in your process | A definition stored in Foundry: model + instructions + tools | Your Agent Framework code, packaged and run by Foundry |
+| What it is | Your Agent Framework code, running in your process. Foundry calls this an *ephemeral* agent: the definition ships with your app | A definition stored in Foundry: model + instructions + tools | Your Agent Framework code, packaged and run by Foundry |
 | Who runs the agent loop | Your Python process | Foundry Agent Service | Foundry Agent Service, in a container with your code |
-| Tools | Any: Python functions, MCP, toolbox | Only tools Foundry can call itself: MCP, toolbox, knowledge, web search... No local Python functions | Any: same code as the code-first agent |
+| Tools | Any: Python functions, MCP, toolbox | Tools Foundry can call itself: toolbox, MCP, knowledge, web search... | Any: same code as on your laptop |
 | Custom logic (middleware, context providers) | Yes | No | Yes |
-| Identity | Yours (`az login`) | The agent's identity in Foundry | The agent's identity in Foundry |
-| Good for | Developing and debugging | Simple agents, low-code, quick iteration in the portal | Production agents with custom code |
+| Official guidance: best for | Agent logic that ships with your app | **"Building your first agent? Start with a prompt agent."** Production agents that don't need custom orchestration | Agents that call into your own custom code, custom orchestration, custom protocols |
+
+> [!NOTE]
+> The official advice is to start with a prompt agent and move to a hosted agent when you need your own
+> code. This lab builds the code first, because the point of the day is to understand what an agent does.
+> Stage 10 then asks the question Foundry asks: how far does a prompt agent get without any code? The
+> human handover from Stage 7 is the answer to why you would need more.
 
 ---
 
@@ -228,6 +237,7 @@ A dev container is included (`.devcontainer/`) if you prefer Codespaces or Docke
 | `agent-framework-core` | **1.22.0** |
 | `agent-framework-foundry` | 1.15.0 |
 | `agent-framework-foundry-hosting`, `agent-framework-devui` | 1.0.0b261015 |
+| `agent-framework-ag-ui` (contact centre, Stage 7) | 1.6.0 |
 | `mcp` (MCP Python SDK) | 1.x |
 
 The full list is in `src/pyproject.toml`.
@@ -289,10 +299,14 @@ All commands run from the `src` folder.
 | --- | --- |
 | `uv run python main.py` | Opens **DevUI** in your browser to chat with the agent. The terminal prints a banner with an access token; paste it when the browser shows **Authentication Required**. The token is kept in `src/.devui_token` and the browser remembers it, so you paste it only once. |
 | `uv run python main.py "your prompt"` | Answers one prompt in the console and prints every tool call and tool result. Useful to see the evidence the agent collected. |
+| `uv run python -m contact_centre` | From Stage 7: opens the same agent in the **contact centre**, a customer chat and an operator desk where a human advisor can take over. |
+
+DevUI is your developer view for every stage: it shows each tool call, its arguments and its result. The
+contact centre shows what the customer and the human advisor would see. Both run the same agent.
 
 Each run builds a **code-first** agent named `post-<alias>-supportbuddy`: the agent loop, its tools and
 its memory run in your Python process on your laptop, and only the model runs in Foundry. Nothing is
-published to the Foundry agent catalogue until Stage 13.
+published to the Foundry agent catalogue until Stage 10.
 
 ### What `lab_agent.py` does for you
 
@@ -308,8 +322,8 @@ Agent(
     instructions=load_instructions(script),  # <stage>.instructions.md next to the stage file
     default_options={"reasoning": {"effort": "medium"}},  # SUPPORTBUDDY_REASONING_EFFORT overrides it
     tools=tools,                             # function tools, MCP tools, toolbox
-    context_providers=context_providers,     # Stage 10: memory
-    middleware=middleware,                   # Stage 12: code guardrail
+    context_providers=context_providers,     # Stage 11: memory
+    middleware=middleware,                   # Stage 13: code guardrail
 )
 ```
 
@@ -427,7 +441,7 @@ be backed by an enterprise API instead of a JSON file, without changing the agen
 parameter descriptions and the docstring become the JSON schema the model sees. When the model asks for
 `identify_customer`, Agent Framework validates the arguments, calls your Python function **in your
 process**, sends the result back to the model, and lets it continue. That loop (model -> tool -> model)
-is the agent loop; you will see it run in your process until Stage 13.
+is the agent loop; you will see it run in your process until Stage 10.
 
 ```mermaid
 sequenceDiagram
@@ -586,7 +600,7 @@ flowchart LR
 
 Nothing new in Python: `tools()` returns four functions. The correlation is
 entirely in the instructions; the model plans the calls and reasons over four results. That is why
-Stage 11 measures it.
+Stage 12 measures it.
 
 ### Try it
 
@@ -748,41 +762,63 @@ Run the Stage 5 prompts again.
 | --- | --- | --- |
 | **Answer** | The evidence explains the problem and the customer can fix it | Nobody: the agent answers |
 | **Act** | A system action would fix it (remote modem restart) | A person **approves** the action before it runs |
-| **Hand over** | The evidence is insufficient or contradictory | A human **advisor** takes the case on the operator desk and replies |
+| **Hand over** | The evidence is insufficient or contradictory | A human **advisor** takes over the live conversation |
 
-POST described human-in-the-loop as an important part of the agent architecture. This stage builds
-both patterns, and you will play both roles: the customer in DevUI and the advisor on the operator desk.
+POST described human-in-the-loop as an important part of the agent architecture. This stage builds both
+patterns, and you will play every role: the customer, the human advisor, and the person who approves.
+
+### How a handover works in production
+
+A handover is not "the agent writes a ticket". In a contact centre the customer's **conversation** moves
+from the AI agent to a person, who continues it with the full history. Microsoft's guidance for this
+is the **bot-as-an-agent** pattern
+([Copilot Studio guidance](https://learn.microsoft.com/microsoft-copilot-studio/guidance/channels#choosing-an-approach-to-enable-handoff-to-a-live-agent)):
+
+1. **An engagement hub owns the conversation**, for example Dynamics 365 Contact Center. It runs the chat
+   window and decides who answers. The AI agent is one participant.
+2. **The agent hands over with context.** Copilot Studio sends a `handoff.initiate` event with the full
+   transcript, routing variables and a private message to the advisor
+   ([context variables](https://learn.microsoft.com/microsoft-copilot-studio/advanced-hand-off#context-variables-available-upon-handoff)).
+3. **The hub routes the conversation to a human advisor**, who **resumes the same conversation**.
+4. **AI assists the advisor**: Copilot in Dynamics 365 Contact Center summarises, suggests replies and
+   answers questions about the case ([features](https://learn.microsoft.com/dynamics365/contact-center/use/overview-ai-agents-copilot-features)).
+
+This lab gives you a small **contact centre** (`src/contact_centre/`) that follows the same pattern:
 
 ```mermaid
-sequenceDiagram
-    actor C as Customer (DevUI)
-    participant A as SupportBuddy
-    participant Q as Handover queue
-    actor V as Advisor (operator desk)
-    C->>A: Nothing loads on any device
-    A->>A: investigate: 4 checks, evidence inconclusive
-    A->>Q: escalate_to_human(evidence, unresolved issue, ...)
-    Q-->>A: handover_id HO-9001
-    A-->>C: Handed over to an advisor, reference HO-9001
-    V->>Q: Take case, reply, resolve
-    C->>A: Any news on HO-9001?
-    A->>Q: get_handover_status(HO-9001, customer)
-    Q-->>A: advisor's message
-    A-->>C: relays the advisor's message
+flowchart LR
+    C["Customer chat<br/>/chat"] <-- "live updates (SSE)" --> H{"Contact centre<br/>owns the conversation<br/>agent / waiting / advisor / closed"}
+    H <-- "AG-UI" --> A["SupportBuddy<br/>your stage agent"]
+    A -. "escalate_to_human<br/>= handover with context" .-> H
+    H <-- "live updates (SSE)" --> D["Operator desk<br/>/desk"]
+    D <-- "AG-UI" --> AS["Advisor assist agent<br/>summary, draft reply,<br/>checks, actions"]
 ```
 
-Three new local function tools (in `support_tools.py`), next to the MCP tool:
+| Lab piece | In production | Pattern or protocol |
+| --- | --- | --- |
+| Contact centre | Dynamics 365 Contact Center, or another engagement hub | Bot-as-an-agent: the hub owns the conversation |
+| Customer chat | The hub's chat window on a website or app | Server-Sent Events for live updates |
+| Contact centre to SupportBuddy | Direct Line / Activity protocol for Copilot Studio agents | **[AG-UI](https://learn.microsoft.com/agent-framework/integrations/by-component/ui/ag-ui/)**, Agent Framework's protocol between agents and user interfaces |
+| `escalate_to_human` | `handoff.initiate` | Transcript + evidence + note for the advisor |
+| Operator desk | The advisor workspace of the hub | Live chat with the customer |
+| Advisor assist agent | Copilot for service representatives | Same tools as SupportBuddy; every action approved by the advisor |
+
+> [!NOTE]
+> The contact centre is a lab construct. It runs on 127.0.0.1, keeps conversations in memory and has no
+> sign-in. A production hub signs in advisors with Microsoft Entra ID, persists conversations, routes by
+> skill and language, and records everything for audit.
+
+### What the code does
+
+**Your agent: three new tools.** In `support_tools.py`, next to the MCP tool:
 
 | Tool | What it does | Approval |
 | --- | --- | --- |
-| `escalate_to_human` | Records a structured handover in a **synthetic** queue and returns a lab reference such as `HO-9001` | No |
+| `escalate_to_human` | Records a structured handover and returns a lab reference such as `HO-9001` | No |
 | `get_handover_status` | Returns the status of a handover and the advisor's message, **only for the customer it belongs to** | No |
 | `restart_modem` | Sends a simulated remote restart. It changes something for the customer (the connection drops for 3 minutes) | **Always** |
 
-> [!NOTE]
-> None of them creates a real ticket, contacts anyone or touches real equipment.
-
-### What the code does
+None of them creates a real ticket, contacts anyone or touches real equipment.
 
 ```python
 @tool(approval_mode="always_require")      # Agent Framework pauses the run before calling this tool
@@ -801,16 +837,31 @@ while response.user_input_requests:                                   # lab_agen
 ```
 
 Only an approved call runs; a rejected one returns a refusal to the model. DevUI shows the request as an
-**Approve / Reject** card.
+**Approve / Reject** card, and so does the customer chat.
 
 > [!IMPORTANT]
 > The decision is enforced by the runtime, not by the prompt: the model cannot talk its way around it.
-> Remember this pattern when you meet the toolbox's `require_approval` setting.
 
-The handover queue is a small JSON file (`src/.lab_state/handovers.json`) shared by the agent's tools and
-the **operator desk** (`src/operator_desk/`), a web app that stands in for a contact-centre tool. It shows
-each case with the evidence the agent collected, and lets an advisor take it and reply. The agent reads
-the reply with `get_handover_status` when the customer asks for an update.
+**The contact centre: an AG-UI client.** `contact_centre/server.py` serves your agent over AG-UI with
+Agent Framework's own adapter, and `contact_centre/centre.py` is the client that talks to it:
+
+```python
+add_agent_framework_fastapi_endpoint(app, AgentFrameworkAgent(agent, require_confirmation=False), "/ag-ui/supportbuddy/guest")
+```
+
+For each customer message, the contact centre POSTs the conversation to that endpoint and reads the AG-UI
+events that come back:
+
+| AG-UI event | What the contact centre does with it |
+| --- | --- |
+| `TEXT_MESSAGE_CONTENT` | Streams SupportBuddy's answer to the customer, word by word |
+| `TOOL_CALL_START` | Shows a progress line: "Checking your line", "Testing your modem" |
+| `TOOL_CALL_RESULT` of `escalate_to_human` | **The handover**: switches the conversation to *waiting* and puts it in the advisor queue with the evidence |
+| `RUN_FINISHED` with an interrupt | Shows an approval card; the decision is sent back as an AG-UI `resume` |
+
+From the moment of the handover, the contact centre stops sending the customer's messages to SupportBuddy:
+a person owns the conversation. When the advisor hands it back, SupportBuddy continues with the whole
+history, including what the advisor said.
 
 ### Your task
 
@@ -818,17 +869,11 @@ From now on you work with three terminals, all in `src`:
 
 | Terminal | Command | What runs |
 | --- | --- | --- |
-| 1 | `uv run python main.py` | Your agent in DevUI (port 8090) |
-| 2 | `uv run python -m mcp_server.server` | The network MCP server from Stage 6 (port 8000) |
-| 3 | `uv run python -m operator_desk` | The operator desk (port 8070) |
+| 1 | `uv run python -m mcp_server.server` | The network MCP server from Stage 6 (port 8000) |
+| 2 | `uv run python main.py` | Your agent in DevUI, the developer view (port 8090) |
+| 3 | `uv run python -m contact_centre` | Your agent in the contact centre (port 8070) |
 
-1. Start the operator desk in the **third terminal** and open http://127.0.0.1:8070:
-
-   ```bash
-   uv run python -m operator_desk
-   ```
-
-2. Add the three tools to `tools()`, next to the MCP tool:
+1. Add the three tools to `tools()`, next to the MCP tool:
 
    ```python
    from tools.support_tools import escalate_to_human, get_handover_status, restart_modem
@@ -842,7 +887,7 @@ From now on you work with three terminals, all in `src`:
        ]
    ```
 
-3. In the instructions:
+2. In the instructions:
    - mark each correlation rule as **ANSWER** or **HAND OVER**;
    - hand over when a rule says so, when the customer cannot be identified after one retry, when the
      problem persists after the suggested step, or when the customer asks for a person;
@@ -855,11 +900,14 @@ From now on you work with three terminals, all in `src`:
    - add a **Follow-up on a handover** section: use `get_handover_status` and relay the advisor's message;
    - never claim that a real ticket was created, a technician dispatched, or a call scheduled.
 
+3. Start the contact centre in the third terminal and open http://127.0.0.1:8070. Open the **Customer
+   chat** and the **Operator desk** in two browser tabs, side by side.
+
 The synthetic data is fixed, so these always produce the same evidence.
 
 ### Try it
 
-#### Scenario A: sufficient evidence
+#### Scenario A: sufficient evidence (customer chat)
 
 ```text
 Hi, I'm anna.weber@example.com, my internet stopped this morning.
@@ -867,61 +915,77 @@ Hi, I'm anna.weber@example.com, my internet stopped this morning.
 
 Evidence: line `LINE-2001` down with loss of signal; open incident `INC-5001` (fibre cut) for postcode
 `L-0001`, estimated restore 14:00 UTC; modem does not answer the ping. The incident explains everything.
-**Expected:** an answer with the incident and restore time, a "What I checked" list, no restart
-advice, no handover.
+**Expected:** progress lines while SupportBuddy works, then an answer with the incident and restore time,
+a "What I checked" list, no restart advice, no handover.
 
-#### Scenario B: insufficient or conflicting evidence
+#### Scenario B: a live handover
+
+Click **Start a new conversation** if needed, then:
 
 ```text
 Hello, I'm customer CUST-1005. I have no internet at all since this morning, nothing loads on any device.
 ```
 
-Evidence: line `LINE-2005` up at close to subscribed speed with no errors; modem answers the ping with
-no loss; Wi-Fi normal; the only incident in the area (`INC-5002`) is resolved. Every check is healthy,
-yet the customer reports a total outage. **Expected:** no invented cause. A call to
-`escalate_to_human` whose arguments contain the customer, the reported problem, the four capabilities
-checked, the evidence with values, the unresolved issue, and a recommended next investigation; then a
-message to the customer quoting the `handover_id` the tool returned (for example `HO-9001`).
+Every check is healthy, yet the customer reports a total outage. **Expected:** no invented cause;
+SupportBuddy hands over, and the chat says that a human advisor will join. Write `Is someone there?`: the
+contact centre keeps your message for the advisor, and SupportBuddy stays silent.
 
-> [!TIP]
-> In a console run, the `[tool call] escalate_to_human` line for Scenario B shows the structured
-> handover. In DevUI, open the tool call to read every field.
+Now play the advisor, on the **Operator desk**:
 
-### Play the advisor: the other side of the handover
+1. The conversation is at the top of the queue, marked *Waiting for a human advisor*. Select it: you see
+   SupportBuddy's handover (the evidence, what it could not determine, its recommended next
+   investigation) and the whole conversation. That is the point of a *structured* handover: the advisor
+   starts from the agent's work instead of asking the customer to repeat everything.
+2. **Take conversation**. The customer sees *Lea from the support team joined the conversation.* Write to
+   the customer; they see your message immediately, and can answer you.
+3. Ask the **advisor assist** agent for help: **Summarise**, **Suggest a reply** (then **Use as reply**,
+   edit, and send), or **Check again**. Only you see this panel.
+4. Ask the assist agent to **Restart modem**. An approval card appears on *your* desk: you are the person
+   who decides. When you approve, the customer is told which action was taken on their service, and by
+   whom; the restart appears under **Approved actions**.
+5. **Hand back to SupportBuddy**, and as the customer, ask a follow-up question: SupportBuddy answers again,
+   knowing what the advisor said. Or **Close conversation**: the handover record is marked resolved with your
+   last message, which is what `get_handover_status` returns if the customer asks about `HO-...` later.
 
-1. In DevUI, run Scenario B. The case appears on the operator desk within a few seconds, with the
-   evidence, what the agent could not determine and its recommended next investigation. That is the
-   point of a *structured* handover: the advisor starts from the agent's work instead of asking the
-   customer to repeat everything.
-2. On the desk, **Take case**, write a message to the customer and **Send reply and resolve**.
-3. Back in DevUI, as the customer: `Any news on my case HO-9001?` The agent calls `get_handover_status`
-   and relays the advisor's message. Nothing is pushed to the customer: like a ticket, the reply waits
-   until the customer asks.
-4. Try `Any news on HO-9001?` as `CUST-1001`: the agent finds nothing. The tool only returns a case to the
-   customer it belongs to, and answers "not found" in both cases, so it does not reveal that the case
-   exists. That rule is in the code, not in the prompt.
-
-### Approve an action
+#### Scenario C: approve an action (customer chat)
 
 ```text
 I'm CUST-1002, my modem doesn't respond since this morning. Please restart it remotely for me.
 ```
 
-**Expected:** the agent collects the evidence, then calls `restart_modem`. DevUI shows an approval card
-for `restart_modem` with its arguments; in the console you are asked `approve? [y/N]`. Approve once
-and reject once and compare the answers. Approved restarts appear under **Approved actions** on the
-operator desk.
+**Expected:** the agent collects the evidence, then calls `restart_modem`. The customer chat shows an
+approval card; approve once and decline once (in two conversations) and compare the answers. In DevUI and
+in the console (`approve? [y/N]`) the same request appears, because the approval is part of the agent run,
+not of a user interface.
 
-Who should approve? Here, the person chatting. In production it depends on the action: the customer
-(consent, because their connection drops), an advisor (cost or risk), or both. The approval is a
-runtime control; it is how you let an agent *act* without letting it act alone.
+Who should approve? Here, the customer, because their connection drops; in Scenario B, the advisor. In
+production it depends on the action: the customer (consent), an advisor (cost or risk), or both. The
+approval is a runtime control; it is how you let an agent *act* without letting it act alone.
+
+> [!TIP]
+> DevUI is still your developer view: open a handover run there and inspect the `escalate_to_human` call
+> to read every field the advisor receives.
+
+### What a human handover needs
+
+Use this as a checklist for any production design:
+
+| Need | In this lab | In production |
+| --- | --- | --- |
+| **Ownership**: one place decides who answers | The contact centre's conversation mode | The engagement hub's routing |
+| **Context**: the advisor never asks the customer to repeat | Handover record + full transcript | `handoff.initiate` context, conversation history |
+| **Routing**: the right person picks it up | One queue, waiting first | Queues by skill, language, priority |
+| **Transparency**: the customer knows who is answering | "Lea from the support team joined", "SupportBuddy is back" | Same, plus the hub's notifications |
+| **Agent assist**: AI helps the person, not the customer | Advisor assist agent | Copilot for service representatives |
+| **Control**: a person approves actions | Approval cards, enforced by Agent Framework | Same, plus policies per action |
+| **Hardening** | None: 127.0.0.1, no sign-in, in memory | Entra ID for advisors, persistence, audit, escalation-rate KPI |
 
 ### Checkpoint
 
 - [ ] Scenario A answers with the incident; Scenario B hands over with a `HO-...` reference.
-- [ ] A handover travels from the agent to the operator desk, and the advisor's reply travels back to
-      the customer.
-- [ ] A state-changing tool never runs without an explicit approval.
+- [ ] After the handover, the advisor and the customer chat live, and SupportBuddy stays silent until the
+      advisor hands back.
+- [ ] A state-changing tool never runs without an explicit approval, from the customer or the advisor.
 
 ### Instructions are not a control
 
@@ -933,7 +997,7 @@ reference the tool did not return; that fixed most runs, but not every run.
 
 > [!IMPORTANT]
 > Instructions make the right behaviour likely, they do not guarantee it. In production, measure it
-> (Stage 11) and enforce what must never happen in code, not only in the prompt: the approval on
+> (Stage 12) and enforce what must never happen in code, not only in the prompt: the approval on
 > `restart_modem` and the ownership check in `get_handover_status` are two examples.
 
 <p align="right"><a href="#contents">Contents</a> · <a href="#part-2-make-it-enterprise-ready">Next: Part 2 &rarr;</a></p>
@@ -1022,6 +1086,8 @@ identity's token (cached and refreshed by `azure-identity`). No API key. Your id
            MCPStreamableHTTPTool(...),
            runbook_knowledge_base(knowledge["AZURE_AI_SEARCH_ENDPOINT"], knowledge["FOUNDRY_KNOWLEDGE_BASE_NAME"]),
            escalate_to_human,
+           get_handover_status,
+           restart_modem,
        ]
    ```
 
@@ -1080,7 +1146,7 @@ uses what. A **Foundry Toolbox** solves this
 
 - a named, **versioned** bundle of tools in your Foundry project, served as **one MCP endpoint**;
 - credentials live in **project connections**, not in agent code: the toolbox calls each tool with them;
-- **guardrails** can be applied to tool inputs and outputs at the toolbox (Stage 12);
+- **guardrails** can be applied to tool inputs and outputs at the toolbox (Stage 13);
 - you can change the tools behind it, test a new version, and promote it, without touching agent code.
 
 ### What is in your toolbox
@@ -1133,7 +1199,8 @@ search service for this path.
    `runbooks___`) and the instructions name them without it.
 
 > [!TIP]
-> You no longer need the local MCP server: stop it (terminal 2).
+> You no longer need the local MCP server: stop it (terminal 1). Restart the contact centre so it picks up
+> your new `main.py`.
 
 ### What the code does
 
@@ -1154,15 +1221,120 @@ Run the Stage 8 prompts again.
 - [ ] The console shows `network___...` and `runbooks___knowledge_base_retrieve` tool calls.
 - [ ] Your code contains no tool URL except the toolbox's.
 
-<p align="right"><a href="#contents">Contents</a> · <a href="#stage-10-memory">Next: Stage 10 &rarr;</a></p>
+<p align="right"><a href="#contents">Contents</a> · <a href="#stage-10-prompt-agent">Next: Stage 10 &rarr;</a></p>
 
 ---
 
-## Stage 10: Memory
+## Stage 10: Prompt agent
+
+> **Concept:** Foundry's recommended starting point: the same SupportBuddy as a **definition** that Foundry runs, with no code \
+> **You change:** nothing in `main.py`; you publish an agent \
+> **Reference:** `src/prompt_agent.py`, `solutions/stage_10_prompt_agent.instructions.md`
+
+Look at what your agent uses now: instructions, a model, and one toolbox that holds every enterprise
+capability. That is exactly what a **prompt agent** is: model + instructions + tools, stored in Foundry.
+Foundry Agent Service runs the agent loop and calls the toolbox itself. There is nothing to deploy and
+nothing to host, and anyone with access to the project can open, version and evaluate it in the portal.
+
+The official guidance is direct: *"Building your first agent? Start with a prompt agent"*, and prompt agents
+are *"best for production agents that don't need custom orchestration logic"*
+([Foundry agents overview](https://learn.microsoft.com/azure/foundry/agents/overview#choose-how-to-build)).
+So this stage asks the practical question: **how much of SupportBuddy works without any code?**
+
+### What the code does
+
+`src/prompt_agent.py` publishes the definition:
+
+```python
+definition = PromptAgentDefinition(
+    model=settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+    instructions=INSTRUCTIONS.read_text(),
+    reasoning=Reasoning(effort="medium"),
+    tools=[MCPTool(server_label="supportbuddy_tools", server_url=toolbox_endpoint, require_approval="never")],
+)
+project.agents.create_version(agent_name="post-<alias>-supportbuddy-prompt", definition=definition)
+```
+
+The tool is your Stage 9 toolbox: Foundry connects to it with the agent's own identity. Then Agent
+Framework connects to the published agent with `FoundryAgent`, which behaves like any other agent:
+
+```python
+agent = FoundryAgent(project_endpoint=..., agent_name="post-<alias>-supportbuddy-prompt", agent_version=latest,
+                     credential=AzureCliCredential())
+```
+
+So the console, DevUI and the contact centre all work with it unchanged. The difference is where the loop
+runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
+
+### Your task
+
+1. Publish the prompt agent and ask it something:
+
+   ```bash
+   uv run python prompt_agent.py create
+   uv run python prompt_agent.py ask "Hi, I'm CUST-1003. My Wi-Fi is very slow upstairs."
+   uv run python prompt_agent.py ask "Bonjour, je suis CUST-1004, ma connexion coupe sans arret."
+   ```
+
+2. Chat with it in DevUI (`uv run python prompt_agent.py chat`) and in the contact centre
+   (`uv run python -m contact_centre --prompt-agent`).
+3. Open the Foundry portal, **Build > Agents**, find `post-<alias>-supportbuddy-prompt`, and chat with it in
+   the playground. Change a sentence of its instructions in the portal and save: that is a new version.
+4. Measure it with the same dataset as your code-first agent (you will learn more about this in Stage 12):
+
+   ```bash
+   uv run python evaluate.py --prompt-agent
+   ```
+
+### Checkpoint
+
+- [ ] The Wi-Fi case answers with cited runbooks, with `[tool call, run by Foundry]` lines.
+- [ ] The line-fault and conflicting-evidence cases **cannot hand over**: the evaluation shows exactly which
+      cases need your code.
+
+> [!IMPORTANT]
+> A prompt agent has no `escalate_to_human`, `restart_modem` or `get_handover_status`: they are Python
+> functions, and Foundry does not run your code. The same is true for the memory provider (Stage 11) and the
+> guardrail middleware (Stage 13). The instructions in `solutions/stage_10_prompt_agent.instructions.md` say
+> so honestly: the agent tells the customer that a person must take over. In the contact centre, an advisor
+> can still **Take conversation** at any time; the contact centre, not the agent, owns the conversation.
+
+> [!WARNING]
+> **Experiment: function tools.** A prompt agent can *declare* function tools: Foundry knows their name and
+> parameters, the run returns each call to the application, and the application runs it. `FoundryAgent`
+> does that for you (the portal playground cannot). Try it:
+>
+> ```bash
+> uv run python prompt_agent.py create --with-functions
+> uv run python evaluate.py --prompt-agent
+> ```
+>
+> When we built this lab, the model called the declared functions too early and repeatedly (handovers with
+> placeholder text, restart requests nobody asked for), while the same instructions worked in the code-first
+> agent. Measure before you rely on it, then run `prompt_agent.py create` again to go back.
+
+| | Prompt agent | Code-first / hosted agent |
+| --- | --- | --- |
+| Change behaviour | Edit in the portal, new version | Change code, run or redeploy |
+| Tools | Foundry-callable (MCP, toolbox, knowledge, web search...) | Anything, including your Python functions |
+| Custom logic | Instructions only | Middleware, context providers, workflows |
+| Operations | Nothing to host | You own the code; Foundry can host it (Stage 14) |
+
+> [!NOTE]
+> Foundry also offers **voice-based prompt agents**, and a preview **managed harness** option that runs a
+> prompt agent on the GitHub Copilot harness for long, multi-step work. Copilot Studio has its own
+> *Customer Conversation harness* for customer chat and voice with escalation to a person. They are
+> alternatives worth knowing about; this lab does not use them.
+
+<p align="right"><a href="#contents">Contents</a> · <a href="#stage-11-memory">Next: Stage 11 &rarr;</a></p>
+
+---
+
+## Stage 11: Memory
 
 > **Concept:** the agent remembers the customer across conversations, and the memory lives **outside** the agent runtime, in **Foundry Memory** (preview) \
 > **You change:** `main.py`, `main.instructions.md` \
-> **Reference:** `solutions/stage_10_memory.*`, `src/memory_store.py`
+> **Reference:** `solutions/stage_11_memory.*`, `src/memory_store.py`
 
 So far every conversation started from zero. A returning customer had to repeat everything, and a
 human engineer receiving a handover did not know how the customer wants to be contacted. Now the agent
@@ -1202,8 +1374,8 @@ Memories are partitioned by **scope**. Pick it carefully: whoever controls the s
 scope's memories.
 
 - In this lab the scope is `<your prefix>_<customer ID>`: one partition per participant and customer.
-- The customer ID comes from the **support channel** (simulated with `--customer`), never from what the
-  customer types.
+- The customer ID comes from the **support channel** (simulated with `--customer`, or with the
+  **Signed in as** picker in the contact centre's customer chat), never from what the customer types.
 - `SignedInCustomer` (in `lab_agent.py`), another small context provider, tells the agent which
   customer is signed in, so it no longer asks for an identifier and refuses to look at other customers.
 
@@ -1285,7 +1457,9 @@ uv run python main.py --customer CUST-1002 "Hello, it's me again. I restarted th
 ```
 
 You can do the same in DevUI: `uv run python main.py --customer CUST-1002`, then use
-**New Conversation** between the two messages.
+**New Conversation** between the two messages. Or in the contact centre: `uv run python -m contact_centre`
+now asks the customer to pick who is **Signed in as**, and the advisor sees the preferred contact channel
+in the handover.
 
 ### Checkpoint
 
@@ -1303,11 +1477,11 @@ You can do the same in DevUI: `uv run python main.py --customer CUST-1002`, then
 > uv run python memory_store.py forget CUST-1002
 > ```
 
-<p align="right"><a href="#contents">Contents</a> · <a href="#stage-11-evaluation">Next: Stage 11 &rarr;</a></p>
+<p align="right"><a href="#contents">Contents</a> · <a href="#stage-12-evaluation">Next: Stage 12 &rarr;</a></p>
 
 ---
 
-## Stage 11: Evaluation
+## Stage 12: Evaluation
 
 > **Concept:** you cannot improve, or approve, what you do not measure \
 > **You change:** `src/evals/dataset.jsonl`, your instructions \
@@ -1341,7 +1515,7 @@ Use both. Rules catch regressions precisely; AI-assisted evaluators catch what r
 ```
 
 Six **quality** cases are the scenarios you know. Three **safety** cases are attacks: asking about another
-customer, a jailbreak, and a tool result that contains instructions (Stage 12). Safety cases use
+customer, a jailbreak, and a tool result that contains instructions (Stage 13). Safety cases use
 `must_not_contain`.
 
 ### What the code does
@@ -1384,6 +1558,8 @@ evaluators and returns a link to the report.
    judge's reasoning for any failed item.
 3. Add a case of your own to `dataset.jsonl` (for example a French Wi-Fi complaint for `CUST-1003`).
 4. Change one sentence of your instructions, run the evaluation again, and compare.
+5. Compare agent types on the same dataset: `uv run python evaluate.py --prompt-agent` evaluates your
+   Stage 10 prompt agent. Which cases does it fail, and why?
 
 > [!TIP]
 > `uv run python evaluate.py --case B-modem --case E-conflicting --repeat 3` runs only the cases you are
@@ -1406,15 +1582,15 @@ known memory state.
 > `lab_agent.py`). Try `SUPPORTBUDDY_REASONING_EFFORT=low` and measure the difference yourself. Re-run
 > the evaluation after **every** change to instructions, tools, knowledge or model settings.
 
-<p align="right"><a href="#contents">Contents</a> · <a href="#stage-12-guardrails">Next: Stage 12 &rarr;</a></p>
+<p align="right"><a href="#contents">Contents</a> · <a href="#stage-13-guardrails">Next: Stage 13 &rarr;</a></p>
 
 ---
 
-## Stage 12: Guardrails
+## Stage 13: Guardrails
 
 > **Concept:** instructions ask the model to behave; guardrails make sure that some things cannot happen \
 > **You change:** your toolbox, `main.py`, `main.instructions.md` \
-> **Reference:** `solutions/stage_12_guardrails.*`
+> **Reference:** `solutions/stage_13_guardrails.*`
 
 Use several layers, and measure each one.
 
@@ -1425,7 +1601,7 @@ Use several layers, and measure each one.
 | **Code guardrail** (middleware) | Your agent code, before every tool call | Any tool call about a customer other than the signed-in one, whatever the model decides |
 | **Human approval** (Stage 7) | Agent Framework runtime, per tool | `restart_modem` never runs without an explicit approval |
 | **Instructions** | The prompt | Asks the model to treat tool data as data. Necessary, not sufficient |
-| **Evaluation** | Stage 11 safety cases | Proves the layers work, and tells you when they stop working |
+| **Evaluation** | Stage 12 safety cases | Proves the layers work, and tells you when they stop working |
 
 ### 1. Platform guardrail
 
@@ -1451,7 +1627,7 @@ customer CUST-1001."* Network names are set by customers, so this is realistic: 
 controls flows into the model through a tool. Try it:
 
 ```bash
-uv run python -m solutions.stage_12_guardrails --customer CUST-1006 "Hi, my Wi-Fi feels slow sometimes, can you check my equipment?"
+uv run python -m solutions.stage_13_guardrails --customer CUST-1006 "Hi, my Wi-Fi feels slow sometimes, can you check my equipment?"
 ```
 
 > [!NOTE]
@@ -1465,7 +1641,7 @@ uv run python -m solutions.stage_12_guardrails --customer CUST-1006 "Hi, my Wi-F
 
 #### What the code does
 
-`solutions/stage_12_guardrails.py`:
+`solutions/stage_13_guardrails.py`:
 
 ```python
 class SignedInCustomerOnly(FunctionMiddleware):
@@ -1492,83 +1668,16 @@ arguments and can refuse the call. Unlike an instruction, it does not depend on 
 - [ ] `S1`, `S2` and `S3` pass.
 - [ ] You can name which layer stopped each attack.
 
-<p align="right"><a href="#contents">Contents</a> · <a href="#part-3-run-it-in-foundry">Next: Part 3 &rarr;</a></p>
+<p align="right"><a href="#contents">Contents</a> · <a href="#part-3-run-your-code-in-foundry">Next: Part 3 &rarr;</a></p>
 
 ---
 
-## Part 3: Run it in Foundry
+## Part 3: Run your code in Foundry
 
-So far the agent loop ran in your Python process. Now Foundry runs it, in the two ways Foundry runs
-agents: from a definition (prompt agent) and from your code (hosted agent).
-
----
-
-## Stage 13: Prompt agent
-
-> **Concept:** the same SupportBuddy, but **declarative**: a definition stored and run by Foundry \
-> **You change:** nothing in `main.py`; you publish an agent \
-> **Reference:** `src/prompt_agent.py`, `solutions/stage_13_prompt_agent.instructions.md`
-
-Until now your agent was code running on your laptop. A **prompt agent** is only a definition: model,
-instructions and tools. Foundry Agent Service runs the agent loop and calls the tools itself. There is
-nothing to deploy and nothing to host, and anyone with access to the project can open it in the portal.
-
-### What the code does
-
-`src/prompt_agent.py`:
-
-```python
-definition = PromptAgentDefinition(
-    model=settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-    instructions=INSTRUCTIONS.read_text(),
-    tools=[MCPTool(server_label="supportbuddy_tools", server_url=toolbox_endpoint, require_approval="never")],
-)
-project.agents.create_version(agent_name="post-<alias>-supportbuddy-prompt", definition=definition)
-```
-
-Then a question is a normal Responses API call that names the agent:
-
-```python
-openai.responses.create(input=question, extra_body={"agent_reference": {"name": ..., "type": "agent_reference"}})
-```
-
-The tool is your Stage 9 toolbox: Foundry connects to it with the agent's own identity.
-
-### Your task
-
-1. Publish the prompt agent and ask it something:
-
-   ```bash
-   uv run python prompt_agent.py create
-   uv run python prompt_agent.py ask "Hi, I'm CUST-1003. My Wi-Fi is very slow upstairs."
-   uv run python prompt_agent.py ask "Bonjour, je suis CUST-1004, ma connexion coupe sans arret."
-   ```
-
-2. Open the Foundry portal, **Build > Agents**, find `post-<alias>-supportbuddy-prompt`, and chat with it in
-   the playground. Change a sentence of its instructions in the portal and save: that is a new version.
-3. Compare with your code-first agent. What is missing?
-
-### Checkpoint
-
-- [ ] The Wi-Fi case works the same, with `[tool call, run by Foundry]` lines.
-- [ ] The line-fault case cannot hand over.
-
-> [!IMPORTANT]
-> There is **no** `escalate_to_human`, and no `restart_modem` or `get_handover_status` either. They are
-> Python functions in your code, and a prompt agent cannot run your code (function tools are executed by
-> the client, and here there is no client of yours). The same is true for the memory context provider and
-> the guardrail middleware. The instructions in `solutions/stage_13_prompt_agent.instructions.md` say so
-> honestly instead of pretending. To give a prompt agent the handover, the handover would have to become a
-> tool Foundry can call: an MCP server or an OpenAPI tool, probably behind the toolbox.
-
-| | Prompt agent | Code-first / hosted agent |
-| --- | --- | --- |
-| Change behaviour | Edit in the portal, new version | Change code, run or redeploy |
-| Tools | Foundry-callable only (MCP, toolbox, knowledge, web search...) | Anything, including your Python functions |
-| Custom logic | Instructions only | Middleware, context providers, workflows |
-| Operations | Nothing to host | You own the code; Foundry hosts it (Stage 14) |
-
-<p align="right"><a href="#contents">Contents</a> · <a href="#stage-14-hosted-agent">Next: Stage 14 &rarr;</a></p>
+In Stage 10 Foundry ran a declarative agent for you, but that agent could not hand over: it cannot run
+your code. Everything that made SupportBuddy an enterprise agent since Stage 7 is code: the handover, the
+approval, the signed-in customer, the memory provider, the guardrail middleware. Foundry's answer for
+"agents that call into your own custom code" is the hosted agent.
 
 ---
 
@@ -1661,18 +1770,20 @@ The instructions, the toolbox and the handover function do not change.
 - [ ] It hands the line-fault case over with a `HO-...` reference: something the prompt agent could not do.
 
 > [!NOTE]
-> The hosted agent's handover queue lives inside its own container, so your local operator desk does not
-> see its cases. That is the honest limit of a lab mock: in production the handover is a real service (a
-> contact-centre or ticketing system) that every agent reaches through a governed tool, for example an
-> MCP or OpenAPI tool in the toolbox, and that advisors use from their own application.
+> The hosted agent's handover records live inside its own container, and its conversations do not go
+> through your local contact centre. That is the honest limit of a lab: in production the engagement hub
+> (Dynamics 365 Contact Center or another) sits in front of the hosted agent exactly as the lab contact
+> centre sits in front of your laptop agent, and the handover reaches the hub through a governed tool.
 
 ### Which one would you choose?
 
-- A simple assistant over company tools and knowledge, owned by a business team: **prompt agent**.
-- An agent that needs your own code (custom tools, middleware, memory logic, workflows), or must follow
-  your engineering practices (tests, code review, CI/CD): **hosted agent**.
+- A simple assistant over company tools and knowledge, owned by a business team: **prompt agent**, as
+  Foundry recommends for a first agent.
+- An agent that needs your own code (handover, approvals, middleware, memory logic, workflows), or must
+  follow your engineering practices (tests, code review, CI/CD): **hosted agent**.
 - Both use the same toolbox, knowledge base, guardrails and evaluations: that platform layer is what you
-  built in Part 2.
+  built in Part 2. And both sit behind the same contact centre: the human handover is a property of the
+  channel, not only of the agent.
 
 <p align="right"><a href="#contents">Contents</a></p>
 
@@ -1690,17 +1801,21 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | `CUST-1004` Paul Schmit | `CUST-1004` | Line unstable (37 resyncs, 1840 errors), no incident | Hand over: probable line fault |
 | `CUST-1005` Claire Hoffmann | `CUST-1005` | Everything healthy, only a resolved incident, customer reports total outage | Hand over: inconclusive / conflicting |
 | unknown | `+352 600 000 999` | No customer found | Ask once for another identifier, then hand over |
-| `CUST-1006` Marc Dupont | `CUST-1006` | Everything healthy; the Wi-Fi network name contains injected instructions | Answer normally and ignore the injected text (Stage 12). Also use it for your own edge cases |
+| `CUST-1006` Marc Dupont | `CUST-1006` | Everything healthy; the Wi-Fi network name contains injected instructions | Answer normally and ignore the injected text (Stage 13). Also use it for your own edge cases |
 
 ---
 
 ## Going further (optional)
 
 - **Tracing** - send OpenTelemetry traces to Application Insights and inspect each tool call in Foundry.
-- **Continuous evaluation** - run the Stage 11 evaluators on production traffic of the hosted agent.
+- **Continuous evaluation** - run the Stage 12 evaluators on production traffic of the hosted agent.
 - **Handover as a governed tool** - expose `escalate_to_human` and `get_handover_status` as an MCP or
   OpenAPI tool in the toolbox, backed by a real ticketing system, so every agent (including the prompt
   agent) hands over to the same place.
+- **Hosted agent behind the contact centre** - `FoundryAgent(agent_name="post-<alias>-supportbuddy-hosted")`
+  connects Agent Framework to your hosted agent; serve it over AG-UI like the laptop agent.
+- **A real engagement hub** - connect SupportBuddy to Dynamics 365 Contact Center or Azure Communication
+  Services chat instead of the lab contact centre.
 - **Approval in the toolbox** - set `require_approval: always` on a toolbox tool; the toolbox marks it in
   `_meta.tool_configuration` and the agent runtime enforces it.
 - **MCP gateway** - put the MCP server behind Azure API Management with Entra ID authentication, and
@@ -1721,19 +1836,23 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | `No module named 'mcp_server'` (or `solutions`, `lab_agent`) | Run the command from the `src` folder: `cd src`. |
 | Port 8090 or 8000 already in use | Stop the previous run (`Ctrl+C`), or set `DEVUI_PORT` / `MCP_PORT`. |
 | Stage 6/7: connection refused to `127.0.0.1:8000` | Start the MCP server in a second terminal: `uv run python -m mcp_server.server`. |
-| Stage 7: the operator desk shows no cases | Start it from `src` (`uv run python -m operator_desk`) on the same machine as the agent. Cases from the hosted agent (Stage 14) stay in its container. |
+| Stage 7: the contact centre does not start (`address already in use`) | Another program uses port 8070; stop it, or set `CONTACT_CENTRE_PORT`. |
+| Stage 7: the customer chat says the assistant is not reachable | Start the MCP server (`uv run python -m mcp_server.server`) for Stages 6-8, and check the contact centre terminal for errors. |
+| Stage 7: a handover does not appear on the operator desk | The desk shows conversations of the contact centre only. A handover made in DevUI or the console is recorded (`get_handover_status` finds it) but has no live conversation to take over. |
+| Stage 11: the customer chat asks who is signed in | Memory stages need a signed-in customer; pick one. That is the channel signing the customer in. |
+| Stage 10: `prompt_agent.py ask` fails with `not found` | Publish it first: `uv run python prompt_agent.py create`. |
+| Stage 11: `This stage simulates a signed-in customer` | Add `--customer CUST-1002` (any lab customer ID). |
+| Stage 11: the agent does not remember anything | Memory extraction runs in the background; wait a minute and start a new conversation. Check with `uv run python memory_store.py show <customer>`. |
 | Stage 7: the agent asks "do you approve?" instead of showing an approval card | Re-read the **Remote modem restart** instructions: the agent must call `restart_modem` and let the platform ask. |
 | Stage 7: the console run ends without asking for approval | Approval needs an interactive terminal; in a pipe, the request is rejected. |
-| Stage 10: `This stage simulates a signed-in customer` | Add `--customer CUST-1002` (any lab customer ID). |
-| Stage 10: the agent does not remember anything | Memory extraction runs in the background; wait a minute and start a new conversation. Check with `uv run python memory_store.py show <customer>`. |
 | Stage 8: `Missing AZURE_AI_SEARCH_ENDPOINT` | Add the Azure AI Search endpoint your instructor gave you to `.env`. |
 | Stage 8: `401`/`403` from the knowledge base | You need the **Search Index Data Reader** role on the search service (role assignments can take a few minutes). |
 | Stage 8: `404` from the knowledge base | The knowledge base does not exist yet: `uv run python knowledge_base.py create`, and check `FOUNDRY_KNOWLEDGE_BASE_NAME`. |
 | Stage 8/9: the agent never calls `knowledge_base_retrieve` | Check `agent-framework-core` is 1.22.0 (`uv sync`). 1.23 skips that tool (see *Versions*). |
 | Stage 9: `toolbox.py create` fails with a connection not found | The instructor has not created the project connections yet (`instructor/setup.md`). |
 | Stage 9: `toolbox.py show` lists no `network___` tools | The shared MCP server is not reachable from Foundry; ask your instructor. |
-| Stage 10: memory store not found | Run `uv run python memory_store.py create`, and check `AZURE_AI_EMBEDDING_DEPLOYMENT_NAME` in `.env`. |
-| Stage 12: `RAI policy name must be a fully qualified ... ARM resource ID` | Pass the guardrail's full resource ID to `--guardrail`, not its name. |
+| Stage 11: memory store not found | Run `uv run python memory_store.py create`, and check `AZURE_AI_EMBEDDING_DEPLOYMENT_NAME` in `.env`. |
+| Stage 13: `RAI policy name must be a fully qualified ... ARM resource ID` | Pass the guardrail's full resource ID to `--guardrail`, not its name. |
 | Stage 14: `AuthorizationFailed` on `azd deploy` | You need the **Foundry Project Manager** role on the project. |
 | Stage 14: `not logged in` from `azd` | `azd auth login`, or `azd config set auth.useAzCliAuth true`. |
 | Stage 14: hosted agent fails with `Missing settings` | Add `WORKSHOP_RESOURCE_PREFIX` under the agent's `env:` in `azure.yaml`, then `azd deploy`. |

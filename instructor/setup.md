@@ -58,13 +58,13 @@ azd ai connection create supportbuddy-runbooks-kb --kind remote-tool \
 
 `toolbox.py` refers to these two connection names.
 
-## 5. Foundry Memory store (Stage 10)
+## 5. Foundry Memory store (Stage 11)
 
 ```bash
 uv run python memory_store.py create
 ```
 
-## 6. Guardrail (Stage 12)
+## 6. Guardrail (Stage 13)
 
 `guardrail.json` is the default policy plus **Indirect Attack** detection.
 
