@@ -898,9 +898,15 @@ It listens on `http://127.0.0.1:8000/mcp` (streamable HTTP).
 
 #### Your task
 
-In `src/main.py`, replace the imports of the four local tools and the existing `tools()` function with
-the following imports and function. Keep the existing `if __name__ == "__main__":` block at the bottom
-of `src/main.py`. The server code in `src/mcp_server/server.py` is provided; inspect it, but do not edit it.
+In `src/main.py`, replace everything above the `if __name__ == "__main__":` block with the code below:
+
+- remove the four `from tools.support_tools import ...` lines;
+- replace `from lab_agent import build_agent, run` with the import below (it adds `load_settings`);
+- replace the existing `tools()` function.
+
+Keep the existing `if __name__ == "__main__":` block at the bottom of `src/main.py` unchanged. The server
+code in `src/mcp_server/server.py` is provided; inspect it, but do not edit it. This is the same code as
+`src/solutions/stage_6_mcp.py`.
 
 ```python
 import os
@@ -909,18 +915,23 @@ from agent_framework import MCPStreamableHTTPTool
 
 from lab_agent import build_agent, load_settings, run
 
+DEFAULT_MCP_URL = "http://127.0.0.1:8000/mcp"
+
 
 def tools() -> list:
     load_settings()
     return [
+        # Client-side MCP: this process calls the server, so a localhost URL works.
         MCPStreamableHTTPTool(
             name="network",
-            url=os.getenv("MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
+            url=os.getenv("MOCK_MCP_URL", DEFAULT_MCP_URL),
             approval_mode="never_require",
             load_prompts=False,
         ),
     ]
 ```
+
+`load_settings()` reads `src/.env`, so `MOCK_MCP_URL` from your `.env` is used when it is set.
 
 > **🟣 Important**
 >
