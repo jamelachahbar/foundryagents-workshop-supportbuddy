@@ -161,6 +161,31 @@ def test_handover_moves_the_conversation_to_a_human_advisor_and_back():
         run(centre.customer_message(conversation, "Still there?"))
 
 
+def test_customer_leaving_closes_the_conversation_for_the_desk():
+    record = handover_record()
+    agents = ScriptedAgents(tool("c1", "escalate_to_human", record) + [{"type": "RUN_FINISHED"}])
+    centre = ContactCentre(agents, signs_in=False, agent_label="test")
+    conversation = centre.start(None)
+    events = centre.store.bus.subscribe()
+
+    centre.customer_leave(conversation)
+    assert conversation.mode == "closed"
+    assert conversation.transcript[-1]["text"] == "The customer left the conversation."
+    published = [events.get_nowait() for _ in range(events.qsize())]
+    assert {"type": "conversation", "conversation": conversation.id} in [
+        {k: e[k] for k in ("type", "conversation")} for e in published
+    ]
+    assert published[0]["summary"]["mode"] == "closed"
+
+    # A SupportBuddy turn that finishes after the customer left keeps the case but does not reopen the chat.
+    run(centre._run_supportbuddy(conversation, resume=None))
+    assert conversation.mode == "closed"
+    assert conversation.handover["handover_id"] == record["handover_id"]
+    assert backend.recorded_handovers()[0]["status"] == "waiting_for_advisor"
+    with pytest.raises(ValueError):
+        run(centre.customer_message(conversation, "Still there?"))
+
+
 def test_customer_approval_resumes_the_run():
     interrupt = {
         "id": "approval-1",
@@ -330,6 +355,10 @@ def test_api_rejects_bad_requests(api):
     assert client.post(f"/api/desk/conversations/{cid}/delete", json={"advisor": "Lea"}).status_code == 404
     assert client.post(f"/api/desk/conversations/{cid}/take", json={"advisor": "Lea"}).status_code == 200
     assert client.post(f"/api/desk/conversations/{cid}/messages", json={"advisor": "Lea", "text": "hi"}).status_code == 200
+    assert client.post(f"/api/conversations/{cid}/leave", content="{}", headers={"Content-Type": "text/plain"}).status_code == 415
+    assert client.post("/api/conversations/not-an-id/leave", json={}).status_code == 404
+    assert client.post(f"/api/conversations/{cid}/leave", json={}).status_code == 200
+    assert client.post(f"/api/conversations/{cid}/messages", json={"text": "x"}).status_code == 409
 
 
 @pytest.mark.parametrize("page", ["/", "/chat", "/desk", "/chat.js", "/desk.js", "/common.js", "/centre.css", "/icon.svg"])

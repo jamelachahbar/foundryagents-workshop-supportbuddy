@@ -107,6 +107,13 @@ class ContactCentre:
         elif conversation.mode == "waiting" and not any(m.get("kind") == "waiting" for m in conversation.transcript[-3:]):
             self.store.add(conversation, "system", "An advisor will join this conversation shortly.", kind="waiting")
 
+    def customer_leave(self, conversation: Conversation) -> None:
+        if conversation.mode == "closed":
+            return
+        self.store.set_mode(conversation, "closed")
+        # An open handover stays open: the case still needs follow-up even if the chat ended.
+        self.store.add(conversation, "system", "The customer left the conversation.")
+
     async def customer_approval(self, conversation: Conversation, interrupt_id: str, approved: bool) -> None:
         approval = self._pending_approval(conversation.transcript, interrupt_id)
         approval["status"] = "approved" if approved else "rejected"
@@ -222,6 +229,7 @@ class ContactCentre:
             conversation.busy = False
         if handover:
             conversation.handover = handover
+        if handover and conversation.mode != "closed":
             self.store.set_mode(conversation, "waiting")
             self.store.add(
                 conversation,

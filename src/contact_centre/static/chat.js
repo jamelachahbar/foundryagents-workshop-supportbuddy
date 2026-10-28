@@ -131,7 +131,13 @@ async function approve(message, approved) {
   }
 }
 
-function startOver() {
+async function startOver() {
+  const c = state.conversation;
+  if (c && c.mode !== "closed") {
+    // Tell the contact centre, so the operator desk sees that the customer left.
+    await postJSON(`/api/conversations/${c.id}/leave`, {}).catch(() => {});
+  }
+  state.conversation = null;
   sessionStorage.removeItem(STORAGE_KEY);
   state.source?.close();
   showStart();

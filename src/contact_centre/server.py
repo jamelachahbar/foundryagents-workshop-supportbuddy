@@ -194,6 +194,13 @@ def create_app(
         in_background(centre.customer_message(found, text))
         return {"status": "accepted"}
 
+    @app.post("/api/conversations/{conversation_id}/leave")
+    async def customer_leave(conversation_id: str, request: Request) -> dict[str, str]:
+        found = conversation(conversation_id)
+        await body(request)
+        centre.customer_leave(found)
+        return {"status": "ok"}
+
     @app.post("/api/conversations/{conversation_id}/approvals", status_code=202)
     async def customer_approval(conversation_id: str, request: Request) -> dict[str, str]:
         found = conversation(conversation_id)
