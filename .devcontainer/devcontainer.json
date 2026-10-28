@@ -2,13 +2,15 @@
   "name": "SupportBuddy connectivity agent lab",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "features": {
-    "ghcr.io/devcontainers/features/azure-cli:1": {}
+    "ghcr.io/devcontainers/features/azure-cli:1": { "installUsingPython": true },
+    "ghcr.io/azure/azure-dev/azd:0": {}
   },
-  "postCreateCommand": "pip install --user uv && cd src && uv sync",
-  "forwardPorts": [8000, 8070, 8090],
+  "postCreateCommand": "pip install --user uv && azd ext install microsoft.foundry && cd src && uv sync",
+  "forwardPorts": [8000, 8070, 8088, 8090],
   "portsAttributes": {
     "8000": { "label": "Synthetic MCP server (Stage 6+)" },
     "8070": { "label": "Contact centre (Stage 7+)" },
+    "8088": { "label": "Hosted agent local run (Stage 14)" },
     "8090": { "label": "DevUI" }
   },
   "customizations": {

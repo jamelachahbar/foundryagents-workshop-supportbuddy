@@ -37,6 +37,7 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 
 from contact_centre.centre import ASSIST_PATH, SUPPORTBUDDY_PATH, UNIDENTIFIED, ContactCentre, http_runner
 from lab_backend import backend
+from runtime_settings import app_url
 
 logger = logging.getLogger("contact_centre")
 STATIC = Path(__file__).parent / "static"
@@ -310,8 +311,8 @@ def main() -> None:
     app = create_app(centre, agents, customers=customers)
     print(
         f"\nContact centre for {label}"
-        f"\n  Customer chat:  http://127.0.0.1:{port}/chat"
-        f"\n  Operator desk:  http://127.0.0.1:{port}/desk\n",
+        f"\n  Customer chat:  {app_url(port)}/chat"
+        f"\n  Operator desk:  {app_url(port)}/desk\n",
         flush=True,
     )
     uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")

@@ -40,6 +40,7 @@ from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
 from devui_branding import serve_branded
+from runtime_settings import app_url
 
 AGENT_BASE_NAME = "supportbuddy"
 PREFIX_PATTERN = re.compile(r"^lab-[a-z0-9]{2,8}$")
@@ -236,7 +237,7 @@ def run(agent: Agent) -> None:
         token = _devui_token()
         print(
             "\n" + "=" * 70
-            + f"\nDevUI: http://127.0.0.1:{port}"
+            + f"\nDevUI: {app_url(port)}"
             + "\nWhen the browser asks for an authentication token, paste:"
             + f"\n\n    {token}\n"
             + f"\n(Stored in {DEVUI_TOKEN_FILE.name}; the browser remembers it, so you paste it once.)\n"
@@ -262,7 +263,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _devui_token() -> str:
-    """Reuse one local DevUI token per machine; DevUI only listens on 127.0.0.1."""
+    """Reuse one local DevUI token per machine, including in Codespaces."""
     if os.getenv("DEVUI_AUTH_TOKEN"):
         return os.environ["DEVUI_AUTH_TOKEN"]
     if DEVUI_TOKEN_FILE.is_file():

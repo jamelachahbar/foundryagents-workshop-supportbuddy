@@ -15,6 +15,8 @@ and hands the case to a human when it cannot resolve it.
 
 **Start here: [docs/workshop.md](docs/workshop.md)**
 
+Optional Copilot skills and references: [.github/skills/README.md](.github/skills/README.md).
+
 ## The use case, and what is synthetic
 
 The scenario is one that every connectivity provider knows: a customer contacts support and says
@@ -117,6 +119,23 @@ az login
 uv run python preflight.py
 uv run python main.py      # opens DevUI
 ```
+
+**Connect to DevUI (once per browser)**
+
+1. In Codespaces, open port **8090** from the **Ports** tab. Keep it **Private**. On a laptop, use the
+  browser window opened by the command.
+2. In VS Code, press **Ctrl+P** (**Cmd+P** on macOS), type `src/.devui_token`, and press **Enter**.
+   This local file is created when you first start DevUI. Copy its single token value, without spaces
+   or line breaks. Leave the file unchanged.
+3. Paste it into DevUI's **Enter Authentication Token** field and click **Connect**.
+
+The token is also printed below **When the browser asks for an authentication token, paste:** in the
+terminal where you ran `uv run python main.py`. If you explicitly set `DEVUI_AUTH_TOKEN`, use that value
+instead of the file.
+
+The browser remembers the token. An initial `401 Unauthorized` is normal before connecting. This token
+is separate from your Azure sign-in; keep it private and do not paste it into chat or shared documents.
+Complete these steps alongside preflight before day 1.
 
 Run the offline tests with `uv run pytest` from `src`.
 

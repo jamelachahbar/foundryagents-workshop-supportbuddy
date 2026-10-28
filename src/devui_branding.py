@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import html
+import os
 import threading
 import webbrowser
 from importlib.resources import files
@@ -19,6 +20,8 @@ import uvicorn
 from agent_framework_devui import DevServer, serve
 from starlette.responses import HTMLResponse
 from starlette.routing import Route
+
+from runtime_settings import app_url, devui_host
 
 BRAND_NAME = "SupportBuddy"
 ICON_FILE = Path(__file__).resolve().parents[1] / "docs" / "assets" / "icon.svg"
@@ -64,17 +67,20 @@ def branded_index(icon_svg: str) -> str:
 
 
 def serve_branded(agent: Any, port: int, auth_token: str) -> None:
-    """Run DevUI for one agent on 127.0.0.1 with SupportBuddy branding (plain DevUI if the icon is missing)."""
+    """Run authenticated DevUI with SupportBuddy branding (plain DevUI if the icon is missing)."""
+    host = devui_host()
+    auto_open = os.getenv("CODESPACES") != "true"
     if not ICON_FILE.is_file():
-        serve(entities=[agent], port=port, auto_open=True, auth_token=auth_token)
+        serve(entities=[agent], port=port, host=host, auto_open=auto_open, auth_token=auth_token)
         return
 
     page = branded_index(ICON_FILE.read_text(encoding="utf-8"))
-    server = DevServer(port=port, host="127.0.0.1", auth_token=auth_token)
+    server = DevServer(port=port, host=host, auth_token=auth_token)
     server.set_pending_entities([agent])
     app = server.get_app()
     # DevUI mounts its UI at "/" after its API routes; serve the branded start page ahead of it.
     app.router.routes.insert(0, Route("/", lambda _request: HTMLResponse(page), methods=["GET"]))
 
-    threading.Timer(2.0, webbrowser.open, [f"http://127.0.0.1:{port}"]).start()
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
+    if auto_open:
+        threading.Timer(2.0, webbrowser.open, [app_url(port)]).start()
+    uvicorn.run(app, host=host, port=port, log_level="info")

@@ -5,10 +5,14 @@ SupportBuddy and the assist agent are replaced by scripted AG-UI event streams.
 
 import asyncio
 import json
+import socket
+import threading
 import time
 from pathlib import Path
 
+import httpx
 import pytest
+import uvicorn
 from fastapi.testclient import TestClient
 
 from contact_centre.centre import ASSIST_PATH, ContactCentre
@@ -279,6 +283,35 @@ def test_customer_conversation_over_http(api):
             break
         time.sleep(0.05)
     assert stored.transcript[-1]["text"] == "Hello!"
+
+
+def test_loopback_contact_centre_accepts_forwarded_host_and_streams_events():
+    centre = ContactCentre(ScriptedAgents(), signs_in=False, agent_label="test")
+    app = create_app(centre, {})
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        listener.listen()
+        port = listener.getsockname()[1]
+        server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
+        thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
+        thread.start()
+        try:
+            with httpx.Client(
+                base_url=f"http://127.0.0.1:{port}", headers={"Host": "x-8070.app.github.dev"}, trust_env=False,
+            ) as client:
+                for path in ("/chat", "/desk", "/chat.js", "/desk.js", "/common.js", "/api/config"):
+                    assert client.get(path).status_code == 200
+                conversation = client.post("/api/conversations", json={}).json()
+                for path in (f"/api/conversations/{conversation['id']}/events", "/api/desk/events"):
+                    with client.stream("GET", path) as response:
+                        assert response.status_code == 200
+                        assert response.headers["content-type"].startswith("text/event-stream")
+                        first = next(response.iter_lines())
+                        assert json.loads(first.removeprefix("data: "))["type"] == "snapshot"
+        finally:
+            server.should_exit = True
+            thread.join(timeout=5)
+        assert not thread.is_alive()
 
 
 def test_api_rejects_bad_requests(api):

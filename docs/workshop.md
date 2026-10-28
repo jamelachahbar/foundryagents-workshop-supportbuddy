@@ -245,6 +245,22 @@ agents never call each other: there is no multi-agent orchestration in this lab.
 
 A dev container is included (`.devcontainer/`) if you prefer Codespaces or Docker.
 
+### Running in GitHub Codespaces
+
+Open the codespace **before day 1** and wait for container setup to finish. Use it in the browser or
+connect with VS Code desktop. The container installs Python, uv, Azure CLI and Azure Developer CLI,
+including the Foundry extension.
+
+- Sign in with `az login --use-device-code --tenant <tenant>`. Use the tenant your instructor gives you.
+- Open apps from the **Ports** tab, not the printed `127.0.0.1` links. DevUI also prints its forwarded
+  URL and authentication token. `DEVUI_HOST` overrides the Codespaces default bind (`0.0.0.0`).
+- Keep ports **Private**. The contact centre has no sign-in. Ports 8000, 8070, 8088 and 8090 are forwarded;
+  8088 is for the Stage 14 local hosted-agent run.
+- Codespaces normally stops after 30 minutes idle (your account or organisation can change this).
+  After lunch, restart the codespace and the server commands in your terminals. Files and `.env` survive.
+- The customer's Conditional Access policy may block device-code sign-in or non-managed devices.
+  Check access with a customer test account before the workshop; ask the customer's administrator if blocked.
+
 ### Versions, and why Agent Framework 1.22
 
 | Package | Version |
@@ -1869,6 +1885,9 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | `reasoning` ... `not supported with this model` | Your chat model has no reasoning support: set `SUPPORTBUDDY_REASONING_EFFORT=off` in `.env`. |
 | `AzureCliCredential.get_token failed: Timed out waiting for Azure CLI` | The Azure CLI took too long to answer (slow or busy laptop). Run `az account get-access-token -o none` once, then try again. `Please run 'az login'` means your sign-in expired: `az login --tenant <tenant>`. |
 | DevUI shows **Authentication Required** | Paste the token from the banner at the top of the terminal output (also in `src/.devui_token`). |
+| Codespaces: DevUI returns `invalid_host` / `host_not_allowed` | Restart the agent with `CODESPACES=true` and no `DEVUI_HOST` override (or `DEVUI_HOST=0.0.0.0`). Open port 8090 from the **Ports** tab and paste the token. Keep the port **Private**. |
+| Codespaces: device-code sign-in is blocked | Check the tenant in `az login --use-device-code --tenant <tenant>`. Ask the customer's administrator whether Conditional Access allows device-code sign-in and non-managed devices. |
+| Codespaces: servers stopped after the idle timeout | Restart the codespace and rerun the server commands in your terminals. Files and `.env` survive; server processes do not. |
 | `No module named 'mcp_server'` (or `solutions`, `lab_agent`) | Run the command from the `src` folder: `cd src`. |
 | Port 8090 or 8000 already in use | Stop the previous run (`Ctrl+C`), or set `DEVUI_PORT` / `MCP_PORT`. |
 | Stage 6/7: connection refused to `127.0.0.1:8000` | Start the MCP server in a second terminal: `uv run python -m mcp_server.server`. |
