@@ -4,6 +4,18 @@ Optional Copilot skills used while preparing and troubleshooting this lab. They 
 reference material for a coding assistant, not tools loaded by SupportBuddy. The workshop works without
 Copilot.
 
+## Workshop skills
+
+Written for this lab. They read your stage files and the workshop guide, coach rather than solve, and
+never read `.env` or the DevUI token.
+
+| Skill | Use it for | Example request |
+| --- | --- | --- |
+| [SupportBuddy lab coach](supportbuddy-lab-coach/SKILL.md) | Detect your stage, review your changes against the checkpoint, hints, catching up | "Which stage am I at and what is missing?" |
+| [SupportBuddy lab troubleshoot](supportbuddy-lab-troubleshoot/SKILL.md) | Errors while running the lab: sign-in, DevUI, ports, MCP, toolbox, knowledge base | "I get a 404 on the toolbox URL, why?" |
+
+Type `/` in Copilot Chat to call one directly, for example `/supportbuddy-lab-coach check my Stage 5`.
+
 ## Included copies
 
 | Skill | Use it for | Version |
