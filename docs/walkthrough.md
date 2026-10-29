@@ -514,8 +514,10 @@ Agent: Il faut passer votre dossier à un conseiller humain ... contactez le sup
 ```
 
 The tool calls now say **run by Foundry**: the agent loop runs in Foundry Agent Service, not in your process.
-And the line-fault case **cannot hand over**: the prompt agent has no `escalate_to_human`, so it tells the
-customer to contact support.
+The line-fault case **cannot hand over with this default definition**: it omits `escalate_to_human`, so
+the agent tells the customer to contact support. This is a lab configuration choice, not a prompt-agent
+limitation. The optional Stage 10 experiment declares function tools that the calling application executes;
+handover could also be exposed through a remote MCP or OpenAPI tool.
 
 In the portal, **Build > Agents** lists `lab-demo-supportbuddy-prompt`. Open it and chat in the playground:
 
@@ -671,6 +673,10 @@ instructions and tool design).
 
 [Concepts and exercise](workshop.md#stage-14-hosted-agent)
 
+This simplified example hosts the Stage 9-style toolbox and support functions, including restart approval.
+It does not configure Stage 11 signed-in customer context/memory or Stage 13 customer-checking middleware.
+Your Python code runs the agent loop; Foundry manages its compute, endpoint, identity and scaling.
+
 Sign in to `azd` (`azd auth login`, same account and tenant), then describe the deployment, with the project
 resource ID from the lab environment:
 
@@ -684,7 +690,8 @@ azd ai agent init --no-prompt --project-id "<project resource ID>" --model-deplo
 Added agent 'lab-demo-supportbuddy-hosted' to azure.yaml.
 ```
 
-Open `src/azure.yaml` and add your prefix under the agent's `env:`:
+Open `src/azure.yaml`, verify the model mapping and add your prefix under the agent's `env:`.
+Foundry injects the project endpoint automatically; the model mapping below resolves from azd configuration:
 
 ```yaml
         env:
@@ -721,8 +728,10 @@ In the portal, **Build > Agents** shows your prompt agent and your hosted agent 
 
 ![Prompt agent and hosted agent side by side](assets/walkthrough/portal-agents.png)
 
-**Check:** the hosted agent answers the modem case and hands the line-fault case over with a `HO-...`
-reference, which the prompt agent could not do.
+**Check:** the hosted agent answers the modem case and records the line-fault handover with a `HO-...`
+reference by executing the Python function inside the hosted process. The default Stage 10 prompt-agent
+definition omitted this tool; the difference is configuration and execution location, not whether prompt
+agents can support handover. This hosted mock queue is not connected to the local advisor desk.
 
 ---
 

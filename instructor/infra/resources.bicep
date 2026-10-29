@@ -178,7 +178,7 @@ resource networkMcp 'Microsoft.App/containerApps@2024-03-01' = if (hostNetworkMc
 
 // ----- Role assignments ----------------------------------------------------------------------
 
-// Foundry Memory (Stage 11) and hosted agents (Stage 14) call the model deployments with the project's identity.
+// Foundry Memory (Stage 11) uses the project identity; hosted agents have their own runtime identity.
 var projectModelRoles = [roles.cognitiveServicesOpenAIUser, roles.foundryUser]
 
 resource projectUsesModels 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in projectModelRoles: {

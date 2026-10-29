@@ -1,15 +1,16 @@
 """Stage 14 - SupportBuddy as a Foundry hosted agent.
 
-Same Agent Framework code as Stages 9 and 13, served over the Responses protocol by
+Stage 9-style toolbox and support functions, served over the Responses protocol by
 ResponsesHostServer. Locally it listens on http://localhost:8088. Deployed with
 `azd deploy`, Foundry runs this code for you: it builds it, gives it a managed identity
 and an endpoint, scales it, and shows it in the portal next to your prompt agent.
 
 What changes compared to the local agent:
   - credentials: DefaultAzureCredential (your az login locally, the agent's identity in Foundry);
-  - settings: Foundry injects FOUNDRY_PROJECT_ENDPOINT and AZURE_AI_MODEL_DEPLOYMENT_NAME;
+  - settings: Foundry injects FOUNDRY_PROJECT_ENDPOINT; deployment env supplies the model name;
   - no DevUI and no console: callers use the Responses API (portal playground, azd ai agent invoke).
-What does not change: the instructions, the toolbox and the local escalate_to_human function.
+This example has its own instructions and reuses the toolbox and local support functions.
+It does not configure Stage 11 signed-in customer context/memory or Stage 13 customer-checking middleware.
 
 Run locally from the src folder:   uv run python hosted_agent.py
 Then, in another terminal:         azd ai agent invoke --local "I'm CUST-1004, my connection keeps dropping"
@@ -33,7 +34,7 @@ from tools.support_tools import escalate_to_human, get_handover_status, restart_
 def tools() -> list:
     return [
         FoundryToolbox(AsyncDefaultAzureCredential(), url=toolbox_settings()["TOOLBOX_ENDPOINT"]),
-        # Local Python functions: possible here, impossible in a prompt agent.
+        # Executed here; prompt-agent function tools execute in the calling application.
         escalate_to_human,
         get_handover_status,
         restart_modem,

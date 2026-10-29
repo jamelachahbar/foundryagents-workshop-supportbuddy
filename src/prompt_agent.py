@@ -7,14 +7,16 @@ Run from the src folder:
     uv run python -m contact_centre --prompt-agent        # customer chat + operator desk
 
 A prompt agent is declarative: a definition (model + instructions + tools) stored in Foundry.
-Foundry Agent Service runs the agent loop and calls the toolbox itself; nothing of yours runs.
+Foundry Agent Service runs the agent loop and calls the toolbox itself; no custom orchestration is deployed.
 Agent Framework's FoundryAgent connects to it like to any other agent, so DevUI, the console and
 the contact centre work with it unchanged.
 
 Optional experiment: `create --with-functions` also declares your three Python functions
 (escalate_to_human, get_handover_status, restart_modem) as function tools. Foundry knows their name
-and parameters, but it cannot run your code: the run returns each call to the application, and
-FoundryAgent runs the function and sends the result back. The Foundry portal playground cannot.
+and parameters, not their Python bodies: the run returns each call to the application, and
+FoundryAgent runs the function and sends the result back. The portal does not host these implementations.
+Custom business logic can also be exposed as remote MCP or OpenAPI tools; handover does not require hosting
+your own agent loop.
 """
 
 from __future__ import annotations

@@ -230,17 +230,18 @@ each at the moment the lab needs it:
 | | Your code calls Foundry (Stages 1-13) | Prompt agent (Stage 10) | Hosted agent (Stage 14) |
 | --- | --- | --- | --- |
 | What it is | Your Agent Framework code, running in your process. Foundry calls this an *ephemeral* agent: the definition ships with your app | A definition stored in Foundry: model + instructions + tools | Your Agent Framework code, packaged and run by Foundry |
-| Who runs the agent loop | Your Python process | Foundry Agent Service | Foundry Agent Service, in a container with your code |
-| Tools | Any: Python functions, MCP, toolbox | Tools Foundry can call itself: toolbox, MCP, knowledge, web search... | Any: same code as on your laptop |
-| Custom logic (middleware, context providers) | Yes | No | Yes |
+| Who runs the agent loop | Your Python process | Foundry Agent Service | Your Python code, in a Foundry-managed container |
+| Tools | Python functions, MCP, toolbox | Foundry-executed tools (MCP, toolbox, knowledge, web search...) and application-executed function tools | Python functions, MCP, toolbox |
+| Custom logic (middleware, context providers) | In your process | In an external application or tool backend, not deployed inside the managed agent loop | In your hosted process |
 | Official guidance: best for | Agent logic that ships with your app | **"Building your first agent? Start with a prompt agent."** Production agents that don't need custom orchestration | Agents that call into your own custom code, custom orchestration, custom protocols |
 
 > **🔵 Note**
 >
-> The official advice is to start with a prompt agent and move to a hosted agent when you need your own
-> code. This lab builds the code first, because the point of the day is to understand what an agent does.
-> Stage 10 then asks the question Foundry asks: how far does a prompt agent get without any code? The
-> human handover from Stage 7 is the answer to why you would need more.
+> The official advice is to start with a prompt agent and use a hosted agent when you need to own the
+> orchestration, framework, middleware or runtime dependencies. Prompt agents can still call your business
+> logic through remote tools or application-executed functions. This lab builds the code first to explain
+> the agent loop, then compares a declarative definition with hosting that loop yourself. Handover alone
+> does not require a hosted agent.
 
 ### The agents in this lab
 
@@ -2009,10 +2010,12 @@ Stop the previous code-first DevUI and contact centre with **Ctrl+C** before swi
 After publishing a new prompt-agent version, restart these clients and click **New Conversation**.
 No local network MCP server is needed: the published agent uses the Azure toolbox.
 
-Look at what your agent uses now: instructions, a model, and one toolbox that holds every enterprise
+Look at what your agent uses now: instructions, a model, and one toolbox that holds the remote
 capability. That is exactly what a **prompt agent** is: model + instructions + tools, stored in Foundry.
-Foundry Agent Service runs the agent loop and calls the toolbox itself. There is nothing to deploy and
-nothing to host, and anyone with access to the project can open, version and evaluate it in the portal.
+Foundry Agent Service runs the agent loop and calls the toolbox itself. There is no custom orchestration
+code or container to deploy. Users with the appropriate project permissions can open, version and
+evaluate the definition in the portal. Remote tool backends and any function-executing application
+still need to run somewhere.
 
 The official guidance is direct: *"Building your first agent? Start with a prompt agent"*, and prompt agents
 are *"best for production agents that don't need custom orchestration logic"*
@@ -2073,22 +2076,26 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 ### Checkpoint
 
 - [ ] The Wi-Fi case answers with cited runbooks, with `[tool call, run by Foundry]` lines.
-- [ ] The line-fault and conflicting-evidence cases **cannot hand over**: the evaluation shows exactly which
-      cases need your code.
+- [ ] The line-fault and conflicting-evidence cases **cannot hand over with this default definition**:
+      the evaluation shows the effect of omitting the handover tool.
 
 > **🟣 Important**
 >
-> A prompt agent has no `escalate_to_human`, `restart_modem` or `get_handover_status`: they are Python
-> functions, and Foundry does not run your code. The same is true for the memory provider (Stage 11) and the
-> guardrail middleware (Stage 13). The instructions in `src/solutions/stage_10_prompt_agent.instructions.md` say
-> so honestly: the agent tells the customer that a person must take over. In the contact centre, an advisor
-> can still **Take conversation** at any time; the contact centre, not the agent, owns the conversation.
+> This lab's **default Stage 10 definition** has no `escalate_to_human`, `restart_modem` or
+> `get_handover_status` tool. It also does not configure the Stage 11 memory provider or Stage 13 Python
+> middleware. These are choices in this example, not universal prompt-agent limitations. A prompt agent
+> can request application-executed function calls or invoke business logic exposed through MCP or OpenAPI;
+> Foundry does not upload and execute your local Python function bodies as part of the definition.
+> The default instructions honestly say that a person must take over. In the contact centre, an advisor
+> can still **Take conversation** at any time; the contact centre owns that conversation routing.
 
 > **🟠 Warning**
 >
 > **Experiment: function tools.** A prompt agent can *declare* function tools: Foundry knows their name and
 > parameters, the run returns each call to the application, and the application runs it. `FoundryAgent`
-> does that for you (the portal playground cannot). Try it:
+> does that for you; the portal playground does not host these Python implementations. This is the
+> documented [function-calling pattern](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/function-calling).
+> Try it:
 >
 > ```bash
 > uv run python prompt_agent.py create --with-functions
@@ -2097,14 +2104,18 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 >
 > When we built this lab, the model called the declared functions too early and repeatedly (handovers with
 > placeholder text, restart requests nobody asked for), while the same instructions worked in the code-first
-> agent. Measure before you rely on it, then run `prompt_agent.py create` again to go back.
+> agent. This is an observation about that experiment, not a platform limitation. Measure before you rely
+> on it, then run `prompt_agent.py create` again to go back.
 
 | | Prompt agent | Code-first / hosted agent |
 | --- | --- | --- |
-| Change behaviour | Edit in the portal, new version | Change code, run or redeploy |
-| Tools | Foundry-callable (MCP, toolbox, knowledge, web search...) | Anything, including your Python functions |
-| Custom logic | Instructions only | Middleware, context providers, workflows |
-| Operations | Nothing to host | You own the code; Foundry can host it (Stage 14) |
+| Change behaviour | Version the definition through the portal, SDK, REST or supported CLI tooling | Change code, run or redeploy |
+| Tools | Foundry-executed remote tools and application-executed function tools | Remote tools and in-process Python functions |
+| Custom logic | Managed orchestration; custom logic can live in an application or tool backend | Your orchestration, middleware, context providers and workflows |
+| Operations | No orchestration container to operate; custom backends still need hosting | You own the runtime code; Foundry can host it (Stage 14) |
+
+Both approaches support source control, tests, code review and CI/CD. Choose based on runtime ownership,
+not whether the team follows engineering practices. See [Prompt agents](https://learn.microsoft.com/azure/foundry/agents/concepts/prompt-agents).
 
 > **🔵 Note**
 >
@@ -2569,10 +2580,11 @@ arguments and can refuse the call. Unlike an instruction, it does not depend on 
 | --- | --- | --- |
 | **14** | Microsoft Foundry Agent Service | Your Python agent deployed, callable and visible in Foundry |
 
-In Stage 10 Foundry ran a declarative agent for you, but that agent could not hand over: it cannot run
-your code. Everything that made SupportBuddy an enterprise agent since Stage 7 is code: the handover, the
-approval, the signed-in customer, the memory provider, the guardrail middleware. Foundry's answer for
-"agents that call into your own custom code" is the hosted agent.
+In Stage 10 Foundry ran a declarative agent for you. Its default definition omitted handover, although
+the optional function-tools experiment lets an application execute it. Stage 14 takes a different path:
+run your own Agent Framework orchestration and Python tools inside Foundry-managed compute, rather than
+hosting a separate function-executing client. This is useful when you need control over the framework,
+middleware, dependencies or protocols, not simply because you need a handover tool.
 
 ---
 
@@ -2600,9 +2612,16 @@ If you change hosted-agent code or instructions, stop the local Responses server
 rerun it. For the deployed agent, use `azd deploy` to publish changes; restarting a local server does
 not update Azure.
 
-A **hosted agent** keeps everything a prompt agent cannot do (your Python tools, middleware, any library)
-and gets what your laptop cannot give: a managed endpoint, a managed identity, scaling, and a place in
-the portal next to the prompt agent. Foundry runs your code; you do not manage a container platform.
+A **hosted agent** runs your orchestration code and Python tools with your chosen dependencies. Foundry
+provides a managed endpoint, agent identity, scaling and a place in the portal next to the prompt agent.
+Your code owns the agent loop; Foundry manages the compute. See
+[Hosted agents](https://learn.microsoft.com/azure/foundry/agents/concepts/hosted-agents).
+
+**Scope of this example:** Stage 14 hosts the Stage 9-style toolbox and three local support functions,
+including the approval-required modem restart. It does **not** carry forward the Stage 11 signed-in
+customer context and memory provider, or the Stage 13 `SignedInCustomerOnly` middleware. It is a
+simplified hosting exercise, not a feature-complete deployment of Stage 13. Platform model/toolbox
+guardrails remain separate from that omitted Python middleware.
 
 ### What the code does
 
@@ -2612,7 +2631,7 @@ the portal next to the prompt agent. Foundry runs your code; you do not manage a
 def tools() -> list:
     return [
         FoundryToolbox(AsyncDefaultAzureCredential(), url=toolbox_settings()["TOOLBOX_ENDPOINT"]),
-        # Local Python functions: possible here, impossible in a prompt agent.
+        # Executed in this process; prompt-agent function tools execute in the calling application.
         escalate_to_human,
         get_handover_status,
         restart_modem,
@@ -2628,9 +2647,11 @@ Three things change compared to your code-first agent:
   OpenAI-compatible Responses protocol, instead of DevUI or the console.
 - **Identity:** `DefaultAzureCredential` uses your `az login` locally, and the agent's managed identity
   in Foundry. Same code, no secrets.
-- **Settings:** Foundry injects `FOUNDRY_PROJECT_ENDPOINT` and `AZURE_AI_MODEL_DEPLOYMENT_NAME`.
+- **Settings:** Foundry injects `FOUNDRY_PROJECT_ENDPOINT`. The deployment supplies
+  `AZURE_AI_MODEL_DEPLOYMENT_NAME` through the service's `env:` mapping in `azure.yaml`; it is not an
+  unconditional platform-injected setting. See [environment configuration](https://learn.microsoft.com/azure/foundry/agents/how-to/configure-hosted-agent-env-variables).
 
-The instructions, the toolbox and the handover function do not change.
+The hosted example has its own instructions and reuses the toolbox and support functions.
 
 ### Your task
 
@@ -2651,10 +2672,12 @@ The instructions, the toolbox and the handover function do not change.
   are relative to the repository root here; keep the generated YAML's paths relative to `src/`.
 
 2. Your `src/.env` is not uploaded, so give the agent its prefix. In `src/azure.yaml`, under the hosted
-  agent service's existing `env:` mapping, add the following entry (replace `<alias>` with your alias).
+  agent service's existing `env:` mapping, verify the model entry and add the prefix (replace `<alias>`
+  with your alias). The model placeholder resolves from the azd environment.
   Do not add it to `src/.env` or `instructor/azure.yaml` instead.
 
    ```yaml
+   AZURE_AI_MODEL_DEPLOYMENT_NAME: ${AZURE_AI_MODEL_DEPLOYMENT_NAME}
    WORKSHOP_RESOURCE_PREFIX: lab-<alias>
    ```
 
@@ -2686,7 +2709,8 @@ The instructions, the toolbox and the handover function do not change.
 ### Checkpoint
 
 - [ ] The hosted agent answers the modem case with `[RB-02 Modem restart procedure]`.
-- [ ] It hands the line-fault case over with a `HO-...` reference: something the prompt agent could not do.
+- [ ] It records the line-fault handover with a `HO-...` reference by executing Python inside the hosted
+      process; the default Stage 10 definition omitted this capability.
 
 > **🔵 Note**
 >
@@ -2699,11 +2723,13 @@ The instructions, the toolbox and the handover function do not change.
 
 - A simple assistant over company tools and knowledge, owned by a business team: **prompt agent**, as
   Foundry recommends for a first agent.
-- An agent that needs your own code (handover, approvals, middleware, memory logic, workflows), or must
-  follow your engineering practices (tests, code review, CI/CD): **hosted agent**.
-- Both use the same toolbox, knowledge base, guardrails and evaluations: that platform layer is what you
-  built in Part 2. And both sit behind the same contact centre: the human handover is a property of the
-  channel, not only of the agent.
+- An agent that needs your own framework, orchestration, in-process middleware, dependencies or
+  custom protocols: **hosted agent**.
+- Handover and other business actions can work with either: expose a remote tool, execute function
+  calls in an application, or run the function inside a hosted agent. Both approaches support CI/CD.
+- Both can reuse the toolbox, knowledge base, platform guardrails and evaluations. A contact centre
+  can front either architecture, but this lab only wires the local code-first and prompt-agent clients
+  to it. The hosted example records a mock handover; it does not connect to your local advisor desk.
 
 <p align="right"><a href="#stage-13-guardrails">Previous: Stage 13</a> · <a href="#contents">Contents</a> · <a href="#scenario-reference">Next: Scenarios &rarr;</a></p>
 
