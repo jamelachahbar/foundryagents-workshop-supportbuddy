@@ -43,7 +43,7 @@ The full symptom table is the **Troubleshooting** section of [docs/workshop.md](
 | Foundry `401`/`403` | Expired sign-in or missing **Foundry User** role | `az account show --query user.name -o tsv` | `az login --tenant <tenant>` (Codespaces: add `--use-device-code`); ask the instructor for the role |
 | `AzureCliCredential.get_token failed: Timed out` | Slow Azure CLI | `az account get-access-token -o none` | Run it once, retry |
 | `429 Too Many Requests` | Shared model rate limit | none | Wait a minute, retry |
-| Knowledge base `404` (Stage 8) | Knowledge base not created | `uv run python knowledge_base.py ask "test"` | `uv run python knowledge_base.py create` |
+| Knowledge base `404` (Stage 8) | Wrong endpoint/name or knowledge base not created | `uv run python knowledge_base.py ask "test"` | Shared environment: confirm endpoint/name with the instructor and ask them to check setup; do not run `create`. Personal environment only: `uv run python knowledge_base.py create` |
 | Knowledge base `401`/`403` | Missing **Search Index Data Reader** | none | Ask the instructor; role assignments take minutes |
 | Toolbox URL `404` / `Session terminated` | Toolbox not created (before Stage 9) or wrong prefix | stage map; `WORKSHOP_RESOURCE_PREFIX` name present in `.env` | Finish Stage 9: `uv run python toolbox.py create` |
 | `prompt_agent.py ask` → `not found` | Prompt agent not published | none | `uv run python prompt_agent.py create` |

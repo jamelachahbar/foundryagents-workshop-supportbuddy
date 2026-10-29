@@ -7,7 +7,10 @@ Foundry IQ knowledge base, and every step is cited as [RB-xx Title].
 A Foundry IQ knowledge base is itself an MCP server, so the agent gets a second MCP tool,
 this time authenticated with Microsoft Entra ID.
 
-One-time setup (from the src folder):  uv run python knowledge_base.py create
+Instructor setup once per shared environment (or your own personal environment), from src:
+    uv run python knowledge_base.py create
+Shared-workshop participants only verify access:
+    uv run python knowledge_base.py ask "wifi slow upstairs, cable works"
 Start the MCP server in another terminal: uv run python -m mcp_server.server
 Then run:
     uv run python -m solutions.stage_8_knowledge ["prompt"]

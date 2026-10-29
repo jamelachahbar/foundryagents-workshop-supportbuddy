@@ -1,12 +1,14 @@
 """Create and test the Foundry IQ knowledge base of synthetic troubleshooting runbooks (Stage 8).
 
 Run from the src folder:
-    uv run python knowledge_base.py create                       # once per workshop (idempotent)
+    uv run python knowledge_base.py create                       # instructor once per shared environment
     uv run python knowledge_base.py ask "wifi slow upstairs"     # query it like the agent will
 
 A Foundry IQ knowledge base lives in Azure AI Search: an index holds the runbooks, a knowledge
 source points at the index, and the knowledge base exposes retrieval as an MCP endpoint that the
 agent calls. Every runbook is fictional training content, not a real operator procedure.
+Participants in a shared workshop use ask only. Personal-environment owners run create themselves.
+Rerunning create updates the shared resources and uploads the runbooks again; it makes no personal copy.
 """
 
 from __future__ import annotations
@@ -85,9 +87,8 @@ def definitions(names: dict[str, str]) -> tuple[dict[str, Any], dict[str, Any], 
             "sourceDataFields": [{"name": "id"}, {"name": "title"}, {"name": "content"}],
         },
     }
-    # No model: minimal reasoning (no LLM query planning) and extractive output (raw runbook text).
-    # The agent's own model writes the answer and the citations. This is the setup the Foundry IQ
-    # docs recommend for agents, and it keeps the knowledge base free of extra model calls.
+    # No attached chat model: minimal skips LLM query planning; extractive output skips answer synthesis.
+    # Microsoft-hosted semantic ranking still runs. This is a workshop choice, not a universal recommendation.
     base = {
         "name": names["base"],
         "description": "SupportBuddy lab runbooks. Synthetic content for training only.",
@@ -108,6 +109,14 @@ class SearchClient:
             timeout=60,
         )
 
+    def exists(self, path: str) -> bool:
+        response = self._http.get(path)
+        if response.status_code == 404:
+            return False
+        if response.is_error:
+            sys.exit(f"GET {path} failed: {response.status_code} {response.text}")
+        return True
+
     def send(self, method: str, path: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         response = self._http.request(method, path, json=body)
         if response.is_error:
@@ -118,16 +127,31 @@ class SearchClient:
 def create(client: SearchClient, names: dict[str, str]) -> None:
     index, source, base = definitions(names)
     runbooks = load_runbooks()
-    client.send("PUT", f"/indexes/{names['index']}", index)
-    client.send(
-        "POST",
-        f"/indexes/{names['index']}/docs/index",
-        {"value": [{"@search.action": "mergeOrUpload", **doc} for doc in runbooks]},
-    )
-    client.send("PUT", f"/knowledgesources/{names['source']}", source)
-    client.send("PUT", f"/knowledgebases/{names['base']}", base)
-    print(f"Indexed {len(runbooks)} runbooks into '{names['index']}'.")
-    print(f"Knowledge base '{names['base']}' is ready.")
+    for label, path, definition in (
+        ("Search index", f"/indexes/{names['index']}", index),
+        ("Knowledge source", f"/knowledgesources/{names['source']}", source),
+        ("Knowledge base", f"/knowledgebases/{names['base']}", base),
+    ):
+        print(f"Checking {label.lower()} '{definition['name']}'...", flush=True)
+        if client.exists(path):
+            print("  Already exists; updating...", flush=True)
+        else:
+            print("  Not found; creating...", flush=True)
+        client.send("PUT", path, definition)
+        print("  Ready.", flush=True)
+        if label == "Search index":
+            print(f"Uploading {len(runbooks)} synthetic runbooks...", flush=True)
+            result = client.send(
+                "POST",
+                f"/indexes/{names['index']}/docs/index",
+                {"value": [{"@search.action": "mergeOrUpload", **doc} for doc in runbooks]},
+            )
+            failures = [item for item in result["value"] if not item["status"]]
+            if failures:
+                sys.exit(f"Runbook upload failed: {json.dumps(failures)}")
+            print(f"Indexed {len(runbooks)} runbooks into '{names['index']}'.", flush=True)
+    print(f"Setup complete: knowledge base '{names['base']}' is ready.")
+    print('Next: uv run python knowledge_base.py ask "wifi slow upstairs, cable works"')
 
 
 def ask(client: SearchClient, names: dict[str, str], query: str) -> None:

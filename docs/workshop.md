@@ -402,6 +402,14 @@ published to the Foundry agent catalogue until Stage 10.
 
 ### After changing code or instructions
 
+The per-stage **Run / restart** reminders below list the commands you need, all run from `src/`.
+Use a separate terminal for each long-running process. Do not start a second copy if it is already
+running. After editing agent code or instructions, stop DevUI and the contact centre with **Ctrl+C**
+in their own terminals and rerun their stage-specific commands; each loads its own copy of the agent.
+The unchanged network MCP server can keep running across Stages 6-8. After a reload, reconnect or
+terminal closure, check which processes are still running rather than assuming they stopped.
+Click **New Conversation** before each independent DevUI test.
+
 The agent loads its Python code, tools and `.instructions.md` file when it starts. It does **not**
 reload them when you edit a file. Refreshing DevUI alone does not load your changes.
 
@@ -492,6 +500,15 @@ over to a human advisor.
 <details>
 <summary><strong>Stage 1 lab</strong> &middot; Instructions, prompts and checkpoint</summary>
 
+**Run / restart (from `src/`):**
+
+```bash
+uv run python main.py
+```
+
+DevUI uses port **8090**. No MCP server or contact centre is needed. After saving edits, stop the
+previous DevUI process with **Ctrl+C**, rerun this command, and click **New Conversation**.
+
 Open `src/main.py`. It creates the agent with no tools, and loads its instructions from
 `src/main.instructions.md`.
 
@@ -562,6 +579,15 @@ prompts in new conversations. Compare the answers with the starting behaviour.
 
 <details>
 <summary><strong>Stage 2 lab</strong> &middot; First tool, tasks and checkpoint</summary>
+
+**Run / restart (from `src/`):**
+
+```bash
+uv run python main.py
+```
+
+After saving edits, stop the previous DevUI process with **Ctrl+C**, rerun this command, and click
+**New Conversation**. No MCP server or contact centre is needed.
 
 A tool is a Python function the model can decide to call. Agent Framework turns the function's
 signature, type hints and docstring into a schema the model understands.
@@ -670,6 +696,15 @@ uv run python main.py "My internet is down. My phone number is +1 202 555 0999."
 <details>
 <summary><strong>Stage 3 lab</strong> &middot; Tool chaining, tasks and checkpoint</summary>
 
+**Run / restart (from `src/`):**
+
+```bash
+uv run python main.py
+```
+
+After saving edits, stop the previous DevUI process with **Ctrl+C**, rerun this command, and click
+**New Conversation**. No MCP server or contact centre is needed.
+
 `identify_customer` returns the customer's `line_ids`: the internet services they have. The next
 capability reads a line's status from a (synthetic) service inventory.
 
@@ -713,6 +748,15 @@ Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
 
 <details>
 <summary><strong>Stage 4 lab</strong> &middot; Equipment checks, tasks and checkpoint</summary>
+
+**Run / restart (from `src/`):**
+
+```bash
+uv run python main.py
+```
+
+After saving edits, stop the previous DevUI process with **Ctrl+C**, rerun this command, and click
+**New Conversation**. No MCP server or contact centre is needed.
 
 This stage is the typical diagnostic step: checking or pinging the equipment the customer
 uses. `check_equipment` returns a **simulated** ping (no real equipment is contacted): packets sent and
@@ -759,6 +803,15 @@ Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
 
 <details>
 <summary><strong>Stage 5 lab</strong> &middot; Evidence, decision rules and checkpoint</summary>
+
+**Run / restart (from `src/`):**
+
+```bash
+uv run python main.py
+```
+
+After saving edits, stop the previous DevUI process with **Ctrl+C**, rerun this command, and click
+**New Conversation**. No MCP server or contact centre is needed.
 
 Add a fourth, independent source: known network incidents. Now the agent must **collect evidence from
 several enterprise capabilities before making a recommendation**.
@@ -862,6 +915,16 @@ out an area outage.
 
 <details>
 <summary><strong>Stage 6 lab</strong> &middot; MCP server, agent connection and discussion</summary>
+
+**Run / restart (from `src/`, separate terminals):**
+
+| Process | Command |
+| --- | --- |
+| Network MCP server, port 8000 | `uv run python -m mcp_server.server` |
+| DevUI, port 8090 | `uv run python main.py` |
+
+After completing the edits below, restart DevUI with **Ctrl+C** and its command, then click
+**New Conversation**. Keep the MCP server running; do not launch a duplicate. No contact centre yet.
 
 So far the capabilities are Python functions inside the agent's process. In an enterprise they are
 owned by other teams (customer data, network operations) and reused by many agents and applications.
@@ -1014,6 +1077,17 @@ Send one prompt at a time, not the whole block.
 
 <details>
 <summary><strong>Stage 7 lab</strong> &middot; Approvals, contact centre and checkpoint</summary>
+
+**Run / restart (from `src/`, separate terminals):**
+
+| Process | Command |
+| --- | --- |
+| Network MCP server, port 8000 | `uv run python -m mcp_server.server` |
+| DevUI, port 8090 | `uv run python main.py` |
+| Contact centre, port 8070 | `uv run python -m contact_centre` |
+
+After saving agent edits, restart DevUI and the contact centre with **Ctrl+C** and their commands.
+The unchanged MCP server can stay running. Click **New Conversation** before each DevUI scenario.
 
 | Outcome | When | Who is in the loop |
 | --- | --- | --- |
@@ -1318,6 +1392,18 @@ and measured: knowledge, tools, memory, evaluation and guardrails. The agent sti
 <details>
 <summary><strong>Stage 8 lab</strong> &middot; Knowledge setup, citations and checkpoint</summary>
 
+**Run / restart (from `src/`, separate terminals):**
+
+| Process | Command |
+| --- | --- |
+| Network MCP server, port 8000 | `uv run python -m mcp_server.server` |
+| DevUI, port 8090 | `uv run python main.py` |
+| Contact centre, port 8070 | `uv run python -m contact_centre` |
+
+After saving agent edits, restart DevUI and the contact centre with **Ctrl+C** and their commands.
+The unchanged MCP server can stay running; start it only if stopped. Click **New Conversation** before
+each DevUI scenario. The Foundry IQ knowledge base runs in Azure, not in another local terminal.
+
 Until now the troubleshooting advice ("switch the modem off for 30 seconds", "use 5 GHz near the modem")
 was written into the instructions. That does not scale: procedures change, they belong to the support
 team, not to the prompt, and the customer cannot see where advice comes from. In this stage the advice
@@ -1330,10 +1416,12 @@ comes from **runbooks** retrieved from a **Foundry IQ knowledge base**, and ever
 - `src/knowledge_base.py create` loads them into an Azure AI Search index, adds a **knowledge source**
   on that index, and creates a **knowledge base** on top. That knowledge base is what Foundry IQ calls
   a knowledge base: a reusable, permission-aware retrieval layer that any agent can use.
-- The knowledge base has no model attached: `retrievalReasoningEffort` is `minimal` (no LLM query
-  planning) and `outputMode` is `extractiveData` (it returns the runbook text itself). Your agent's model
-  writes the answer and the citations. This is the setup the Foundry IQ documentation recommends for
-  agents: one model, in one place.
+- The provided setup defines the knowledge base without an attached chat model:
+  `retrievalReasoningEffort` is `minimal` (no LLM-based query planning) and `outputMode` is
+  `extractiveData` (retrieved content, not a synthesized answer). Your agent's chat model writes the
+  answer and citations. Retrieval still uses Microsoft-hosted semantic-ranking models, separate from
+  your chat and embedding deployments. This is a supported configuration chosen for this workshop,
+  not a universal recommendation for every agent.
 
 A Foundry IQ knowledge base can be queried two ways ([docs](https://learn.microsoft.com/azure/search/agentic-retrieval-how-to-retrieve)):
 
@@ -1343,6 +1431,55 @@ A Foundry IQ knowledge base can be queried two ways ([docs](https://learn.micros
 | **MCP endpoint** | `.../knowledgebases/<name>/mcp` | Agents. Each knowledge base **is an MCP server** with one tool, `knowledge_base_retrieve` |
 
 Your agent already speaks MCP (Stage 6), so it uses the MCP endpoint, like Foundry Agent Service does.
+
+#### Does this lab use vectorization?
+
+**No. This lab uses text search with semantic reranking, not vector or hybrid search.**
+The index contains `id`, `title`, `symptoms` and `content` fields, with no vector fields or
+embedding/vectorizer configuration. Each short runbook is indexed as one document.
+
+```text
+Agent's search query -> text search -> semantic reranking -> retrieved runbooks
+```
+
+These are different capabilities:
+
+| Capability | What it does | Used here? |
+| --- | --- | --- |
+| Text search | Finds documents using indexed terms | Yes |
+| Semantic reranking | Uses a language model to reorder candidate results by relevance | Yes |
+| Vector search | Compares query and document embeddings for similarity | No |
+| Hybrid search | Combines text and vector results, optionally followed by semantic reranking | No |
+
+`retrievalReasoningEffort=minimal` disables LLM-based query planning; it does **not** disable semantic
+reranking or determine whether the index has vectors. Minimal retrieval can work with text or vector
+indexes; this lab's index contains text only. Semantic reranking uses language understanding models
+hosted by Microsoft, not your embedding deployment. See
+[semantic ranking](https://learn.microsoft.com/azure/search/semantic-search-overview) and
+[retrieval reasoning effort](https://learn.microsoft.com/azure/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort).
+The embedding deployment is configured for **Foundry Memory** in Stage 11; it does not automatically
+vectorize the runbooks. The [memory store setup](https://learn.microsoft.com/azure/foundry/agents/how-to/memory-usage#create-a-memory-store)
+specifies both chat and embedding deployments. Configuration alone does not demonstrate that
+embedding requests have occurred.
+
+For these 12 short synthetic runbooks, this is a deliberately simple workshop starting point: no
+embedding generation pipeline or calls to your embedding deployment are configured for runbook
+retrieval. Vectorization is not a prerequisite for a
+[search index knowledge source](https://learn.microsoft.com/azure/search/agentic-knowledge-source-how-to-search-index).
+Choosing text-only retrieval here is a lab design decision, not a general recommendation against vectors.
+
+**Beyond the lab:** if the collection grows, documents become longer, or evaluations show missed
+matches when customers use different wording, evaluate hybrid retrieval against this text-only
+baseline. That requires suitable document chunking, an embedding model, vector fields and a vector
+search profile, document embeddings generated during ingestion, and query embeddings generated at
+retrieval time (by a configured vectorizer or application code). Use compatible embedding models and
+dimensions for documents and queries. Compare retrieval quality, citations, latency and cost using
+representative cases; do not assume vectors improve every case.
+
+This is architectural guidance, not an extra participant task. Changes to the shared index and
+ingestion pipeline belong to the instructor or environment owner, not individual participants.
+See Microsoft's guidance on [vector search](https://learn.microsoft.com/azure/search/vector-search-overview)
+and [hybrid search](https://learn.microsoft.com/azure/search/hybrid-search-overview).
 
 #### What the code does
 
@@ -1368,13 +1505,25 @@ identity's token (cached and refreshed by `azure-identity`). No API key. Your id
 
 ### Your task
 
-1. From `src/`, run the provided `src/knowledge_base.py` script to make sure the knowledge base exists
-  (your instructor may already have done this), then try it. No edits to that script are needed.
+1. **Shared workshop environment:** the instructor creates the knowledge base once for the group.
+   Participants share the same Search endpoint and knowledge base name (`supportbuddy-runbooks`);
+   `WORKSHOP_RESOURCE_PREFIX` does not give each participant a separate knowledge base.
+   From `src/`, check your read access with the provided script. No edits to that script are needed.
 
    ```bash
-   uv run python knowledge_base.py create
    uv run python knowledge_base.py ask "wifi slow upstairs, cable works"
    ```
+
+   **Personal environment only:** if you own a separate lab environment, run
+   `uv run python knowledge_base.py create` once before the query above.
+   In a shared environment, do not run `create` unless the instructor asks you to:
+   it updates the group's resources and uploads the runbooks again, rather than making a personal copy.
+   If `ask` returns `404`, confirm the endpoint and knowledge base name with the instructor.
+
+   For the person doing setup, `create` checks the search index, knowledge source and knowledge base individually. It prints
+   **Not found; creating...** for missing resources or **Already exists; updating...** for existing ones.
+   Existing resources are updated, not skipped, and the synthetic runbooks are uploaded again.
+   **Setup complete** confirms that setup succeeded; `ask` is a separate read-only retrieval check.
 
 2. In `src/main.py`, update the imports as shown below. Inside the existing `tools()` function, after
   `load_settings()`, add `knowledge_config = knowledge_settings()` and add `runbook_knowledge_base(...)` to
@@ -1444,6 +1593,79 @@ CUST-1004: constant disconnections for three days.
 > "Escalate only if, after the customer has tried these steps: ...") and one instruction line fixed it.
 > Review what you index as carefully as what you write in the prompt.
 
+### Optional portal experiment: retrieval effort and output mode
+
+**Instructor-led extension, not required for the Stage 8 checkpoint.** Keep the shared
+`supportbuddy-runbooks` base unchanged. The instructor must first complete the
+[model-access preparation](../instructor/setup.md#optional-model-backed-knowledge-base-experiments):
+Search needs its own managed identity and model-access role, and the portal needs a supported chat
+deployment. Standard participants have read access, not permission to change shared knowledge bases.
+No DevUI, contact centre or local MCP server is needed for this portal-only exercise.
+
+1. In the **Azure portal**, open the workshop's Azure AI Search service and its **Knowledge bases** page.
+   As the instructor (or an explicitly authorized environment owner), create a separate base called
+   `lab-<alias>-runbooks-experiment`. Select the existing **knowledge source**
+   `supportbuddy-runbooks-source` rather than importing documents or creating another source/index.
+   The source name is not the knowledge base name.
+2. Add a **chat completion model** from the Foundry deployment selector, using **System assigned
+   identity** authentication. This uses the **Search service's identity**, not your user or the Foundry
+   project's identity. If the workshop's agent model is not offered, ask the instructor to arrange a
+   [portal-supported model](https://learn.microsoft.com/azure/search/get-started-portal-agentic-retrieval#supported-llms);
+   do not create or change a shared model deployment yourself.
+3. In the experimental base's configuration and chat playground, compare the combinations below.
+   Change only the experimental base. Where the playground exposes request settings, per-request
+   overrides avoid repeatedly changing its defaults; available controls can vary by portal version.
+   If a setting is not exposed, have the instructor use the documented retrieve API rather than editing
+   the baseline. Saving or querying the experiment does not change the agent's existing MCP connection.
+
+   **Compatibility matrix for `2026-08-01-preview`:**
+
+   | Retrieval effort | `extractiveData` | `answerSynthesis` |
+   | --- | --- | --- |
+   | `minimal` | Supported | Not supported |
+   | `low` | Supported | Supported |
+   | `medium` | Supported | Supported |
+   | `auto` | Supported | Supported |
+
+   **Suggested comparisons** (not an exhaustive list of supported combinations):
+
+   | Retrieval effort | Output mode | What to compare |
+   | --- | --- | --- |
+   | `minimal` | `extractiveData` | Direct retrieval baseline, without LLM-based query planning |
+   | `low` | `extractiveData` | LLM query planning and source selection, returning grounding content |
+   | `medium` | `extractiveData` | Deeper retrieval, potentially with a follow-up search |
+   | `low` | `answerSynthesis` | A generated answer grounded in the retrieved content |
+   | `auto` (if offered) | `extractiveData` | Adaptive retrieval, escalating to LLM planning when needed |
+
+   You can also compare `medium` or `auto` with `answerSynthesis` to see how retrieval behavior affects
+   the generated answer.
+
+   `minimal` is incompatible with `answerSynthesis`. Model-backed modes need an accessible configured
+   model; `medium` has regional restrictions, and `auto` requires `2026-08-01-preview` and a configured
+   model. The portal may expose fewer options than the API. These are
+   **knowledge-base retrieval settings**, not the agent's `SUPPORTBUDDY_REASONING_EFFORT` setting.
+   None of them adds vector fields, generates document embeddings or changes the existing text-only index.
+4. Start a fresh playground conversation for each setting and submit the same query:
+
+   ```text
+   Wi-Fi is slow upstairs, but a wired connection works. What procedure applies?
+   ```
+
+   Compare retrieved runbook IDs, citations, response shape, elapsed time and the activity/debug
+   information for query planning and answer synthesis. Record token usage where exposed. A generated
+   answer is not proof of better retrieval; check whether it stays within applicable runbook procedures.
+   Query planning and synthesis add model usage, cost and load on the shared deployment.
+5. Leave participant settings and the toolbox connection pointing to the standard base. If cleaning up,
+   delete only `lab-<alias>-runbooks-experiment` after confirming its name; do not delete the shared
+   source or index. Do not use the setup script's `ask` command for synthesized output: that helper
+   currently prints titles from the extractive JSON response only.
+
+The portal can also configure managed ingestion with chunking and embeddings for supported sources.
+This exercise instead reuses our existing text-only index; it tests retrieval behavior, not vectorization.
+See the official [portal workflow](https://learn.microsoft.com/azure/search/get-started-portal-agentic-retrieval),
+[reasoning effort options](https://learn.microsoft.com/azure/search/agentic-retrieval-how-to-set-retrieval-reasoning-effort)
+and [output modes](https://learn.microsoft.com/azure/search/agentic-retrieval-how-to-answer-synthesis).
+
 <p align="right"><a href="#stage-7-answer-act-or-hand-over">Previous: Stage 7</a> · <a href="#contents">Contents</a> · <a href="#stage-9-foundry-toolbox">Next: Stage 9 &rarr;</a></p>
 
 </details>
@@ -1461,7 +1683,7 @@ CUST-1004: constant disconnections for three days.
 <details>
 <summary><strong>Stage 9 lab</strong> &middot; Toolbox connection, tasks and checkpoint</summary>
 
-Look at what your agent now knows: the URL of the network MCP server, the URL of the knowledge base,
+At the end of Stage 8, your agent knows the URL of the network MCP server, the URL of the knowledge base,
 and how to authenticate to each one. Multiply that by every agent in a company, every tool and every
 credential, and you get duplicated integrations, secrets in many places, and no overview of which agent
 uses what. A **Foundry Toolbox** solves this
@@ -1472,19 +1694,47 @@ uses what. A **Foundry Toolbox** solves this
 - **guardrails** can be applied to tool inputs and outputs at the toolbox (Stage 13);
 - you can change the tools behind it, test a new version, and promote it, without touching agent code.
 
+Keep your Stage 8 services running while you work through the changes below. Restart commands and
+instructions for stopping the local MCP server appear under **Try it**, after the code edits.
+
 ### What is in your toolbox
 
 ```mermaid
 flowchart LR
-    A[Your agent] -- "one MCP endpoint<br/>your Entra token" --> T["Your toolbox<br/>lab-alias-supportbuddy-tools"]
+    A[Your agent] -- "one MCP endpoint<br/>your Entra token" --> T["Your toolbox<br/>lab-&lt;alias&gt;-supportbuddy-tools"]
     T -- "network___*<br/>connection supportbuddy-network-mcp" --> N["Shared MCP server<br/>Azure Container Apps"]
-    T -- "runbooks___*<br/>connection supportbuddy-runbooks-kb<br/>(project managed identity)" --> K["Foundry IQ<br/>knowledge base"]
+    T -- "runbooks___*<br/>connection supportbuddy-runbooks-kb<br/>(project managed identity)" --> K["Foundry IQ knowledge base<br/>supportbuddy-runbooks"]
 ```
+
+`<alias>` is your participant alias. The arrow labels name the shared **project connections**;
+`network___` and `runbooks___` are the tool-name prefixes exposed to the agent, not resource names.
+The knowledge base is named `supportbuddy-runbooks`; its underlying knowledge source,
+`supportbuddy-runbooks-source`, is not shown.
 
 Your instructor created the two **connections** once. The network MCP server is the same code as Stage 6,
 now running on Azure Container Apps, because Foundry (not your laptop) calls it. The knowledge base
 connection uses the Foundry project's **managed identity**: you no longer need your own access to the
 search service for this path.
+
+### Before you start: shared resources and your toolbox
+
+| Resource | Owner / scope | What you do |
+| --- | --- | --- |
+| Network MCP server in Azure | Instructor; shared by the group | Use the existing service |
+| `supportbuddy-runbooks` knowledge base, source and index | Instructor; shared by the group | Reuse them; do not run knowledge-base setup again |
+| `supportbuddy-network-mcp` and `supportbuddy-runbooks-kb` project connections | Instructor; shared by the group | Confirm they are available; do not recreate or retarget them |
+| `lab-<alias>-supportbuddy-tools` toolbox | You; named using your participant prefix | Create and configure your own toolbox |
+
+Use the Foundry project endpoint supplied by the instructor and your own unique `WORKSHOP_RESOURCE_PREFIX`.
+The shared knowledge connection must target the **knowledge base** `supportbuddy-runbooks`, not the
+similarly named knowledge source `supportbuddy-runbooks-source`. Your user needs the workshop's
+**Foundry User** role; the project's managed identity needs **Search Index Data Reader** on Search.
+These are different identities and permissions.
+
+If a project connection is missing or its target is wrong, stop and ask the instructor to check setup.
+Do not create a replacement knowledge base. Only use `NETWORK_TOOLS=local` when the instructor confirms
+there is no network MCP server in Azure: this intentionally omits the network project connection and
+keeps those diagnostics local. The knowledge-base connection is still required.
 
 ### Your task
 
@@ -1498,12 +1748,27 @@ search service for this path.
 
    You should see `network___identify_customer`, ..., `runbooks___knowledge_base_retrieve`: the toolbox
    prefixes every tool with its `server_label`.
+   With `NETWORK_TOOLS=local`, `show` lists only `runbooks___knowledge_base_retrieve`; network diagnostics
+   are added separately by your agent code in the next step.
 
-2. In `src/main.py`, replace the imports used for the two MCP tools with the imports below, then replace
-  the existing `tools()` function with the one shown. Keep the three human-in-the-loop tools: they
-  are part of your agent's own code. Keep the existing `if __name__ == "__main__":` block.
+   `create` is not a read-only existence check: every successful run creates a new immutable toolbox
+   version and immediately makes it the default. Run it once for this stage; use `show` to inspect
+   tools without creating a version. The default-version endpoint stays the same across versions.
+
+2. **Update `src/main.py` to use your toolbox.** The block below is the complete executable code for
+   this stage, not an addition to your Stage 8 code.
+
+   - Keep the introductory triple-quoted description at the top of the file if you want.
+   - Replace **everything after that description**, from `import os` through the final
+     `if __name__ == "__main__":` block, with the code below.
+   - Do not append it to the old code: the result should have one set of imports, one `tools()` function
+     and one entry-point block. You do not need to remove individual old imports or connections by hand.
+   - Leave `src/main.instructions.md` unchanged until step 3.
 
    ```python
+   import os
+
+   from agent_framework import MCPStreamableHTTPTool
    from agent_framework.foundry import FoundryToolbox
    from azure.identity.aio import AzureCliCredential
 
@@ -1512,21 +1777,46 @@ search service for this path.
 
 
    def tools() -> list:
-       return [
-           FoundryToolbox(AzureCliCredential(), url=toolbox_settings()["TOOLBOX_ENDPOINT"]),
+       toolbox_config = toolbox_settings()
+       configured_tools = [
+           FoundryToolbox(AzureCliCredential(), url=toolbox_config["TOOLBOX_ENDPOINT"]),
            escalate_to_human,
            get_handover_status,
            restart_modem,
        ]
+       if toolbox_config["NETWORK_TOOLS"] == "local":
+           configured_tools.append(MCPStreamableHTTPTool(
+               name="network",
+               url=os.getenv("MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
+               approval_mode="never_require",
+               load_prompts=False,
+           ))
+       return configured_tools
+
+
+   if __name__ == "__main__":
+       run(build_agent(__file__, tools()))
    ```
 
+   **What changed:** the two direct MCP connections from Stage 8 are replaced by one `FoundryToolbox`
+   connection. The three imported functions (`escalate_to_human`, `get_handover_status`, `restart_modem`)
+   remain in the tools list and still run in your agent. You do not copy their implementations.
+   The final entry-point block starts the agent in the same way as before.
+
+   **Local fallback only:** the `if toolbox_config["NETWORK_TOOLS"] == "local":` branch is inactive in
+   the normal Azure setup. It adds a direct network MCP connection only when the instructor configured
+   the local fallback; runbook retrieval still uses the toolbox. Keep this branch as shown in either setup.
+
 3. In `src/main.instructions.md`, add one paragraph to **Tools**: tool names carry a prefix (`network___`,
-   `runbooks___`) and the instructions name them without it.
+   `runbooks___`) and the instructions name them without it. The three local human-in-the-loop
+   functions have no toolbox prefix. In the local fallback, network tool names also remain unprefixed.
+   Keep the Stage 8 investigation, ANSWER / HAND OVER rules, runbook citations and approval behavior.
 
 > **🟢 Tip**
 >
-> You no longer need the local MCP server: stop it (terminal 1). Restart the contact centre so it picks up
-> your updated `src/main.py`.
+> With the normal Azure toolbox setup, you no longer need the local MCP server: stop it (terminal 1).
+> Keep it running only for the instructor's `NETWORK_TOOLS=local` fallback. Restart DevUI and the
+> contact centre so both pick up your updated `src/main.py`.
 
 ### What the code does
 
@@ -1539,14 +1829,157 @@ search service for this path.
   authenticates with a token for `https://ai.azure.com/.default`. Foundry then calls each underlying tool
   with the connection's credentials.
 
-In DevUI, select your agent and click **New Conversation** before **each** Stage 8 prompt you rerun.
+### Try it
+
+Save both files, stop the previous DevUI and contact-centre processes with **Ctrl+C**, then restart
+them from `src/` in separate terminals:
+
+```bash
+uv run python main.py
+```
+
+```bash
+uv run python -m contact_centre
+```
+
+Stop the local network MCP server only for the normal Azure setup. For `NETWORK_TOOLS=local`, keep
+`uv run python -m mcp_server.server` running in another terminal.
+In DevUI, select your agent and click **New Conversation** before **each** prompt below.
 Send one prompt at a time, not the whole block.
+
+```text
+Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
+Mon modem ne répond plus, je suis le client CUST-1002.
+Hi, I'm anna.weber@example.com, my internet stopped this morning.
+CUST-1004: constant disconnections for three days.
+```
 
 ### Checkpoint
 
-- [ ] Same conclusions and runbook citations as Stage 8 (the wording may differ).
-- [ ] The console shows `network___...` and `runbooks___knowledge_base_retrieve` tool calls.
-- [ ] Your code contains no tool URL except the toolbox's.
+- [ ] Wi-Fi: four diagnostics, then retrieval; cites `[RB-03 Wi-Fi interference]`, usually also `RB-11`.
+- [ ] Modem: cites `[RB-02 Modem restart procedure]` and answers without handing over.
+- [ ] Outage: cites `RB-09` or `RB-04`, reports the incident and restore time, and does not suggest a restart.
+- [ ] Line fault: calls `escalate_to_human`, returns its handover reference, and cites `RB-07` in the handover.
+- [ ] The normal setup shows `network___...` and `runbooks___knowledge_base_retrieve` tool calls.
+      The local fallback shows unprefixed network calls and prefixed runbook retrieval.
+- [ ] In the normal setup, your agent uses no direct backend URL: only the toolbox endpoint.
+      The local fallback additionally uses the local network MCP URL, but no direct knowledge-base URL.
+
+### Optional: explore your toolbox
+
+Complete the baseline checkpoint first. These experiments use **your participant's toolbox**;
+do not modify shared project connections, knowledge bases or model deployments.
+Guardrail configuration is covered in Stage 13.
+
+#### Know which layer you are changing
+
+| Layer | Where it is configured | Examples |
+| --- | --- | --- |
+| Agent-side connection | `FoundryToolbox(...)` in `src/main.py` | `timeout`, `allowed_tools`, `approval_mode` |
+| Published backend entry | `MCPToolboxTool(...)` when publishing | `server_label`, `project_connection_id`, `allowed_tools`, `tool_configs` |
+| Published toolbox version | `project.toolboxes.create_version(...)` | Tools, `ToolSearchToolboxTool()`, policies |
+
+`FoundryToolbox(...)` connects to a published toolbox; it does not create one or turn on server-side tool
+search. Client-side `use_progressive_disclosure` is a different mechanism from Foundry's toolbox search.
+Client filtering is not a replacement for server-side authorization.
+
+#### 1. Inspect and filter
+
+Run `uv run python toolbox.py show` from `src/` and inspect your toolbox's versions and connections in
+Foundry. Record its name, current default version, tool names and prefixes.
+
+For a temporary client-only experiment, add
+`allowed_tools=["runbooks___knowledge_base_retrieve"]` to your `FoundryToolbox(...)` call.
+Restart the agent and ask it to find a Wi-Fi runbook. Only runbook retrieval from that connection
+is exposed; the three separately registered local functions remain available.
+Network diagnostics through the toolbox are hidden, so do not expect the full Stage 9 checkpoint
+to pass while this filter is active. The local-network fallback is a separate connection and is not
+filtered by this option.
+
+Remove the filter and restart before the next experiment. Nothing was changed in the published
+toolbox, and `toolbox.py show` still lists its unfiltered server-side tools.
+
+#### 2. Publish and inspect a tool-search candidate without promoting it
+
+The standard `toolbox.py create` command promotes immediately, so do **not** use it to stage a candidate.
+Instead, save the following as a separate optional script, `src/toolbox_experiment.py`, and run
+`uv run python toolbox_experiment.py` from `src/`. Do not edit the provided `toolbox.py`.
+This script creates a version of your existing toolbox but leaves its default unchanged:
+
+```python
+import asyncio
+
+from azure.ai.projects import AIProjectClient
+from azure.ai.projects.models import ToolSearchToolboxTool
+from azure.identity import AzureCliCredential
+
+from lab_agent import load_settings, toolbox_settings
+from toolbox import show, toolbox_tools
+
+settings = load_settings()
+toolbox_config = toolbox_settings()
+
+with AIProjectClient(
+    endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"],
+    credential=AzureCliCredential(),
+) as project:
+    name = toolbox_config["TOOLBOX_NAME"]
+    previous_default = project.toolboxes.get(name).default_version
+    candidate = project.toolboxes.create_version(
+        name=name,
+        description="Optional Stage 9 tool-search experiment",
+        tools=[
+            *toolbox_tools(project, include_network=toolbox_config["NETWORK_TOOLS"] == "toolbox"),
+            ToolSearchToolboxTool(),
+        ],
+    )
+
+candidate_url = (
+    f"{settings['AZURE_AI_PROJECT_ENDPOINT'].rstrip('/')}"
+    f"/toolboxes/{name}/versions/{candidate.version}/mcp?api-version=v1"
+)
+print(f"Unchanged default: {previous_default}; candidate: {candidate.version}")
+print(f"Candidate endpoint: {candidate_url}")
+asyncio.run(show(candidate_url))
+```
+
+Expect the candidate's initial remote listing to contain `tool_search` and `call_tool`, rather than the
+ordinary unpinned backend functions. `toolbox.py show` still inspects the unchanged default version.
+Each run of the experiment script creates another candidate version.
+
+To test the candidate with your agent, temporarily use the printed **version-specific endpoint** as the
+`url` in `FoundryToolbox(...)`. Restart DevUI, click **New Conversation**, and repeat the Wi-Fi scenario.
+Observe discovery calls followed by invocation through `call_tool`; the baseline's direct-call listing
+expectations no longer apply. Your three local Python functions remain directly available.
+
+#### 3. Tune discovery and compare versions
+
+For a further candidate, configure `tool_configs` on an individual backend entry before publishing:
+
+- Set `pin=True` for a critical tool so it appears beside the discovery meta-tools.
+- Add `additional_search_text` using terms participants actually use to improve tool discovery.
+- Use backend function names within that entry, not an assumed client-side name; follow the
+  [official pinning and search-keyword examples](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/tool-search#fine-tune-tool-discovery).
+
+Use the same Wi-Fi prompt and fresh conversations for each version. Compare initially visible tools,
+discovery and invocation calls, correct diagnostics, citations and elapsed time. Record token usage
+where exposed. With only five remote functions, tool search might add overhead rather than improve
+the result; that is a useful outcome too.
+
+After testing, promotion is an explicit SDK operation:
+`project.toolboxes.update(name, default_version=candidate.version)`.
+To roll back, set `default_version` to the recorded `previous_default` instead.
+Do this only inside an authenticated project client and only for your own toolbox.
+Promotion changes what all clients using that toolbox's default endpoint discover.
+Client-only testing of a candidate endpoint requires no promotion.
+
+**Before continuing to Stage 10:** restore the original `url=toolbox_config["TOOLBOX_ENDPOINT"]`,
+remove temporary client filters, restore the original default if you promoted an experiment, and
+restart DevUI and the contact centre. Rerun the Stage 9 baseline checkpoint.
+Do not delete the toolbox or its shared connections.
+
+See [Toolbox capabilities](https://learn.microsoft.com/azure/foundry/agents/concepts/toolbox-overview)
+and [server-side tool search](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/tool-search).
 
 <p align="right"><a href="#stage-8-knowledge-foundry-iq">Previous: Stage 8</a> · <a href="#contents">Contents</a> · <a href="#stage-10-prompt-agent">Next: Stage 10 &rarr;</a></p>
 
@@ -1564,6 +1997,17 @@ Send one prompt at a time, not the whole block.
 
 <details>
 <summary><strong>Stage 10 lab</strong> &middot; Publish, compare and checkpoint</summary>
+
+**Run / restart after publishing (from `src/`, separate terminals):**
+
+| Process | Command |
+| --- | --- |
+| Prompt-agent DevUI, port 8090 | `uv run python prompt_agent.py chat` |
+| Prompt-agent contact centre, port 8070 | `uv run python -m contact_centre --prompt-agent` |
+
+Stop the previous code-first DevUI and contact centre with **Ctrl+C** before switching modes.
+After publishing a new prompt-agent version, restart these clients and click **New Conversation**.
+No local network MCP server is needed: the published agent uses the Azure toolbox.
 
 Look at what your agent uses now: instructions, a model, and one toolbox that holds every enterprise
 capability. That is exactly what a **prompt agent** is: model + instructions + tools, stored in Foundry.
@@ -1685,6 +2129,18 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 
 <details>
 <summary><strong>Stage 11 lab</strong> &middot; Memory scope, tasks and checkpoint</summary>
+
+**Run / restart after the edits below (from `src/`, separate terminals):**
+
+| Process | Command |
+| --- | --- |
+| Code-first DevUI, signed-in customer, port 8090 | `uv run python main.py --customer CUST-1002` |
+| Code-first contact centre, port 8070 | `uv run python -m contact_centre` |
+
+Stop Stage 10's prompt-agent clients with **Ctrl+C** before switching back to code-first mode.
+Restart both clients after agent edits; the contact centre asks the customer to select an identity.
+Click **New Conversation** for each memory test. No local MCP server is needed with the normal Azure
+toolbox setup; for `NETWORK_TOOLS=local`, run `uv run python -m mcp_server.server` in another terminal.
 
 So far every conversation started from zero. A returning customer had to repeat everything, and a
 human engineer receiving a handover did not know how the customer wants to be contacted. Now the agent
@@ -1862,6 +2318,19 @@ In the contact centre, `uv run python -m contact_centre` now asks the customer t
 <details>
 <summary><strong>Stage 12 lab</strong> &middot; Dataset, evaluators and checkpoint</summary>
 
+**Run / restart (from `src/`):** evaluations load the agent directly; they do not need DevUI or the
+contact centre running.
+
+```bash
+uv run python evaluate.py
+```
+
+Each evaluation run reloads saved code and instructions. For an optional manual check, use separate
+terminals for `uv run python main.py --customer CUST-1002` and `uv run python -m contact_centre`;
+restart those clients after edits and click **New Conversation** in DevUI.
+No local MCP server is needed with the normal Azure toolbox setup. For `NETWORK_TOOLS=local`, keep
+`uv run python -m mcp_server.server` running in a separate terminal, including during evaluations.
+
 Since Stage 5 you have checked the agent by reading answers. That does not scale, and Stage 7 showed
 that instructions make the right behaviour *likely*, not certain. Before an agent goes near customers you
 need evidence: does it collect the evidence, take the right decision, cite the right runbook, and never
@@ -1980,6 +2449,19 @@ known memory state.
 
 <details>
 <summary><strong>Stage 13 lab</strong> &middot; Guardrails, attack scenario and checkpoint</summary>
+
+**Run / restart after the edits below (from `src/`):**
+
+```bash
+uv run python evaluate.py --repeat 2
+```
+
+Evaluations load the agent directly; DevUI and the contact centre are not required.
+For manual tests, use separate terminals for `uv run python main.py --customer CUST-1002` and
+`uv run python -m contact_centre`. Stop the previous clients with **Ctrl+C**, rerun after saving edits,
+and click **New Conversation** in DevUI.
+No local MCP server is needed with the normal Azure toolbox setup; for `NETWORK_TOOLS=local`, keep
+`uv run python -m mcp_server.server` running in a separate terminal.
 
 Use several layers, and measure each one.
 
@@ -2104,6 +2586,19 @@ approval, the signed-in customer, the memory provider, the guardrail middleware.
 
 <details>
 <summary><strong>Stage 14 lab</strong> &middot; Deployment, testing and checkpoint</summary>
+
+**Run / restart for the local hosted-agent test (from `src/`, separate terminals):**
+
+| Terminal | Command |
+| --- | --- |
+| Hosted Responses server, port 8088 | `uv run python hosted_agent.py` |
+| Test client | `azd ai agent invoke --local "Bonjour, je suis CUST-1004, ma connexion coupe sans arret."` |
+
+Start these after the deployment configuration steps below. DevUI, the local contact centre and the
+local network MCP server are not required for this test with the normal Azure toolbox setup.
+If you change hosted-agent code or instructions, stop the local Responses server with **Ctrl+C** and
+rerun it. For the deployed agent, use `azd deploy` to publish changes; restarting a local server does
+not update Azure.
 
 A **hosted agent** keeps everything a prompt agent cannot do (your Python tools, middleware, any library)
 and gets what your laptop cannot give: a managed endpoint, a managed identity, scaling, and a place in
@@ -2295,7 +2790,7 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | Stage 7: the console run ends without asking for approval | Approval needs an interactive terminal; in a pipe, the request is rejected. |
 | Stage 8: `Missing AZURE_AI_SEARCH_ENDPOINT` | Add the Azure AI Search endpoint your instructor gave you to `.env`. |
 | Stage 8: `401`/`403` from the knowledge base | You need the **Search Index Data Reader** role on the search service (role assignments can take a few minutes). |
-| Stage 8: `404` from the knowledge base | The knowledge base does not exist yet: `uv run python knowledge_base.py create`, and check `FOUNDRY_KNOWLEDGE_BASE_NAME`. |
+| Stage 8: `404` from the knowledge base | Check the Search endpoint and `FOUNDRY_KNOWLEDGE_BASE_NAME`. In a shared environment, ask the instructor to check setup; do not recreate shared resources. In your own personal environment, run `uv run python knowledge_base.py create`. |
 | Stage 8/9: the agent never calls `knowledge_base_retrieve` | Check `agent-framework-core` is 1.22.0 (`uv sync`). 1.23 skips that tool (see *Versions*). |
 | Stage 9: `toolbox.py create` fails with a connection not found | The instructor has not created the project connections yet (`instructor/setup.md`). If the lab environment has no network MCP server on Azure, set `NETWORK_TOOLS=local` in `.env`. |
 | Stage 9: `toolbox.py show` lists no `network___` tools | The shared MCP server is not reachable from Foundry; ask your instructor. |

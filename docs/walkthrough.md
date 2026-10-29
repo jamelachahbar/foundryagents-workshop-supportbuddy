@@ -382,7 +382,17 @@ Stage 9; it must restart to pick up a new `main.py`.
 
 [Concepts and exercise](workshop.md#stage-8-knowledge-foundry-iq)
 
-The lab environment already created the knowledge base. Query it directly first:
+In a shared workshop, the instructor creates one knowledge base for the group. Participants use the
+same Search endpoint and knowledge base name; their participant prefix does not create a personal copy.
+Query it directly first:
+
+Only the instructor (or the owner of a personal lab environment) runs
+`uv run python knowledge_base.py create` as part of setup. It reports whether each resource
+is missing (**Not found; creating...**) or already exists (**Already exists; updating...**).
+It updates existing resources and uploads the synthetic runbooks again; **Setup complete** confirms success.
+The `ask` command below only queries the knowledge base.
+If it returns `404` in a shared workshop, check the endpoint and name with the instructor rather than
+running `create` yourself.
 
 ```powershell
 uv run python knowledge_base.py ask "wifi slow upstairs, cable works"
@@ -420,12 +430,21 @@ In DevUI: `Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202
 
 [Concepts and exercise](workshop.md#stage-9-foundry-toolbox)
 
+The instructor's two project connections and knowledge base are shared. Your toolbox is separate,
+named `lab-<alias>-supportbuddy-tools` using your unique participant prefix.
+If a connection is missing or points to the wrong service, ask the instructor; do not recreate the
+knowledge base. The `supportbuddy-runbooks-kb` connection targets the base `supportbuddy-runbooks`.
+
 Create your own toolbox and list what an agent will see:
 
 ```powershell
 uv run python toolbox.py create
 uv run python toolbox.py show
 ```
+
+Each successful `create` makes a new immutable version and promotes it to the default; `show` only
+lists tools. With the instructor's `NETWORK_TOOLS=local` fallback, the toolbox lists only runbook
+retrieval, and the agent keeps a direct connection to the local network MCP server.
 
 ```text
 Toolbox 'lab-demo-supportbuddy-tools' version 1 is now the default.
@@ -441,7 +460,8 @@ In the portal, **Build > Tools > Toolboxes** lists it; **Tools** lists the two c
 
 ![The participant's toolbox in the Foundry portal](assets/walkthrough/portal-toolboxes.png)
 
-Stop the local MCP server (terminal 1): from now on Foundry calls the shared copy on Azure.
+For the normal Azure setup, stop the local MCP server (terminal 1): Foundry calls the shared copy in
+Azure. With `NETWORK_TOOLS=local`, leave terminal 1 running instead.
 
 ```powershell
 Copy-Item solutions/stage_9_toolbox.py main.py
@@ -462,7 +482,9 @@ Agent: Votre ligne est bien synchronisée, il n'y a pas d'incident connu dans vo
 ```
 
 **Check:** the same answers as Stage 8, with `network___` and `runbooks___` tool names, and no tool URL in your
-code except the toolbox endpoint.
+code except the toolbox endpoint. For the local fallback, network calls remain unprefixed and the local
+network URL is also used. The [Stage 9 exercise](workshop.md#stage-9-foundry-toolbox) repeats all four test
+prompts and expected outcomes.
 
 > [!TIP]
 > No network MCP server on Azure in your lab environment? Your instructor tells you to add

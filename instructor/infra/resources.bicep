@@ -23,6 +23,7 @@ var roles = {
   searchServiceContributor: '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
   cognitiveServicesOpenAIUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+  cognitiveServicesUser: 'a97b65f3-24c7-4388-baec-2e87135dc908'
 }
 
 // ----- Foundry: account, project, models, guardrail -----------------------------------------
@@ -89,6 +90,7 @@ resource search 'Microsoft.Search/searchServices@2023-11-01' = {
   location: searchLocation
   tags: tags
   sku: { name: 'basic' }
+  identity: { type: 'SystemAssigned' }
   properties: {
     semanticSearch: 'free'
     disableLocalAuth: true
@@ -197,6 +199,17 @@ resource accountUsesModels 'Microsoft.Authorization/roleAssignments@2022-04-01' 
     principalId: account.identity.principalId
     principalType: 'ServicePrincipal'
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.cognitiveServicesOpenAIUser)
+  }
+}
+
+// Optional knowledge-base planning and answer synthesis call the model as Search, not as the project.
+resource searchUsesModels 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: account
+  name: guid(account.id, search.id, roles.cognitiveServicesUser)
+  properties: {
+    principalId: search.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.cognitiveServicesUser)
   }
 }
 

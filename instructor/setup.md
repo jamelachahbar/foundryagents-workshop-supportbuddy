@@ -160,16 +160,59 @@ and the lab's `src/.env` filled in.
 
 ### 2. Foundry IQ knowledge base (Stage 8)
 
-An Azure AI Search service (Basic or above, semantic ranker enabled). Then, from `src`:
+An Azure AI Search service (Basic or above, semantic ranker enabled). The instructor runs this
+**once per shared environment**, from `src` (personal-environment owners do the same for their own lab):
 
 ```bash
 uv run python knowledge_base.py create
 uv run python knowledge_base.py ask "modem not responding, line up"
 ```
 
+Give all participants the same `AZURE_AI_SEARCH_ENDPOINT` and
+`FOUNDRY_KNOWLEDGE_BASE_NAME` (default `supportbuddy-runbooks`). The knowledge base, its knowledge source
+and its index are shared; `WORKSHOP_RESOURCE_PREFIX` does not scope them to a participant.
+Participants run only `knowledge_base.py ask` to verify access, not `create`.
+Rerunning `create` updates existing shared resources and uploads the runbooks again; its output
+distinguishes **Already exists; updating...** from **Not found; creating...**.
+
 Grant participants **Search Index Data Reader** on the search service (Stage 8 calls it with their
 identity), and grant the **Foundry project's managed identity** the same role (Stage 9 onwards, through
 the toolbox).
+
+#### Optional: model-backed knowledge-base experiments
+
+The [Stage 8 optional portal exercise](../docs/workshop.md#optional-portal-experiment-retrieval-effort-and-output-mode)
+compares retrieval effort and output modes without changing the shared baseline.
+The Bicep setup enables a **system-assigned managed identity on Search** and grants that identity
+**Cognitive Services User** on the Foundry account. This prepares model access only: it does not attach
+a model to `supportbuddy-runbooks`, change its `minimal` / `extractiveData` defaults, or create an
+experimental knowledge base. Merely enabling the identity and role does not invoke a model.
+
+Existing deployments need the updated infrastructure provisioned before this exercise works; a source
+edit alone does not update Azure. For a manually managed environment, the administrator must enable
+Search's system-assigned identity and assign **Cognitive Services User** on the Foundry resource that
+hosts the selected model. This is separate from the project's identity reading Search.
+Allow time for role propagation, and check model endpoint, deployment, regional availability and network
+access if authentication or model calls still fail.
+
+Before the session:
+
+1. Confirm a chat model supported by the portal's knowledge-base model selector is deployed.
+   The workshop's default agent model might not be selectable; consult the
+   [portal's supported-model list](https://learn.microsoft.com/azure/search/get-started-portal-agentic-retrieval#supported-llms)
+   before arranging any additional deployment, quota or cost approval.
+2. Keep the standard participant role at **Search Index Data Reader**. Run configuration changes as
+   an instructor with **Search Service Contributor** and read access to Search, plus access to select
+   the Foundry deployment. Do not grant the whole participant group write access just for this exercise.
+3. Use a separate base named `lab-<alias>-runbooks-experiment`, referencing the existing
+   `supportbuddy-runbooks-source`. Do not create another index, re-upload runbooks or change the toolbox
+   connection. The experiment shares the same synthetic documents, not separate private content.
+4. Confirm the sandbox can call its model before demonstrating different settings. Extra query planning
+   and answer synthesis consume model tokens and shared deployment capacity.
+5. Afterward, remove only the experimental base if no longer needed. Keep the shared source, index,
+   baseline base and toolbox connection.
+
+See Microsoft's [identity and role prerequisites](https://learn.microsoft.com/azure/search/search-get-started-agentic-retrieval#configure-access).
 
 ### 3. Network MCP server on Azure Container Apps (Stage 9)
 

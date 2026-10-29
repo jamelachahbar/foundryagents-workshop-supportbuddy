@@ -30,7 +30,7 @@ Paths are relative to the repository root. Commands run from `src/`. The worksho
 | 1-5 | DevUI: `uv run python main.py` (port 8090) | Stage 1 |
 | 6-8 | MCP server in a second terminal: `uv run python -m mcp_server.server` (port 8000) | Stage 6 |
 | 7+ | Contact centre in a third terminal: `uv run python -m contact_centre` (port 8070) | Stage 7 |
-| 8 | Knowledge base: `uv run python knowledge_base.py create`; **Search Index Data Reader** role; `AZURE_AI_SEARCH_ENDPOINT` in `src/.env` | Stage 8 |
+| 8 | Instructor creates one shared knowledge base; participants verify with `uv run python knowledge_base.py ask "wifi slow upstairs, cable works"`. Only personal-environment owners run `uv run python knowledge_base.py create` themselves. **Search Index Data Reader** role; `AZURE_AI_SEARCH_ENDPOINT` in `src/.env` | Stage 8 |
 | 9+ | Toolbox: `uv run python toolbox.py create`; instructor-created project connections; local MCP server no longer needed | Stage 9 |
 | 10 | The Stage 9 toolbox (`lab-<alias>-supportbuddy-tools`); a 404 on the toolbox URL means Stage 9 is not done | Stage 10 |
 | 11 | Memory store: `uv run python memory_store.py create`; `AZURE_AI_EMBEDDING_DEPLOYMENT_NAME`; run with `--customer CUST-xxxx` | Stage 11 |

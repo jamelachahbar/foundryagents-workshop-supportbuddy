@@ -28,6 +28,19 @@ from tools.support_tools import escalate_to_human, get_handover_status, restart_
 
 
 def tools() -> list:
+    """Build the agent's tool list for the normal Azure setup or the local fallback.
+
+    ``toolbox_settings()`` returns connection settings, not the tools themselves.
+    ``FoundryToolbox`` uses those settings and your Azure CLI identity to connect
+    to one endpoint that exposes multiple remote functions.
+
+    Normally, the toolbox provides both network diagnostics and runbook retrieval.
+    The three support functions run locally in the agent in either setup.
+
+    With ``NETWORK_TOOLS=local``, the toolbox provides only runbook retrieval.
+    Append a separate connection to the local network MCP server for diagnostics.
+    Return the assembled list for ``build_agent`` to register with the agent.
+    """
     toolbox = toolbox_settings()
     tools = [
         # One MCP connection for every Foundry-managed tool. Token scope: https://ai.azure.com/.default
