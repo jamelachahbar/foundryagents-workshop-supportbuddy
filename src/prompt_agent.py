@@ -29,7 +29,7 @@ from azure.ai.projects.models import FunctionTool, MCPTool, PromptAgentDefinitio
 from azure.identity import AzureCliCredential
 from azure.identity.aio import AzureCliCredential as AsyncAzureCliCredential
 
-from lab_agent import agent_name, load_settings, run, toolbox_settings
+from lab_agent import agent_name, load_instructions, load_settings, run, toolbox_settings
 from tools.support_tools import escalate_to_human, get_handover_status, restart_modem
 
 INSTRUCTIONS = Path(__file__).parent / "solutions" / "stage_10_prompt_agent.instructions.md"
@@ -57,7 +57,7 @@ def create(project: AIProjectClient, model: str, toolbox_endpoint: str, with_fun
         tools += [function_declaration(f) for f in LOCAL_FUNCTIONS]
     definition = PromptAgentDefinition(
         model=model,
-        instructions=(INSTRUCTIONS_WITH_FUNCTIONS if with_functions else INSTRUCTIONS).read_text(encoding="utf-8"),
+        instructions=load_instructions(str(INSTRUCTIONS_WITH_FUNCTIONS if with_functions else INSTRUCTIONS)),
         reasoning=Reasoning(effort="medium"),
         tools=tools,
     )

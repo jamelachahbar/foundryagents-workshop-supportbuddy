@@ -13,6 +13,16 @@ participant guide, [workshop.md](workshop.md); each stage below links to its sec
 
 All synthetic: customers, lines, incidents, runbooks and the MCP server are lab constructs, not real systems.
 
+Every lab run replays the fictional snapshot at **18 November 2026, 10:00 UTC**, independently
+of the customer, the actual date or the workshop schedule.
+Customer problem descriptions such as "this morning" use that fixed scenario time; the open incident's
+restore estimate is **18 November 2026, 14:00 UTC**, not an afternoon on the actual workshop date.
+The shared instruction loader and prompt-agent publisher add this context automatically, including
+for reference solutions copied during catch-up. Keep **Synthetic scenario time** in portal instructions.
+Handover/action timestamps and real waiting periods are not frozen.
+See [The scenario clock](workshop.md#the-scenario-clock) and the
+[instructor preparation checklist](../instructor/setup.md#reusable-scenario-time).
+
 | Part | Stages | Runs where |
 | --- | --- | --- |
 | [0. Lab environment](#0-lab-environment) | | Azure, once per group |
@@ -388,6 +398,10 @@ uv run python knowledge_base.py ask "wifi slow upstairs, cable works"
 ```
 
 Then give the agent the knowledge base as a second MCP tool (the MCP server from Stage 6 still runs):
+
+The Stage 8 solution stores the dictionary returned by `knowledge_settings()` in `knowledge_config`
+and passes its endpoint and knowledge base name to `runbook_knowledge_base(...)` using the explicit
+keyword arguments `search_endpoint=` and `knowledge_base=`.
 
 ```powershell
 Copy-Item solutions/stage_8_knowledge.py main.py

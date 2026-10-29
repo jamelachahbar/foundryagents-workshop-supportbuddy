@@ -48,6 +48,19 @@ DEVUI_TOKEN_FILE = Path(__file__).parent / ".devui_token"
 CUSTOMER_ID_PATTERN = re.compile(r"^CUST-\d{4}$")
 DEFAULT_MEMORY_STORE_NAME = "supportbuddy-memory"
 DEFAULT_KNOWLEDGE_BASE_NAME = "supportbuddy-runbooks"
+SCENARIO_TIME = "2026-11-18T10:00:00Z"
+SCENARIO_CONTEXT = f"""# Synthetic scenario time
+The diagnostic data is a fixed synthetic snapshot. For diagnostic evidence and runbook time comparisons,
+the simulated current time is {SCENARIO_TIME} (18 November 2026, 10:00 UTC), regardless of the actual date.
+This date belongs to the fictional dataset, not to a particular customer or workshop schedule.
+Interpret "today", "this morning" and "yesterday" in customer problem descriptions relative to this
+simulated time. The snapshot does not advance between messages, conversations or workshop days.
+Use tool-returned incident status; never infer that an incident is resolved because the actual date is later.
+When reporting a tool-returned timestamp, include its explicit date, time and timezone; never substitute
+the actual workshop date or describe a future restore estimate as already elapsed based on the actual clock.
+Handover and action records retain their actual tool-returned operational timestamps. Waiting periods,
+such as waiting about 3 minutes after a modem restart, remain real elapsed durations. Never invent evidence.
+"""
 REQUIRED_SETTINGS = (
     "AZURE_AI_PROJECT_ENDPOINT",
     "AZURE_AI_MODEL_DEPLOYMENT_NAME",
@@ -136,8 +149,11 @@ class SignedInCustomer(ContextProvider):
 
 
 def load_instructions(script_file: str) -> str:
-    """Load the instructions that sit next to a stage file: ``main.py`` -> ``main.instructions.md``."""
-    return Path(script_file).with_suffix(".instructions.md").read_text(encoding="utf-8").strip()
+    """Load a script's companion instructions, or an instruction file, with the shared scenario time."""
+    path = Path(script_file)
+    if not path.name.endswith(".instructions.md"):
+        path = path.with_suffix(".instructions.md")
+    return f"{SCENARIO_CONTEXT.strip()}\n\n{path.read_text(encoding='utf-8').strip()}"
 
 
 def agent_name() -> str:

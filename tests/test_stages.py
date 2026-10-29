@@ -190,6 +190,9 @@ def test_prompt_agent_definition_uses_the_toolbox():
     (toolbox,) = default.tools
     assert toolbox.server_url == "https://toolbox.example/mcp"
     assert "You have no handover tool" in default.instructions
+    for definition in (default, experiment):
+        assert definition.instructions.startswith("# Synthetic scenario time\n")
+        assert "2026-11-18T10:00:00Z" in definition.instructions
     # The experiment declares the Python functions (name + JSON schema); the application runs them.
     assert [t.name for t in experiment.tools[1:]] == HUMAN_IN_THE_LOOP
     assert all(t.parameters["type"] == "object" for t in experiment.tools[1:])

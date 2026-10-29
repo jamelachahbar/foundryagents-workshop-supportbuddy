@@ -152,6 +152,29 @@ equivalents, purely for education**, so it works the same for every organisation
 | The development model | Microsoft Agent Framework |
 | The enterprise integration pattern | MCP |
 
+### The scenario clock
+
+Every lab run uses a fixed synthetic scenario time:
+**18 November 2026, 10:00 UTC** (`2026-11-18T10:00:00Z`). This date belongs to the fictional
+dataset, not to a particular customer or workshop schedule. The same snapshot can be replayed
+on any date; it does not advance as the workshop runs.
+
+- In customer problem descriptions, "today", "this morning" and "yesterday" refer to this simulated time.
+- Incident `INC-5001` is open, with restoration estimated at **18 November 2026, 14:00 UTC**:
+  that estimate is still in the future in the scenario, even when you run the lab on a later date.
+- Incident `INC-5002` is already resolved at **18 November 2026, 07:25 UTC**; it does not explain
+  the conflicting-evidence scenario.
+- Replies should preserve explicit tool-returned dates, times and timezones, not substitute the
+  workshop date. Do not change incident dates to match a customer's workshop schedule.
+
+The shared instruction loader prepends this context to every stage, including the contact-centre
+advisor assist agent, evaluations and the hosted agent. The prompt-agent publishing script includes
+it in the published instructions too; keep the **Synthetic scenario time** section when editing in
+the portal. The reference instruction files contain stage-specific content, not this shared preamble.
+
+This fixes the diagnostic scenario clock only. Handover and action records retain their actual
+operational timestamps, and a request to wait about 3 minutes after a restart still means a real wait.
+
 ### What you will learn
 
 By the end of the lab your agent will:
@@ -1176,7 +1199,8 @@ Hi, I'm anna.weber@example.com, my internet stopped this morning.
 ```
 
 Evidence: line `LINE-2001` down with loss of signal; open incident `INC-5001` (fibre cut) for postcode
-`MV-0001`, estimated restore 14:00 UTC; modem does not answer the ping. The incident explains everything.
+`MV-0001`, estimated restore **18 November 2026, 14:00 UTC**; modem does not answer the ping.
+At the fixed scenario time (10:00 UTC that day), the incident explains everything.
 **Expected:** progress lines while SupportBuddy works, then an answer with the incident and restore time,
 a "What I checked" list, no restart advice, no handover.
 
@@ -1353,7 +1377,7 @@ identity's token (cached and refreshed by `azure-identity`). No API key. Your id
    ```
 
 2. In `src/main.py`, update the imports as shown below. Inside the existing `tools()` function, after
-  `load_settings()`, add `knowledge = knowledge_settings()` and add `runbook_knowledge_base(...)` to
+  `load_settings()`, add `knowledge_config = knowledge_settings()` and add `runbook_knowledge_base(...)` to
   the returned list as a second MCP tool. Keep the network MCP tool and the three Stage 7 functions.
   The helper in `src/tools/knowledge_tools.py` is provided; do not edit it.
 
@@ -1362,15 +1386,22 @@ identity's token (cached and refreshed by `azure-identity`). No API key. Your id
    from tools.knowledge_tools import runbook_knowledge_base
 
    ...
-       knowledge = knowledge_settings()
+       knowledge_config = knowledge_settings()
        return [
            MCPStreamableHTTPTool(...),
-           runbook_knowledge_base(knowledge["AZURE_AI_SEARCH_ENDPOINT"], knowledge["FOUNDRY_KNOWLEDGE_BASE_NAME"]),
+           runbook_knowledge_base(
+               search_endpoint=knowledge_config["AZURE_AI_SEARCH_ENDPOINT"],
+               knowledge_base=knowledge_config["FOUNDRY_KNOWLEDGE_BASE_NAME"],
+           ),
            escalate_to_human,
            get_handover_status,
            restart_modem,
        ]
    ```
+
+   `knowledge_settings()` returns a dictionary; `knowledge_config` is the local variable holding it.
+   The two dictionary lookups read the service endpoint and the knowledge base name. The keyword
+   arguments `search_endpoint=` and `knowledge_base=` make each value's purpose explicit.
 
 3. In `src/main.instructions.md`:
    - keep the correlation rules for the **decision** (ANSWER or HAND OVER) but remove the advice text
@@ -1551,7 +1582,7 @@ So this stage asks the practical question: **how much of SupportBuddy works with
 ```python
 definition = PromptAgentDefinition(
     model=settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
-    instructions=INSTRUCTIONS.read_text(),
+    instructions=load_instructions(str(INSTRUCTIONS)),  # includes the shared synthetic scenario time
     reasoning=Reasoning(effort="medium"),
     tools=[MCPTool(server_label="supportbuddy_tools", server_url=toolbox_endpoint, require_approval="never")],
 )
@@ -1572,7 +1603,8 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 ### Your task
 
 1. From `src/`, run the provided `src/prompt_agent.py` script to publish the prompt agent and ask it
-  something. It reads `src/solutions/stage_10_prompt_agent.instructions.md`; leave that reference file
+  something. It reads `src/solutions/stage_10_prompt_agent.instructions.md` and prepends the shared
+  [scenario clock](#the-scenario-clock); leave that reference file
   and your code-first agent files (`src/main.py`, `src/main.instructions.md`) unchanged.
 
    ```bash
@@ -1586,7 +1618,8 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
   **New Conversation** before each independent test prompt.
 3. Open the Foundry portal, **Build > Agents**, find `lab-<alias>-supportbuddy-prompt`, and chat with it in
   the playground. In that agent's **Instructions** field in the portal, change one sentence and save:
-  that is a new version. This is a portal edit, not an edit to a local `.instructions.md` file.
+  that is a new version. Keep the **Synthetic scenario time** section unchanged. This is a portal edit,
+  not an edit to a local `.instructions.md` file.
 4. Measure it with the same dataset as your code-first agent (you will learn more about this in Stage 12):
 
    ```bash

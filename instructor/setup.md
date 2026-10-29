@@ -18,6 +18,42 @@ Container Apps environment, no identity.
 One shared environment per group is the normal case. A personal environment costs more (an Azure AI
 Search Basic service each) and takes about 15 minutes per person, so do it **before** the workshop day.
 
+## Reusable scenario time
+
+Every lab run replays the same synthetic snapshot: **18 November 2026, 10:00 UTC**
+(`2026-11-18T10:00:00Z`). This fictional dataset date is independent of the customer and
+workshop schedule. It works before or after that calendar date, for single-day or multi-day
+sessions, without edits. This is intentional, not stale incident data:
+
+- `INC-5001` started at 05:10 UTC and is open; its 14:00 UTC restore estimate is still ahead
+  of the simulated current time, so the outage case answers without a handover.
+- `INC-5002` was resolved at 07:25 UTC; it does not explain the conflicting-evidence case.
+- Customer phrases such as "today", "this morning" and "yesterday" use the simulated date.
+- Actual handover/action timestamps and real waiting periods, including the 3-minute restart wait,
+  are unchanged. This is not a frozen operating-system clock.
+
+Before the workshop:
+
+1. Distribute this updated source checkout to participants. `lab_agent.load_instructions` injects
+   **Synthetic scenario time** into all code-first stages, the contact-centre agents, evaluations
+   and the hosted agent; reference solutions need no edits.
+2. Restart any running local agents and contact centres, and start **New Conversation** for each
+   independent scenario. No incident-date edits or system-clock changes are needed for any session.
+3. If a Stage 10 prompt agent already exists, republish it from the updated source with
+   `uv run python prompt_agent.py create` from `src/` (add `--with-functions` only for that experiment).
+   Publication creates a new version and replaces its instructions; preserve any intentional portal
+   edits separately and reapply them without removing **Synthetic scenario time**.
+4. If a Stage 14 hosted agent is already deployed, redeploy its updated application code using the
+   Stage 14 procedure. A local source edit does not update an existing deployment.
+5. Dry-run the outage, conflicting-evidence and modem scenarios. Check that the outage reports
+   **18 November 2026, 14:00 UTC**, does not treat the estimate as overdue, and does not suggest a restart.
+   The conflicting-evidence case must still hand over; modem actions must still require approval.
+
+The backend fixtures and runbooks are unchanged: no knowledge-base reindex, shared network MCP
+redeployment, toolbox recreation or Azure resource changes are required for this clock update.
+Existing memory stores are not reset; use fresh test conversations and avoid carrying over misleading
+date claims from earlier dry runs.
+
 ## Option A: one command (recommended)
 
 ### What you need

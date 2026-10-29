@@ -26,7 +26,7 @@ DEFAULT_MCP_URL = "http://127.0.0.1:8000/mcp"
 
 def tools() -> list:
     load_settings()
-    knowledge = knowledge_settings()
+    knowledge_config = knowledge_settings()
     return [
         MCPStreamableHTTPTool(
             name="network",
@@ -34,7 +34,10 @@ def tools() -> list:
             approval_mode="never_require",
             load_prompts=False,
         ),
-        runbook_knowledge_base(knowledge["AZURE_AI_SEARCH_ENDPOINT"], knowledge["FOUNDRY_KNOWLEDGE_BASE_NAME"]),
+        runbook_knowledge_base(
+            search_endpoint=knowledge_config["AZURE_AI_SEARCH_ENDPOINT"],
+            knowledge_base=knowledge_config["FOUNDRY_KNOWLEDGE_BASE_NAME"],
+        ),
         escalate_to_human,
         get_handover_status,
         restart_modem,
