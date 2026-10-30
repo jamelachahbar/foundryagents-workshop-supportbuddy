@@ -6,7 +6,7 @@ import pytest
 from agent_framework_devui import DevServer
 from fastapi.testclient import TestClient
 
-from devui_branding import BRAND_NAME, ICON_FILE, branded_index
+from devui_branding import BRAND_NAME, ICON_FILE, SupportBuddyDevServer, branded_index
 from runtime_settings import app_url, devui_host
 
 import devui_branding
@@ -81,12 +81,10 @@ def test_serve_uses_selected_host_and_only_opens_browser_locally(monkeypatch, tm
     monkeypatch.delenv("DEVUI_HOST", raising=False)
     timer = Mock()
     run_server = Mock()
-    serve = Mock()
-    server_factory = Mock(wraps=DevServer)
+    server_factory = Mock(wraps=SupportBuddyDevServer)
     monkeypatch.setattr(devui_branding.threading, "Timer", timer)
     monkeypatch.setattr(devui_branding.uvicorn, "run", run_server)
-    monkeypatch.setattr(devui_branding, "serve", serve)
-    monkeypatch.setattr(devui_branding, "DevServer", server_factory)
+    monkeypatch.setattr(devui_branding, "SupportBuddyDevServer", server_factory)
     if missing_icon:
         monkeypatch.setattr(devui_branding, "ICON_FILE", tmp_path / "missing.svg")
 
@@ -94,17 +92,10 @@ def test_serve_uses_selected_host_and_only_opens_browser_locally(monkeypatch, tm
     devui_branding.serve_branded(agent, 8090, "offline-test-token")
 
     host = "0.0.0.0" if codespaces else "127.0.0.1"
-    if missing_icon:
-        serve.assert_called_once_with(
-            entities=[agent], port=8090, host=host, auto_open=not codespaces, auth_token="offline-test-token",
-        )
-        server_factory.assert_not_called()
+    server_factory.assert_called_once_with(port=8090, host=host, auth_token="offline-test-token")
+    assert run_server.call_args.kwargs == {"host": host, "port": 8090, "log_level": "info"}
+    if codespaces:
         timer.assert_not_called()
     else:
-        server_factory.assert_called_once_with(port=8090, host=host, auth_token="offline-test-token")
-        assert run_server.call_args.kwargs == {"host": host, "port": 8090, "log_level": "info"}
-        if codespaces:
-            timer.assert_not_called()
-        else:
-            timer.assert_called_once_with(2.0, devui_branding.webbrowser.open, ["http://127.0.0.1:8090"])
-            timer.return_value.start.assert_called_once_with()
+        timer.assert_called_once_with(2.0, devui_branding.webbrowser.open, ["http://127.0.0.1:8090"])
+        timer.return_value.start.assert_called_once_with()

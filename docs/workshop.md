@@ -38,7 +38,7 @@ case to a human.
 | **🟩 Part 2** | [**Make it enterprise-ready**](#part-2-make-it-enterprise-ready) | Platform services in Foundry |
 | 8 | [Knowledge (Foundry IQ)](#stage-8-knowledge-foundry-iq) | Cited runbooks over MCP |
 | 9 | [Foundry Toolbox](#stage-9-foundry-toolbox) | One governed tool endpoint |
-| 10 | [Prompt agent](#stage-10-prompt-agent) | The same agent with no code: how far does it get? |
+| 10 | [Prompt agent](#stage-10-prompt-agent) | Foundry-managed orchestration, with optional application-executed functions |
 | 11 | [Memory](#stage-11-memory) | Remember the customer across conversations |
 | 12 | [Evaluation](#stage-12-evaluation) | Measure decisions, citations and safety |
 | 13 | [Guardrails](#stage-13-guardrails) | Layered defence |
@@ -216,7 +216,7 @@ flowchart LR
 | Part | Stages | Where the agent runs | What you add |
 | --- | --- | --- | --- |
 | **1. Build the agent** | 1-7 | Your laptop (Agent Framework); the model runs in Foundry | Instructions, function tools, MCP, correlation, approvals, live handover to a human advisor |
-| **2. Make it enterprise-ready** | 8-13 | Your laptop; knowledge, tools, memory, evaluations and guardrails live in Foundry. Stage 10 also runs the agent *in* Foundry, with no code | Foundry IQ, Foundry Toolbox, prompt agent, Foundry Memory, evaluation, guardrails |
+| **2. Make it enterprise-ready** | 8-13 | Your laptop; knowledge, tools, memory, evaluations and guardrails live in Foundry. Stage 10 runs orchestration in Foundry; optional function tools still execute in your application | Foundry IQ, Foundry Toolbox, prompt agent, Foundry Memory, evaluation, guardrails |
 | **3. Run your code in Foundry** | 14 | Foundry Agent Service, with your code | Hosted agent |
 
 Each stage builds on the previous one, and every stage has a runnable reference in `src/solutions/`.
@@ -361,7 +361,7 @@ and fill in the values.
 
 ```text
 AZURE_AI_PROJECT_ENDPOINT=https://<your-foundry-resource>.services.ai.azure.com/api/projects/<your-project>
-AZURE_AI_MODEL_DEPLOYMENT_NAME=<your-model-deployment>
+AZURE_AI_MODEL_DEPLOYMENT_NAME=model-router
 WORKSHOP_RESOURCE_PREFIX=lab-<alias>
 MOCK_MCP_URL=http://127.0.0.1:8000/mcp
 AZURE_AI_SEARCH_ENDPOINT=https://<your-search-service>.search.windows.net
@@ -369,6 +369,10 @@ FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks
 AZURE_AI_EMBEDDING_DEPLOYMENT_NAME=<your-embedding-deployment>
 FOUNDRY_MEMORY_STORE_NAME=supportbuddy-memory
 ```
+
+The instructor setup defaults to the existing `model-router` deployment, **balanced** routing and all
+available models in its version. Use the instructor's deployment name if different. Routing profiles
+(`balanced`, `quality`, `cost`) and eligible models are shared deployment settings, not prompt settings.
 
 `WORKSHOP_RESOURCE_PREFIX` keeps your agent separate from other participants' agents in a shared
 project. Use `lab-` followed by 2-8 lowercase letters or digits, for example `lab-jdoe`.
@@ -1889,23 +1893,132 @@ Client filtering is not a replacement for server-side authorization.
 Run `uv run python toolbox.py show` from `src/` and inspect your toolbox's versions and connections in
 Foundry. Record its name, current default version, tool names and prefixes.
 
-For a temporary client-only experiment, add
-`allowed_tools=["runbooks___knowledge_base_retrieve"]` to your `FoundryToolbox(...)` call.
-Restart the agent and ask it to find a Wi-Fi runbook. Only runbook retrieval from that connection
-is exposed; the three separately registered local functions remain available.
-Network diagnostics through the toolbox are hidden, so do not expect the full Stage 9 checkpoint
-to pass while this filter is active. The local-network fallback is a separate connection and is not
+**Goal:** temporarily expose only runbook retrieval from the toolbox to your agent, without changing
+the published toolbox. This tests client-side filtering, not the full customer-investigation workflow.
+Leave `src/main.instructions.md` unchanged.
+
+**Change `src/main.py`:** add `allowed_tools=["runbooks___knowledge_base_retrieve"]` to the
+`FoundryToolbox(...)` call, not to the local functions or `build_agent(...)`.
+The complete executable code for this experiment is below. Keep your introductory docstring if you
+want; replace the code after it rather than appending another `tools()` function or entry point.
+
+```python
+import os
+
+from agent_framework import MCPStreamableHTTPTool
+from agent_framework.foundry import FoundryToolbox
+from azure.identity.aio import AzureCliCredential
+
+from lab_agent import build_agent, run, toolbox_settings
+from tools.support_tools import escalate_to_human, get_handover_status, restart_modem
+
+
+def tools() -> list:
+    toolbox_config = toolbox_settings()
+    configured_tools = [
+        FoundryToolbox(
+            AzureCliCredential(),
+            url=toolbox_config["TOOLBOX_ENDPOINT"],
+            allowed_tools=["runbooks___knowledge_base_retrieve"],
+        ),
+        escalate_to_human,
+        get_handover_status,
+        restart_modem,
+    ]
+    if toolbox_config["NETWORK_TOOLS"] == "local":
+        configured_tools.append(MCPStreamableHTTPTool(
+            name="network",
+            url=os.getenv("MOCK_MCP_URL", "http://127.0.0.1:8000/mcp"),
+            approval_mode="never_require",
+            load_prompts=False,
+        ))
+    return configured_tools
+
+
+if __name__ == "__main__":
+    run(build_agent(__file__, tools()))
+```
+
+Only runbook retrieval from that toolbox connection is exposed. The three separately registered
+local functions remain available. The local-network fallback is a separate connection and is not
 filtered by this option.
 
-Remove the filter and restart before the next experiment. Nothing was changed in the published
-toolbox, and `toolbox.py show` still lists its unfiltered server-side tools.
+**Try a runbook lookup, not a customer investigation:**
+
+1. Save `src/main.py`. Stop DevUI and the contact centre with **Ctrl+C**, then restart them from
+   `src/` in separate terminals:
+
+   ```bash
+   uv run python main.py
+   ```
+
+   ```bash
+   uv run python -m contact_centre
+   ```
+
+2. Click **New Conversation** and send:
+
+   ```text
+   Find the Wi-Fi interference runbook and cite its title.
+   ```
+
+3. Expect a `runbooks___knowledge_base_retrieve` call and an answer citing
+   `[RB-03 Wi-Fi interference]`. No customer identifier or diagnostic investigation is needed for
+   this lookup. Use DevUI's tool-call trace to check which function ran; the answer alone does not
+   prove retrieval happened.
+
+Do **not** reuse the baseline prompts such as "Hi, I'm anna.weber@example.com, my internet stopped
+this morning." Those requests trigger the investigation instructions, which require identification
+and diagnostics before retrieval. With those toolbox tools hidden, the agent cannot complete that
+workflow and may ask an unhelpful follow-up question. Another customer identifier will not restore
+the missing tools. This is a workflow/tool-availability mismatch, not a reason to change the
+investigation instructions.
+
+**What this demonstrates:** a successful lookup shows that the allowed tool still works.
+To verify that network tools are hidden, inspect the agent's registered tool list if your client
+exposes it; merely seeing no network calls in one run does not prove they are unavailable.
+`toolbox.py show` still lists the unfiltered server-side tools because the published toolbox has
+not changed. Do not expect the full Stage 9 checkpoint to pass while this filter is active.
+
+**Restore the baseline before the next experiment:** remove the `allowed_tools=...` line, keeping
+the toolbox URL and all other tools unchanged. Save, restart DevUI and the contact centre, and click
+**New Conversation**. No toolbox creation, publication or instruction edits are needed to undo
+this client-only experiment.
 
 #### 2. Publish and inspect a tool-search candidate without promoting it
 
+**Goal:** compare direct tool calls with server-side tool discovery, using a candidate version of
+your own toolbox. Testing its version-specific endpoint does not require promotion.
+Leave `src/main.instructions.md` unchanged.
+
+**Step 1 - Restore and record the baseline.** Remove the previous experiment's `allowed_tools=...`
+filter and use `url=toolbox_config["TOOLBOX_ENDPOINT"]` in `src/main.py`. Save, stop DevUI and the
+contact centre with **Ctrl+C**, then restart them from `src/` in separate terminals:
+
+```bash
+uv run python main.py
+```
+
+```bash
+uv run python -m contact_centre
+```
+
+Click **New Conversation** and send:
+
+```text
+Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
+```
+
+Record the tool calls, diagnostics, runbook citations and elapsed time. The baseline uses direct
+`network___...` and `runbooks___knowledge_base_retrieve` calls. With `NETWORK_TOOLS=local`, network
+calls are unprefixed and the local MCP server must stay running.
+
+**Step 2 - Create one candidate version.** This step changes Azure: it creates a new version of
+your existing participant toolbox, but leaves its default unchanged. It reuses the shared
+connections; do not modify those connections.
 The standard `toolbox.py create` command promotes immediately, so do **not** use it to stage a candidate.
-Instead, save the following as a separate optional script, `src/toolbox_experiment.py`, and run
-`uv run python toolbox_experiment.py` from `src/`. Do not edit the provided `toolbox.py`.
-This script creates a version of your existing toolbox but leaves its default unchanged:
+Instead, save the following as a separate optional script, `src/toolbox_experiment.py`.
+Do not edit the provided `toolbox.py`.
 
 ```python
 import asyncio
@@ -1944,14 +2057,56 @@ print(f"Candidate endpoint: {candidate_url}")
 asyncio.run(show(candidate_url))
 ```
 
-Expect the candidate's initial remote listing to contain `tool_search` and `call_tool`, rather than the
-ordinary unpinned backend functions. `toolbox.py show` still inspects the unchanged default version.
-Each run of the experiment script creates another candidate version.
+Run it once from `src/`:
 
-To test the candidate with your agent, temporarily use the printed **version-specific endpoint** as the
-`url` in `FoundryToolbox(...)`. Restart DevUI, click **New Conversation**, and repeat the Wi-Fi scenario.
-Observe discovery calls followed by invocation through `call_tool`; the baseline's direct-call listing
-expectations no longer apply. Your three local Python functions remain directly available.
+```bash
+uv run python toolbox_experiment.py
+```
+
+Each run creates another candidate version. Save the printed previous default version, candidate
+version and candidate endpoint so you can identify the versions later. The script's Python variables
+do not persist after it exits.
+
+**Step 3 - Inspect the candidate and the unchanged default.** The script lists tools from the
+candidate endpoint. Expect `tool_search` and `call_tool`, rather than the ordinary unpinned backend
+functions. Then run `uv run python toolbox.py show`: it still inspects the unchanged default
+version and should list the baseline tools.
+
+**Step 4 - Connect your agent to the candidate.** In `src/main.py`, replace only the
+`FoundryToolbox(...)` entry with this block, substituting the endpoint printed by the script for
+the placeholder string:
+
+```python
+        FoundryToolbox(
+            AzureCliCredential(),
+            url="<paste the printed candidate endpoint here>",
+        ),
+```
+
+Do **not** keep `allowed_tools=["runbooks___knowledge_base_retrieve"]`: that client filter would
+hide the candidate's discovery meta-tools. Keep the three local support functions, the local-network
+fallback branch, and the entry point unchanged. Your local support functions remain directly available.
+
+**Step 5 - Restart and compare the same scenario.** Save, stop DevUI and the contact centre with
+**Ctrl+C**, and restart both with the commands in Step 1. Click **New Conversation** and send the
+same prompt:
+
+```text
+Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202 555 0103.
+```
+
+Inspect DevUI's tool-call trace. Expect discovery through `tool_search`, followed by backend
+invocation through `call_tool`, with diagnostic findings and a citation to
+`[RB-03 Wi-Fi interference]`. With the local-network fallback, only runbook retrieval uses toolbox
+discovery; network diagnostics still use the separate local connection.
+Compare with your baseline record. The baseline's direct-call listing expectations do not apply
+to the candidate, and a correct answer alone does not demonstrate that discovery occurred.
+
+**Step 6 - Restore or continue tuning.** If stopping here, restore
+`url=toolbox_config["TOOLBOX_ENDPOINT"]`, save, restart both clients, and click **New Conversation**.
+No server-side rollback is needed because you did not promote the candidate. If continuing with
+experiment 3, keep your baseline record and version details; each further candidate has its own
+version-specific endpoint to test.
 
 #### 3. Tune discovery and compare versions
 
@@ -1967,12 +2122,14 @@ discovery and invocation calls, correct diagnostics, citations and elapsed time.
 where exposed. With only five remote functions, tool search might add overhead rather than improve
 the result; that is a useful outcome too.
 
-After testing, promotion is an explicit SDK operation:
+**Optional promotion - only after testing and comparison.** Promotion is not needed to test a
+candidate endpoint. It is an explicit SDK operation:
 `project.toolboxes.update(name, default_version=candidate.version)`.
 To roll back, set `default_version` to the recorded `previous_default` instead.
-Do this only inside an authenticated project client and only for your own toolbox.
+Do this only inside an authenticated project client and only for your own toolbox. These expressions
+assume the variables are available in that client session; if using a new script, use the toolbox name
+and version values you recorded rather than rerunning candidate creation just to recreate variables.
 Promotion changes what all clients using that toolbox's default endpoint discover.
-Client-only testing of a candidate endpoint requires no promotion.
 
 **Before continuing to Stage 10:** restore the original `url=toolbox_config["TOOLBOX_ENDPOINT"]`,
 remove temporary client filters, restore the original default if you promoted an experiment, and
@@ -1992,23 +2149,12 @@ and [server-side tool search](https://learn.microsoft.com/azure/foundry/agents/h
 
 <p align="right"><a href="#stage-9-foundry-toolbox">Previous: Stage 9</a> · <a href="#contents">Contents</a> · <a href="#stage-11-memory">Next: Stage 11 &rarr;</a></p>
 
-> **Concept:** Foundry's recommended starting point: the same SupportBuddy as a **definition** that Foundry runs, with no code \
+> **Concept:** SupportBuddy as a **definition** with Foundry-managed orchestration; optional function tools execute in the calling application \
 > **You change:** the published prompt agent in the Foundry portal; no local file edits \
 > **Reference:** `src/prompt_agent.py`, `src/solutions/stage_10_prompt_agent.instructions.md`
 
 <details>
 <summary><strong>Stage 10 lab</strong> &middot; Publish, compare and checkpoint</summary>
-
-**Run / restart after publishing (from `src/`, separate terminals):**
-
-| Process | Command |
-| --- | --- |
-| Prompt-agent DevUI, port 8090 | `uv run python prompt_agent.py chat` |
-| Prompt-agent contact centre, port 8070 | `uv run python -m contact_centre --prompt-agent` |
-
-Stop the previous code-first DevUI and contact centre with **Ctrl+C** before switching modes.
-After publishing a new prompt-agent version, restart these clients and click **New Conversation**.
-No local network MCP server is needed: the published agent uses the Azure toolbox.
 
 Look at what your agent uses now: instructions, a model, and one toolbox that holds the remote
 capability. That is exactly what a **prompt agent** is: model + instructions + tools, stored in Foundry.
@@ -2020,7 +2166,42 @@ still need to run somewhere.
 The official guidance is direct: *"Building your first agent? Start with a prompt agent"*, and prompt agents
 are *"best for production agents that don't need custom orchestration logic"*
 ([Foundry agents overview](https://learn.microsoft.com/azure/foundry/agents/overview#choose-how-to-build)).
-So this stage asks the practical question: **how much of SupportBuddy works without any code?**
+So this stage asks the practical question: **which capabilities come from the definition, and which
+still need an application or tool backend?** You do not deploy your own agent loop, but the lab's
+Python publishing script, UI clients, contact-centre routing and optional function implementations
+are still code.
+
+### Before you start
+
+- Complete the Stage 9 baseline checkpoint. If you tried the optional experiments, restore the
+  original toolbox default if you promoted a candidate, restore the default endpoint in `src/main.py`,
+  and remove temporary client filters.
+- From `src/`, run `uv run python toolbox.py show`. The normal Azure setup must expose the four
+  `network___...` diagnostics and `runbooks___knowledge_base_retrieve`. A 404 means the Stage 9
+  toolbox is not ready; resolve that before publishing a prompt agent.
+- This stage needs the network MCP backend hosted in Azure. The Stage 9 `NETWORK_TOOLS=local`
+  fallback is not sufficient: Foundry cannot call the MCP server on your laptop. If you used that
+  fallback, ask the instructor to confirm the shared Azure backend and toolbox connections are ready;
+  do not recreate shared resources.
+- The identity invoking the toolbox changes: Foundry calls it using the prompt agent's identity.
+  That identity needs the project's **Foundry User** role, separately from your developer identity
+  ([toolbox prerequisites](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/toolbox#prerequisites)).
+  If runtime tool calls fail with 401/403, ask the instructor to check that access.
+- Stop the code-first DevUI and contact centre with **Ctrl+C** before starting their prompt-agent
+  equivalents below. No local network MCP server is needed for Stage 10.
+
+**What happens to `main.py`?** Nothing in this stage requires editing it or
+`main.instructions.md`. Keep your restored Stage 9 files for the code-first path. Stage 10 uses the
+provided `prompt_agent.py` instead; it publishes instructions from
+`src/solutions/stage_10_prompt_agent.instructions.md`, not your working `main.instructions.md`.
+Leave both the provided script and reference instructions unchanged.
+
+> **🟣 Important**
+>
+> The default definition has diagnostics and runbook retrieval, but no `escalate_to_human`,
+> `restart_modem` or `get_handover_status`. Expect it to explain that a human must take over a line
+> fault, not create an `HO-...` reference. This is intentional for the comparison, not a failed setup.
+> Application-executed function tools are a separate optional experiment below.
 
 ### What the code does
 
@@ -2044,40 +2225,94 @@ agent = FoundryAgent(project_endpoint=..., agent_name="lab-<alias>-supportbuddy-
                      credential=AzureCliCredential())
 ```
 
-So the console, DevUI and the contact centre all work with it unchanged. The difference is where the loop
-runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
+The provided clients connect to this agent instead of building the code-first agent. Foundry coordinates
+model and remote tool calls; the console labels those calls `[tool call, run by Foundry]`.
+With the optional function-enabled definition, `FoundryAgent` also executes declared local functions
+in the application. Those are not Foundry-hosted Python executions. Client adapters still need to
+handle streaming, tool results and approval resume correctly.
 
 ### Your task
 
-1. From `src/`, run the provided `src/prompt_agent.py` script to publish the prompt agent and ask it
-  something. It reads `src/solutions/stage_10_prompt_agent.instructions.md` and prepends the shared
-  [scenario clock](#the-scenario-clock); leave that reference file
-  and your code-first agent files (`src/main.py`, `src/main.instructions.md`) unchanged.
+**Step 1 - Publish the default definition.** From `src/`, run:
 
-   ```bash
-   uv run python prompt_agent.py create
-   uv run python prompt_agent.py ask "Hi, I'm CUST-1003. My Wi-Fi is very slow upstairs."
-   uv run python prompt_agent.py ask "Bonjour, je suis CUST-1004, ma connexion coupe sans arret."
-   ```
+```bash
+uv run python prompt_agent.py create
+```
 
-2. Chat with it in DevUI (`uv run python prompt_agent.py chat`) and in the contact centre
-  (`uv run python -m contact_centre --prompt-agent`). In DevUI, select the prompt agent and click
-  **New Conversation** before each independent test prompt.
-3. Open the Foundry portal, **Build > Agents**, find `lab-<alias>-supportbuddy-prompt`, and chat with it in
-  the playground. In that agent's **Instructions** field in the portal, change one sentence and save:
-  that is a new version. Keep the **Synthetic scenario time** section unchanged. This is a portal edit,
-  not an edit to a local `.instructions.md` file.
-4. Measure it with the same dataset as your code-first agent (you will learn more about this in Stage 12):
+Record the printed agent name and version. Each `create` call publishes another version using the
+local reference instructions, with the shared [scenario clock](#the-scenario-clock) prepended.
+Do not rerun it just to reconnect: doing so after a portal edit publishes a new version from the
+reference file rather than preserving that edit.
 
-   ```bash
-   uv run python evaluate.py --prompt-agent
-   ```
+**Step 2 - Check it in the console before starting the UIs.** Run each command separately:
+
+```bash
+uv run python prompt_agent.py ask "Hi, I'm CUST-1003. My Wi-Fi is very slow upstairs."
+uv run python prompt_agent.py ask "Bonjour, je suis CUST-1004, ma connexion coupe sans arret."
+```
+
+Expect the Wi-Fi case to retrieve and cite `[RB-03 Wi-Fi interference]`. Expect the line-fault case
+to say that a human needs to take over, without claiming a recorded handover or inventing a reference.
+Remote calls appear as `[tool call, run by Foundry]`.
+
+**Step 3 - Start the prompt-agent clients.** From `src/`, in separate terminals:
+
+| Process | Command |
+| --- | --- |
+| Prompt-agent DevUI, port 8090 | `uv run python prompt_agent.py chat` |
+| Prompt-agent contact centre, port 8070 | `uv run python -m contact_centre --prompt-agent` |
+
+Use these commands instead of `uv run python main.py` and the code-first contact-centre command.
+In DevUI, select the prompt agent and click **New Conversation** before each independent test.
+Try the same Wi-Fi and line-fault messages from Step 2 in the clients and compare their answers.
+
+The lab's DevUI adapter renders Foundry's remote MCP call/result events in the tool panel; these
+remain Foundry-executed calls, not local function executions. It also avoids replaying a completed
+answer as another streamed text delta. If you see `Warning: Unknown content type: Content` after
+updating the lab, restart `uv run python prompt_agent.py chat` and start a new conversation.
+No prompt-agent publication or dependency changes are needed for this display-only compatibility fix.
+
+**Test manual advisor takeover separately.** With the default definition, saying that a human must
+take over does not create a handover record or put the conversation into the waiting state.
+The operator desk lists all conversations, including AI-owned ones; appearing there is not an escalation.
+After the answer finishes, open the operator desk, select the conversation, click **Take conversation**,
+and send an advisor message. Confirm that the customer receives it and that SupportBuddy stays silent
+when the customer replies. The button is disabled while the agent is answering. The
+**SupportBuddy (AI)** status identifies who owns the conversation; it does not mean a run is in progress.
+The desk should also show the customer returned by `identify_customer`.
+
+**Step 4 - Edit the published definition in the portal.** Open Foundry, **Build > Agents**, find
+the agent name recorded in Step 1, and test it in the playground. In its **Instructions** field,
+change one sentence with an observable effect, for example asking for a shorter answer, and save
+the new version. Keep the **Synthetic scenario time** section and the synthetic-data boundaries
+unchanged. This is a portal edit, not a local file edit.
+
+The local clients select the latest published version when they start; an already-running client
+stays connected to its selected version. Stop DevUI and the contact centre with **Ctrl+C**, restart
+both with the commands in Step 3, click **New Conversation**, and repeat the same Wi-Fi prompt to
+check the edit. Do not run `prompt_agent.py create` to pick up a portal edit.
+
+**Step 5 - Measure the definition you tested.** Run the same dataset used for the code-first
+comparison (you will learn more about evaluation in Stage 12):
+
+```bash
+uv run python evaluate.py --prompt-agent
+```
+
+This calls your model deployment for multiple cases. Record which published version and instruction
+change you are measuring, along with the results. Omitted function tools affect the handover cases;
+do not treat that difference as proof that prompt agents cannot support handovers.
 
 ### Checkpoint
 
 - [ ] The Wi-Fi case answers with cited runbooks, with `[tool call, run by Foundry]` lines.
-- [ ] The line-fault and conflicting-evidence cases **cannot hand over with this default definition**:
+- [ ] The line-fault and conflicting-evidence cases recommend human support but **do not automatically
+      create a structured handover or queue the conversation with this default definition**:
       the evaluation shows the effect of omitting the handover tool.
+- [ ] After the answer finishes, an advisor can manually **Take conversation**, exchange messages with
+      the customer, and keep SupportBuddy silent until handing the conversation back.
+- [ ] A saved portal instruction change is observable after restarting the clients and starting a
+      new conversation; no edits to `main.py` or local instruction files were needed.
 
 > **🟣 Important**
 >
@@ -2087,7 +2322,8 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 > can request application-executed function calls or invoke business logic exposed through MCP or OpenAPI;
 > Foundry does not upload and execute your local Python function bodies as part of the definition.
 > The default instructions honestly say that a person must take over. In the contact centre, an advisor
-> can still **Take conversation** at any time; the contact centre owns that conversation routing.
+> can still **Take conversation** after the agent finishes answering; the contact centre owns that
+> conversation routing. Automatic tool-driven handover and manual advisor takeover are separate paths.
 
 > **🟠 Warning**
 >
@@ -2095,17 +2331,137 @@ runs: the console shows `[tool call, run by Foundry]` instead of `[tool call]`.
 > parameters, the run returns each call to the application, and the application runs it. `FoundryAgent`
 > does that for you; the portal playground does not host these Python implementations. This is the
 > documented [function-calling pattern](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/function-calling).
-> Try it:
+> Try it only after completing the default-definition checkpoint. Each command below calls Azure;
+> `create --with-functions` publishes a new version under the same agent name using the provided
+> function-enabled reference instructions, not your portal-edited instructions:
 >
 > ```bash
 > uv run python prompt_agent.py create --with-functions
+> ```
+>
+> Restart DevUI and the contact centre with the Step 3 commands before testing this version there.
+> Use a new contact-centre conversation for each check:
+>
+> - **Handover:** "CUST-1004: constant disconnections for three days." Expect diagnostics, retrieval,
+>   an `escalate_to_human` result with an `HO-...` reference, and the conversation entering the waiting
+>   state. An advisor can then take it. A sentence recommending human support is not proof of handover.
+> - **Restart:** "I'm CUST-1002, my modem doesn't respond. Please restart it remotely for me."
+>   Expect diagnostics establishing that the modem is not responding, followed by a restart approval.
+>   Approve one appropriate request; verify a recorded simulated restart in **Approved actions** and
+>   an answer asking the customer to wait and test. Do not infer success from the approval card alone.
+> - **No action needed:** "CUST-1003: Wi-Fi is slow upstairs; cable works." Expect Wi-Fi runbooks,
+>   no restart request and no handover.
+> - **Offer before action:** "I'm CUST-1002, nothing loads on any device." Expect diagnostics and
+>   applicable manual steps or a remote-restart offer explaining the disruption. An offer must end
+>   the turn without a restart approval until the customer explicitly requests or accepts restart.
+> - **Respect rejection:** Repeat the explicit restart check in a new conversation, then decline
+>   the approval. Expect acknowledgement and applicable manual steps, not an automatic retry with
+>   the same or a different customer ID. Verify that no simulated restart was recorded.
+> - **Explicit human request:** "I want to speak to a person." Expect a truthful handover without
+>   compulsory diagnostics, no invented customer ID, and no restart or handover-status call.
+>
+> Test the provided local Python function implementations through the application clients. The portal
+> does not host those implementations; this is not a blanket claim that prompt agents or the portal
+> cannot support function-tool interactions.
+> If a turn requests several approvals, decide each card separately. The contact centre collects all
+> decisions and resumes once with the complete batch, including any rejections. An approved card records
+> consent, not confirmation that the action ran. Decline duplicate or unexpected restart requests;
+> approval batching does not prevent the model from requesting an inappropriate action.
+> The reference instructions separate diagnostic eligibility, customer intent and framework approval.
+> They also distinguish unavailable tool results from a completed, inconclusive investigation.
+> These are model instructions, not enforced authorization: production applications must validate
+> trusted evidence, ownership and duplicate execution before allowing a state-changing action.
+> The desk accepts both `network___identify_customer` and `network.identify_customer` event names.
+> It reads the customer identity from diagnostic results, including Foundry text results that
+> append a duplicate `structuredResponse` JSON document. Conflicting or malformed results are not
+> accepted as customer identification.
+>
+> **Separate model decisions from integration failures.** Repeated approval cards alone do not prove
+> that the model ignored instructions or that the customer asked more than once. Inspect tool-call IDs,
+> approval interrupt IDs, results and errors to distinguish separate calls from replay/resume failures.
+> The lab contact centre previously resumed one decision at a time even when several approvals were
+> pending; this caused `Resume omitted pending interruptId` errors. It now submits the complete batch.
+> That was an application integration bug, not a prompt-agent platform limitation. A generic model
+> deployment error likewise does not, by itself, establish a function-calling limitation.
+>
+> The contact centre retains a Foundry conversation and private, route-scoped AG-UI continuation state
+> for each prompt-agent chat. Approval results and new messages continue that conversation rather than
+> replaying remote MCP calls as local functions. This avoids HTTP 400 `Invalid input[...].name` when
+> Foundry renders toolbox names with dots, such as `network.identify_customer`.
+> Local continuation state is memory-only: after restarting the contact centre, start a new conversation.
+> If an error happens after approving an action, check **Approved actions** before trying again: the action
+> may have completed even though the final reply failed. Never blindly repeat a state-changing action.
+> Production channels need authenticated scope isolation and durable continuation storage; the loopback
+> lab's route scope is not a customer authorization boundary.
+>
+> After the focused checks, measure the tested definition:
+>
+> ```bash
 > uv run python evaluate.py --prompt-agent
 > ```
 >
-> When we built this lab, the model called the declared functions too early and repeatedly (handovers with
-> placeholder text, restart requests nobody asked for), while the same instructions worked in the code-first
-> agent. This is an observation about that experiment, not a platform limitation. Measure before you rely
-> on it, then run `prompt_agent.py create` again to go back.
+> Record the model, agent version, instructions, tool calls and evaluation results. Do not infer that
+> prompt agents are generally less reliable than code-first agents from an unisolated failed run.
+> To restore the default tool set, run `uv run python prompt_agent.py create` from `src/`,
+> restart both clients, and click **New Conversation**. This publishes a fresh default definition
+> from the reference file; it does not restore your earlier portal sentence edit.
+
+### Optional: trace the prompt agent and approval flow
+
+The [instructor setup](../instructor/setup.md) provisions shared Application Insights, links it to
+Foundry and grants the tracing roles automatically, including when the network MCP server runs elsewhere.
+Participants do not deploy monitoring resources or copy connection strings.
+The instructor's handout includes these non-secret options for `src/.env`; restart the contact centre
+or prompt-agent DevUI after setting them:
+
+```dotenv
+SUPPORTBUDDY_TRACING=true
+SUPPORTBUDDY_TRACE_CONTENT=false
+```
+
+The client resolves the connection through the authenticated project SDK; it does not store a
+connection string locally. The signed-in identity needs **Monitoring Metrics Publisher** on
+Application Insights to ingest telemetry, plus permission to read the project connection.
+Missing configuration fails startup rather than silently pretending tracing is enabled.
+
+For **synthetic lab debugging only**, set `SUPPORTBUDDY_TRACE_CONTENT=true` to capture chat and
+tool payloads. Keep it off with real customer data. The contact-centre recorder excludes raw history
+snapshots and encrypted reasoning. Framework message capture can still contain sensitive input/output:
+never send credentials in chat or tools. Application Insights access, retention and ingestion costs apply.
+
+Local spans cover managed-agent requests, application functions, AG-UI tool events, approval requests,
+decisions and resumes. Conversation IDs, run IDs and interrupt IDs correlate separate turns; trace context
+is propagated across the local AG-UI HTTP hop. A tool-call event is a **request**, not proof of execution:
+look for its result and the synthetic action record. Framework spans supply response IDs when emitted by
+the provider. Managed server traces depend on the Foundry project integration; local instrumentation
+does not reveal hidden model reasoning or diagnose the cause of an incorrect model decision.
+
+Run a new conversation, wait a few minutes, then inspect **Foundry > Observability > Traces** or
+the linked **Application Insights > Transaction search / Logs**. Existing processes need restarting;
+instrumentation cannot recover traces from earlier calls.
+
+In Application Insights **Logs**, protocol span events appear in `traces`, not `customEvents`.
+For example:
+
+```kusto
+let turns = dependencies
+| where timestamp > ago(1h)
+| where cloud_RoleName == "supportbuddy-prompt-client" and name == "supportbuddy.turn"
+| project operation_Id,
+    conversation=tostring(customDimensions["gen_ai.conversation.id"]),
+    run=tostring(customDimensions["supportbuddy.run.id"]);
+traces
+| where timestamp > ago(1h)
+| where message in ("approval.requested", "approval.resume", "agent.error")
+| join kind=inner turns on operation_Id
+| project timestamp, conversation, run, message,
+    interrupt=tostring(customDimensions["approval.interrupt.id"])
+| order by timestamp asc
+```
+
+Decisions are separate `supportbuddy.approval` spans; their `supportbuddy.approval.batch`
+attribute points to the requesting turn's run ID. They are correlated by IDs, not kept open
+in a single trace while a person decides.
 
 | | Prompt agent | Code-first / hosted agent |
 | --- | --- | --- |
@@ -2119,8 +2475,8 @@ not whether the team follows engineering practices. See [Prompt agents](https://
 
 > **🔵 Note**
 >
-> Foundry also offers **voice-based prompt agents**, and a preview **managed harness** option that runs a
-> prompt agent on the GitHub Copilot harness for long, multi-step work. Copilot Studio has its own
+> Foundry also offers **voice-based prompt agents**, and an optional **Microsoft Copilot harness**
+> (preview) for supported multi-step tool, skill, file and command workflows. Copilot Studio has its own
 > *Customer Conversation harness* for customer chat and voice with escalation to a person. They are
 > alternatives worth knowing about; this lab does not use them.
 

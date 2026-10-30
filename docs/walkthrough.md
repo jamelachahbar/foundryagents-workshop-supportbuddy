@@ -36,7 +36,7 @@ See [The scenario clock](workshop.md#the-scenario-clock) and the
 | --- | --- | --- |
 | `lab-<alias>-supportbuddy` | Code-first agent (runs on your laptop, calls the model in Foundry) | Stages 1-9, 11-13 |
 | `lab-<alias>-supportbuddy-assist` | Code-first agent for the human advisor, in the contact centre | Stage 7 |
-| `lab-<alias>-supportbuddy-prompt` | Prompt agent (runs in Foundry, no code) | Stage 10 |
+| `lab-<alias>-supportbuddy-prompt` | Prompt agent (Foundry-managed orchestration; optional functions run in the application) | Stage 10 |
 | `lab-<alias>-supportbuddy-hosted` | Hosted agent (your code, run by Foundry) | Stage 14 |
 
 Details: [The agents in this lab](workshop.md#the-agents-in-this-lab).
@@ -86,7 +86,7 @@ SupportBuddy lab: finishing the setup
 Give the participants these lines for src/.env (each adds their own WORKSHOP_RESOURCE_PREFIX):
 
 AZURE_AI_PROJECT_ENDPOINT=https://sb-foundry-<suffix>.services.ai.azure.com/api/projects/supportbuddy
-AZURE_AI_MODEL_DEPLOYMENT_NAME=supportbuddy-chat
+AZURE_AI_MODEL_DEPLOYMENT_NAME=model-router
 MOCK_MCP_URL=http://127.0.0.1:8000/mcp
 AZURE_AI_SEARCH_ENDPOINT=https://sb-search-<suffix>.search.windows.net
 FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks
@@ -514,10 +514,21 @@ Agent: Il faut passer votre dossier à un conseiller humain ... contactez le sup
 ```
 
 The tool calls now say **run by Foundry**: the agent loop runs in Foundry Agent Service, not in your process.
-The line-fault case **cannot hand over with this default definition**: it omits `escalate_to_human`, so
+The line-fault case **cannot automatically record or queue a handover with this default definition**:
+it omits `escalate_to_human`, so
 the agent tells the customer to contact support. This is a lab configuration choice, not a prompt-agent
 limitation. The optional Stage 10 experiment declares function tools that the calling application executes;
 handover could also be exposed through a remote MCP or OpenAPI tool.
+The operator desk lists all conversations, not just escalations. An advisor can manually
+**Take conversation** after the AI finishes, even with the default definition. That routing is owned
+by the contact centre, not by the prompt agent.
+
+The default definition also omits `restart_modem`: it can give manual runbook steps but cannot restart
+remotely. With `create --with-functions`, the application executes the declared restart tool after
+approval. If several approval cards appear in one turn, decide all of them (decline duplicates);
+the client must resume with the complete decision batch. Approval is not proof of execution.
+See the [Stage 10 function-tool checks](workshop.md#stage-10-prompt-agent) to distinguish model
+decisions, approval/resume errors and actual recorded actions.
 
 In the portal, **Build > Agents** lists `lab-demo-supportbuddy-prompt`. Open it and chat in the playground:
 
@@ -681,7 +692,7 @@ Sign in to `azd` (`azd auth login`, same account and tenant), then describe the 
 resource ID from the lab environment:
 
 ```powershell
-azd ai agent init --no-prompt --project-id "<project resource ID>" --model-deployment supportbuddy-chat `
+azd ai agent init --no-prompt --project-id "<project resource ID>" --model-deployment model-router `
   --deploy-mode code --runtime python_3_13 --entry-point hosted_agent.py `
   --agent-name lab-<alias>-supportbuddy-hosted --protocol responses
 ```

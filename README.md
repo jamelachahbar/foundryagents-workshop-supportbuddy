@@ -65,7 +65,7 @@ system or record.
 | **Part 2** | **Make it enterprise-ready with Foundry** | |
 | 8 | Foundry IQ knowledge base, consumed over MCP | tools say what is wrong, runbooks say what to do - cited `[RB-xx]` |
 | 9 | Foundry Toolbox | one governed, versioned MCP endpoint; credentials in project connections |
-| 10 | Prompt agent | Foundry's recommended starting point: the same agent with no code - how far does it get? |
+| 10 | Prompt agent | Foundry-managed orchestration: compare the default tools and optional application-executed functions |
 | 11 | Foundry Memory + signed-in customer | remember preferences and past problems, outside the runtime |
 | 12 | Evaluation: rule-based checks + Foundry evaluators | measure decisions, tool use, citations and safety |
 | 13 | Guardrails: Foundry guardrail + code middleware | layered defence against jailbreaks and poisoned tool data |
@@ -78,7 +78,7 @@ system or record.
 | --- | --- | --- | --- |
 | `lab-<alias>-supportbuddy` | Code-first: your Agent Framework code calls the model in Foundry | Your Python process | 1-9, 11-13 |
 | `lab-<alias>-supportbuddy-assist` | Code-first, helps the human advisor (never the customer) | The contact centre on your laptop | 7 onwards |
-| `lab-<alias>-supportbuddy-prompt` | Prompt agent: model + instructions + toolbox, no code | Foundry Agent Service | 10 |
+| `lab-<alias>-supportbuddy-prompt` | Prompt agent: model + instructions + tools; optional functions execute in the client application | Foundry Agent Service runs the orchestration | 10 |
 | `lab-<alias>-supportbuddy-hosted` | Hosted agent: your code, deployed to Foundry | Foundry Agent Service | 14 |
 
 ## Repository map

@@ -11,7 +11,7 @@ function el(tag, className, text) {
 }
 
 const MODE_LABEL = {
-  agent: "SupportBuddy (AI) is answering",
+  agent: "SupportBuddy (AI)",
   waiting: "Waiting for a human advisor",
   advisor: "Human advisor",
   closed: "Closed",
@@ -82,7 +82,9 @@ function renderMessage(message, view, onApproval) {
       buttons.append(yes, no);
       bubble.append(buttons);
     } else {
-      const label = message.status === "pending" ? "Waiting for approval" : `Decision: ${message.status}`;
+      const label = message.status === "pending"
+        ? "Waiting for approval"
+        : `Decision: ${message.status}. The run resumes after all approvals in this batch are decided.`;
       bubble.append(el("div", `decision ${message.status}`, label));
     }
   } else if (["agent", "advisor"].includes(message.role)) {

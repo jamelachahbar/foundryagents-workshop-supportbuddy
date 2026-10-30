@@ -31,9 +31,11 @@ from typing import Any
 
 import uvicorn
 from agent_framework import SupportsAgentRun
-from agent_framework_ag_ui import AgentFrameworkAgent, add_agent_framework_fastapi_endpoint
+from agent_framework.foundry import FoundryAgent
+from agent_framework_ag_ui import AgentFrameworkAgent, InMemoryAGUIThreadSnapshotStore, add_agent_framework_fastapi_endpoint
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from opentelemetry import context, propagate
 
 from contact_centre.centre import ASSIST_PATH, SUPPORTBUDDY_PATH, UNIDENTIFIED, ContactCentre, http_runner
 from lab_backend import backend
@@ -86,10 +88,19 @@ def create_app(
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     tasks: set[asyncio.Task[None]] = set()
     known_customers = {c["customer_id"] for c in customers or []}
+    snapshots = InMemoryAGUIThreadSnapshotStore()
 
     for path, agent in agents.items():
         # Approvals travel as AG-UI interrupts; the synthetic confirm_changes tool call is not needed.
-        add_agent_framework_fastapi_endpoint(app, AgentFrameworkAgent(agent, require_confirmation=False), path)
+        service_session = isinstance(agent, FoundryAgent)
+        add_agent_framework_fastapi_endpoint(
+            app, AgentFrameworkAgent(agent, require_confirmation=False, use_service_session=service_session), path,
+            snapshot_store=snapshots if service_session else None,
+            # This loopback lab has no sign-in; keep separate agents' thread state in separate server-owned scopes.
+            snapshot_scope_resolver=(
+                (lambda _request, scope=f"contact-centre:{path}": scope) if service_session else None
+            ),
+        )
 
     async def open_agent(path: str) -> None:
         """Open an agent's connections (MCP, toolbox, memory) the first time a conversation needs it."""
@@ -106,7 +117,12 @@ def create_app(
 
     @app.middleware("http")
     async def security_headers(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        response = await call_next(request)
+        token = context.attach(propagate.extract(dict(request.headers))) if request.url.path.startswith("/ag-ui/") else None
+        try:
+            response = await call_next(request)
+        finally:
+            if token is not None:
+                context.detach(token)
         if not request.url.path.startswith("/ag-ui/"):
             response.headers.update(SECURITY_HEADERS)
         return response

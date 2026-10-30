@@ -1,4 +1,4 @@
-"""Serve DevUI with the SupportBuddy name and icon instead of the default Agent Framework branding.
+"""Serve DevUI with SupportBuddy branding and Foundry remote-tool rendering.
 
 DevUI has no official branding option. This replaces only its start page ("/"): same app, same
 scripts, plus a new title, favicon and a small script that swaps the header logo and name.
@@ -17,7 +17,10 @@ from pathlib import Path
 from typing import Any
 
 import uvicorn
-from agent_framework_devui import DevServer, serve
+from agent_framework import Content
+from agent_framework_devui import DevServer
+from agent_framework_devui._executor import AgentFrameworkExecutor
+from agent_framework_devui._mapper import MessageMapper
 from starlette.responses import HTMLResponse
 from starlette.routing import Route
 
@@ -25,6 +28,44 @@ from runtime_settings import app_url, devui_host
 
 BRAND_NAME = "SupportBuddy"
 ICON_FILE = Path(__file__).resolve().parents[1] / "docs" / "assets" / "icon.svg"
+
+
+def register_foundry_renderers(mapper: MessageMapper) -> None:
+    """Adapt remote MCP events for the pinned DevUI, without changing agent content or execution."""
+    async def map_call(content: Content, context: dict[str, Any]) -> Any:
+        if not content.call_id or not content.tool_name:
+            raise ValueError("Foundry MCP tool call is missing its call ID or tool name.")
+        display = Content.from_function_call(
+            call_id=content.call_id,
+            name=content.tool_name,
+            arguments=content.arguments,
+            informational_only=True,
+            hosted=True,
+            server_name=content.server_name,
+        )
+        return await mapper._map_function_call_content(display, context)
+
+    async def map_result(content: Content, context: dict[str, Any]) -> Any:
+        if not content.call_id:
+            raise ValueError("Foundry MCP tool result is missing its call ID.")
+        display = Content.from_function_result(
+            call_id=content.call_id,
+            result=content.output,
+            exception=content.exception,
+        )
+        return await mapper._map_function_result_content(display, context)
+
+    # DevUI has no public mapper-extension API; keep this compatibility shim at its display boundary.
+    mapper.content_mappers.setdefault("mcp_server_tool_call", map_call)
+    mapper.content_mappers.setdefault("mcp_server_tool_result", map_result)
+
+
+class SupportBuddyDevServer(DevServer):
+    async def _ensure_executor(self) -> AgentFrameworkExecutor:
+        executor = await super()._ensure_executor()
+        register_foundry_renderers(executor.message_mapper)
+        return executor
+
 
 _SWAP_HEADER = """
 <script>
@@ -70,16 +111,13 @@ def serve_branded(agent: Any, port: int, auth_token: str) -> None:
     """Run authenticated DevUI with SupportBuddy branding (plain DevUI if the icon is missing)."""
     host = devui_host()
     auto_open = os.getenv("CODESPACES") != "true"
-    if not ICON_FILE.is_file():
-        serve(entities=[agent], port=port, host=host, auto_open=auto_open, auth_token=auth_token)
-        return
-
-    page = branded_index(ICON_FILE.read_text(encoding="utf-8"))
-    server = DevServer(port=port, host=host, auth_token=auth_token)
+    server = SupportBuddyDevServer(port=port, host=host, auth_token=auth_token)
     server.set_pending_entities([agent])
     app = server.get_app()
-    # DevUI mounts its UI at "/" after its API routes; serve the branded start page ahead of it.
-    app.router.routes.insert(0, Route("/", lambda _request: HTMLResponse(page), methods=["GET"]))
+    if ICON_FILE.is_file():
+        page = branded_index(ICON_FILE.read_text(encoding="utf-8"))
+        # DevUI mounts its UI at "/" after its API routes; serve the branded start page ahead of it.
+        app.router.routes.insert(0, Route("/", lambda _request: HTMLResponse(page), methods=["GET"]))
 
     if auto_open:
         threading.Timer(2.0, webbrowser.open, [app_url(port)]).start()

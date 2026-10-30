@@ -24,6 +24,9 @@ var roles = {
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
   cognitiveServicesOpenAIUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
   cognitiveServicesUser: 'a97b65f3-24c7-4388-baec-2e87135dc908'
+  monitoringMetricsPublisher: '3913510d-42f4-4e42-8a64-420c390055eb'
+  monitoringReader: '43d0d8ad-25c7-4714-9337-8ba259a9fe05'
+  logAnalyticsReader: '73c42c96-874c-492b-b04d-ab87d138a893'
 }
 
 // ----- Foundry: account, project, models, guardrail -----------------------------------------
@@ -63,13 +66,13 @@ resource guardrail 'Microsoft.CognitiveServices/accounts/raiPolicies@2025-06-01'
   dependsOn: [project]
 }
 
-resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = {
+resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-10-01-preview' = {
   parent: account
-  name: 'supportbuddy-chat'
+  name: chatModel.deploymentName
   sku: { name: chatModel.sku, capacity: chatModel.capacity }
-  properties: {
+  properties: union({
     model: { format: 'OpenAI', name: chatModel.name, version: chatModel.version }
-  }
+  }, chatModel.name == 'model-router' ? { routing: { mode: chatModel.routingMode } } : {})
   dependsOn: [guardrail]
 }
 
@@ -98,14 +101,29 @@ resource search 'Microsoft.Search/searchServices@2023-11-01' = {
   }
 }
 
-// ----- Network MCP server on Azure Container Apps (skipped when an external URL is given) -----
+// ----- Shared tracing (also needed when the network MCP server is external or local) ---------
 
-resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = if (hostNetworkMcp) {
+resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
   name: 'sb-logs-${suffix}'
   location: location
   tags: tags
   properties: { sku: { name: 'PerGB2018' }, retentionInDays: 30 }
 }
+
+resource insights 'Microsoft.Insights/components@2020-02-02' = {
+  name: 'sb-insights-${suffix}'
+  location: location
+  tags: tags
+  kind: 'web'
+  properties: {
+    Application_Type: 'web'
+    WorkspaceResourceId: logs.id
+    RetentionInDays: 30
+    IngestionMode: 'LogAnalytics'
+  }
+}
+
+// ----- Network MCP server on Azure Container Apps (skipped when an external URL is given) -----
 
 resource registry 'Microsoft.ContainerRegistry/registries@2023-07-01' = if (hostNetworkMcp) {
   name: 'sbacr${suffix}'
@@ -139,7 +157,7 @@ resource containerEnv 'Microsoft.App/managedEnvironments@2024-03-01' = if (hostN
   properties: {
     appLogsConfiguration: {
       destination: 'log-analytics'
-      logAnalyticsConfiguration: { customerId: logs!.properties.customerId, sharedKey: logs!.listKeys().primarySharedKey }
+      logAnalyticsConfiguration: { customerId: logs.properties.customerId, sharedKey: logs.listKeys().primarySharedKey }
     }
   }
 }
@@ -271,6 +289,49 @@ resource participantsOnSearch 'Microsoft.Authorization/roleAssignments@2022-04-0
   }
 }
 
+var setupMonitoringRoles = empty(principalId) ? [] : [roles.monitoringMetricsPublisher, roles.monitoringReader]
+var participantMonitoringRoles = empty(participantsGroupId) ? [] : [roles.monitoringMetricsPublisher, roles.monitoringReader]
+
+resource setupOnInsights 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in setupMonitoringRoles: {
+  scope: insights
+  name: guid(insights.id, principalId, role)
+  properties: {
+    principalId: principalId
+    principalType: principalType
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', role)
+  }
+}]
+
+resource participantsOnInsights 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for role in participantMonitoringRoles: {
+  scope: insights
+  name: guid(insights.id, participantsGroupId, role)
+  properties: {
+    principalId: participantsGroupId
+    principalType: 'Group'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', role)
+  }
+}]
+
+resource setupReadsLogs 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(principalId)) {
+  scope: logs
+  name: guid(logs.id, principalId, roles.logAnalyticsReader)
+  properties: {
+    principalId: principalId
+    principalType: principalType
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.logAnalyticsReader)
+  }
+}
+
+resource participantsReadLogs 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (!empty(participantsGroupId)) {
+  scope: logs
+  name: guid(logs.id, participantsGroupId, roles.logAnalyticsReader)
+  properties: {
+    principalId: participantsGroupId
+    principalType: 'Group'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roles.logAnalyticsReader)
+  }
+}
+
 output projectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${project.name}'
 output chatDeployment string = chatDeployment.name
 output embeddingDeployment string = embeddingDeployment.name
@@ -280,3 +341,4 @@ output projectId string = project.id
 output guardrailId string = guardrail.id
 output networkMcpUrl string = hostNetworkMcp ? 'https://${networkMcp!.properties.configuration.ingress.fqdn}/mcp' : (externalNetworkMcpUrl == 'none' ? '' : externalNetworkMcpUrl)
 output registryEndpoint string = hostNetworkMcp ? registry!.properties.loginServer : ''
+output applicationInsightsResourceId string = insights.id

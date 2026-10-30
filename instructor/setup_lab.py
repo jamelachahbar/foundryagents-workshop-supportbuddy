@@ -1,7 +1,7 @@
 """Finish the SupportBuddy lab environment after `azd provision` (runs as the azd postprovision hook).
 
 Bicep creates the Azure resources; this script creates what lives *inside* them:
-  1. the two Foundry project connections the participants' toolboxes use (Stage 9);
+  1. the toolbox connections (Stage 9) and the shared Application Insights connection (Stage 10);
   2. the Foundry IQ knowledge base with the 12 synthetic runbooks (Stage 8);
   3. the Foundry Memory store (Stage 11);
 and prints the values to give the participants.
@@ -25,10 +25,12 @@ from azure.identity import AzureCliCredential
 SRC = Path(__file__).resolve().parents[1] / "src"
 ARM = "https://management.azure.com"
 CONNECTIONS_API = "2025-06-01"
+INSIGHTS_API = "2020-02-02"
 KB_API = "2026-08-01-preview"
 REQUIRED = [
     "AZURE_AI_PROJECT_ENDPOINT", "AZURE_AI_MODEL_DEPLOYMENT_NAME", "AZURE_AI_EMBEDDING_DEPLOYMENT_NAME",
     "AZURE_AI_SEARCH_ENDPOINT", "FOUNDRY_PROJECT_ID", "SUPPORTBUDDY_GUARDRAIL_ID",
+    "APPLICATIONINSIGHTS_RESOURCE_ID",
 ]
 
 
@@ -47,8 +49,26 @@ def azd_values() -> dict[str, str]:
 
 def create_connections(values: dict[str, str]) -> None:
     token = AzureCliCredential().get_token(f"{ARM}/.default").token
+    insights_id = values["APPLICATIONINSIGHTS_RESOURCE_ID"]
+    response = httpx.get(
+        f"{ARM}{insights_id}?api-version={INSIGHTS_API}",
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=60,
+    )
+    response.raise_for_status()
+    connection_string = response.json().get("properties", {}).get("ConnectionString")
+    if not isinstance(connection_string, str) or not connection_string.strip():
+        raise ValueError("Application Insights did not return a connection string; project tracing cannot be configured.")
     search = values["AZURE_AI_SEARCH_ENDPOINT"].rstrip("/")
     connections = {
+        # The project SDK expects ApiKey credentials for this connection, even with Entra-authenticated ingestion.
+        "supportbuddy-appinsights": {
+            "category": "AppInsights",
+            "authType": "ApiKey",
+            "target": insights_id,
+            "credentials": {"key": connection_string},
+            "metadata": {"ResourceId": insights_id},
+        },
         # The knowledge base, called with the project's managed identity.
         "supportbuddy-runbooks-kb": {
             "category": "RemoteTool",
@@ -112,10 +132,13 @@ def main() -> int:
         "FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks\n"
         f"AZURE_AI_EMBEDDING_DEPLOYMENT_NAME={values['AZURE_AI_EMBEDDING_DEPLOYMENT_NAME']}\n"
         "FOUNDRY_MEMORY_STORE_NAME=supportbuddy-memory\n"
+        "SUPPORTBUDDY_TRACING=true\n"
+        "SUPPORTBUDDY_TRACE_CONTENT=false\n"
         + ("" if values.get("NETWORK_MCP_URL") else "NETWORK_TOOLS=local\n")
         + f"\nStage 13 guardrail ID:\n{values['SUPPORTBUDDY_GUARDRAIL_ID']}\n"
         f"\nStage 14 project resource ID (azd ai agent init --project-id):\n{values['FOUNDRY_PROJECT_ID']}\n"
         f"\nShared network MCP server (Stage 9): {values.get('NETWORK_MCP_URL') or 'none, network tools stay local'}\n"
+        f"\nShared Application Insights (Stage 10): {values['APPLICATIONINSIGHTS_RESOURCE_ID']}\n"
     )
     return 0
 

@@ -31,7 +31,8 @@ from azure.ai.projects.models import FunctionTool, MCPTool, PromptAgentDefinitio
 from azure.identity import AzureCliCredential
 from azure.identity.aio import AzureCliCredential as AsyncAzureCliCredential
 
-from lab_agent import agent_name, load_instructions, load_settings, run, toolbox_settings
+from lab_agent import HideFinalTextReplay, agent_name, load_instructions, load_settings, run, toolbox_settings
+from lab_telemetry import configure_tracing
 from tools.support_tools import escalate_to_human, get_handover_status, restart_modem
 
 INSTRUCTIONS = Path(__file__).parent / "solutions" / "stage_10_prompt_agent.instructions.md"
@@ -68,18 +69,23 @@ def create(project: AIProjectClient, model: str, toolbox_endpoint: str, with_fun
     print("Open it in the Foundry portal: Build > Agents, then use the playground.")
 
 
-def connect_prompt_agent() -> FoundryAgent:
+def connect_prompt_agent(*, devui: bool = False, name: str | None = None) -> FoundryAgent:
     """Agent Framework's client for your prompt agent (latest version). It runs the functions the agent declares."""
     settings = load_settings()
     with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=AzureCliCredential()) as project:
-        latest = project.agents.get(agent_name=prompt_agent_name()).versions.latest
+        configure_tracing(project)
+        latest = project.agents.get(agent_name=name or prompt_agent_name()).versions.latest
     declared = {tool.get("name") for tool in latest.definition.get("tools", []) if tool.get("type") == "function"}
     return FoundryAgent(
         project_endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"],
         agent_name=latest.name,
         agent_version=latest.version,
+        name=latest.name,
+        id=f"{latest.name}:{latest.version}",
         credential=AsyncAzureCliCredential(),
         tools=[f for f in LOCAL_FUNCTIONS if f.name in declared] or None,
+        default_options={"store": True},
+        middleware=[HideFinalTextReplay()] if devui else None,
     )
 
 
@@ -100,7 +106,7 @@ def main() -> int:
         parser.error('ask needs a question, for example "I\'m CUST-1003, my Wi-Fi is slow"')
     # lab_agent.run reads the prompt from the command line: DevUI without one, the console with one.
     sys.argv = [sys.argv[0], *([args.question] if args.action == "ask" else [])]
-    run(connect_prompt_agent())
+    run(connect_prompt_agent(devui=args.action == "chat"))
     return 0
 
 

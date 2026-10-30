@@ -17,6 +17,9 @@ dependencies = [
     # agent-framework-foundry 1.15.0 requires azure-ai-projects <2.8.0
     "azure-ai-projects>=2.7.0,<2.8.0",
     "azure-identity>=1.26.0",
+    # Optional runtime tracing uses the exporter directly, not a second instrumentation distro.
+    "azure-monitor-opentelemetry-exporter>=1.0.0b58,<2",
+    "opentelemetry-api>=1.45.1,<2",
     # MCP support is optional in agent-framework-core 1.22; this matches its "all" extra
     "mcp>=1.24.0,<2",
     # Contact centre web server (Stage 7); already installed with mcp, declared because the lab uses them directly

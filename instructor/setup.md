@@ -1,7 +1,7 @@
 # Lab environment setup
 
 Everything the participants use that they do not build themselves: the Foundry project and models, the
-runbook knowledge base, the network MCP server, the toolbox connections, the memory store and the
+runbook knowledge base, the network MCP server, the toolbox connections, Application Insights, the memory store and the
 guardrail. Everything here is synthetic training data.
 
 ## Who sets it up?
@@ -60,7 +60,9 @@ date claims from earlier dry runs.
 
 - An Azure subscription where you are **Owner**, or **Contributor** plus **User Access Administrator**
   (the setup creates role assignments).
-- Model quota in the region you pick: `gpt-5.4-mini` and `text-embedding-3-small`, **Global Standard**.
+- Model quota in the region you pick: `model-router` (version `2025-11-18`) and
+  `text-embedding-3-small`, **Global Standard** by default. The router can also use **Data Zone Standard**
+  where supported; check the quota for that SKU before switching.
   Check it in the Foundry portal (Quota) or with `az cognitiveservices usage list -l <region>`.
 - On your machine: [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
   (`azd`), [uv](https://docs.astral.sh/uv/) and the Azure CLI. Docker is **not** needed: the MCP server image
@@ -83,14 +85,27 @@ azd up
 
 1. **Provisions** (`infra/`, Bicep): a Foundry resource and project, the chat and embedding deployments,
    the lab guardrail, Azure AI Search, a container registry, a Container Apps environment with the
-   network MCP server app, Log Analytics, and the role assignments.
-2. **Finishes the setup** (`setup_lab.py`): the two toolbox connections, the knowledge base with the
+   network MCP server app, Log Analytics, workspace-based Application Insights, and the role assignments.
+   The monitoring resources are also provisioned when the network MCP server is external or disabled.
+2. **Finishes the setup** (`setup_lab.py`): the toolbox connections, the shared Application Insights
+   project connection, the knowledge base with the
    runbooks, and the memory store. It waits while new role assignments propagate.
 3. **Deploys** the network MCP server: builds `src/mcp_server` in the registry and runs it.
 
 At the end it prints the values to give the participants: the lines for their `src/.env`, the guardrail
 ID (Stage 13) and the project resource ID (Stage 14). Print them again at any time with
 `uv run --project ../src python setup_lab.py` (it is safe to run again).
+
+Application Insights is instructor-provisioned once per environment, not created by participants.
+The handout enables prompt-agent client tracing with `SUPPORTBUDDY_TRACING=true` and leaves chat/tool
+content capture off with `SUPPORTBUDDY_TRACE_CONTENT=false`. Participants need no connection string:
+the client resolves the shared project connection using `az login`. The setup hook transfers the
+connection value directly from Azure to Foundry without printing it or writing it into the handout.
+Resource IDs, not credentials, are exported to the azd environment.
+
+Logs use 30-day retention; ingestion and storage incur Azure Monitor charges. Everyone granted the
+shared monitoring roles can inspect the group's traces: use synthetic lab data only. Opt into payload
+capture only for a controlled debugging exercise, and restart clients after changing tracing settings.
 
 ### Optional settings
 
@@ -102,10 +117,32 @@ Set these with `azd env set <NAME> <value>` before `azd up`.
 | `AZURE_SEARCH_LOCATION` | same as `AZURE_LOCATION` | Azure AI Search has no capacity in your region (`InsufficientResourcesAvailable`; seen in swedencentral, francecentral works). |
 | `EXTERNAL_NETWORK_MCP_URL` | none | Container Apps is not possible in this subscription. See [If Container Apps is not possible](#if-container-apps-is-not-possible). |
 | `AZURE_RESOURCE_TAGS` | none | Your policies require tags. Format: `name=value;name=value`, for example `SecurityControl=Ignore;owner=jane`. |
-| `CHAT_MODEL_NAME`, `CHAT_MODEL_VERSION`, `CHAT_MODEL_SKU` | `gpt-5.4-mini`, `2026-03-17`, `GlobalStandard` | Another model or deployment type (for example `DataZoneStandard` to keep data in the EU). |
+| `CHAT_MODEL_NAME`, `CHAT_MODEL_VERSION` | `model-router`, `2025-11-18` | Use another supported model/version. When changing models, also choose an appropriate deployment name. |
+| `CHAT_MODEL_DEPLOYMENT_NAME` | `model-router` | Name exported as `AZURE_AI_MODEL_DEPLOYMENT_NAME` in the participant handout. |
+| `CHAT_MODEL_SKU` | `GlobalStandard` | `DataZoneStandard` for routing within the deployment's data zone (EU for an EU region), where supported and quota is available. |
+| `CHAT_MODEL_ROUTING_MODE` | `balanced` | `quality` or `cost`. This is a shared deployment setting, not a participant prompt/reasoning setting; ignored for non-router models. |
 | `CHAT_MODEL_CAPACITY` | `100` | Thousands of tokens per minute, shared by everyone. Count about 10 per participant. |
 
 With a model that does not support reasoning, participants set `SUPPORTBUDDY_REASONING_EFFORT=off` in `.env`.
+
+The default matches the workshop's existing `model-router` deployment: model version `2025-11-18`,
+**Global Standard**, **balanced** routing and no restricted model subset. Fresh environments use the
+capacity above; changing these source defaults does not reprovision an existing environment or replace
+its saved azd settings. Existing deployments and local participant configuration remain unchanged until
+the instructor deliberately updates them.
+
+The template uses the `2025-10-01-preview` deployment API for the router's `routing.mode` setting.
+It deliberately omits `routing.models`: Azure then routes across all available models in that router
+version, rather than a hard-coded subset that can become stale. Underlying models do not need separate
+deployments, **except Claude**: Anthropic models require matching deployments in the same Foundry account
+and SKU before you explicitly select them. This lab does not provision Claude or accept extra provider
+terms on your behalf. To limit the pool, configure a supported subset in Foundry and manage that change
+in your deployment template; do not put routing policy in participant instructions.
+
+For example, set `CHAT_MODEL_ROUTING_MODE` to `quality` or `cost` with `azd env set`, then apply with
+`azd provision`. Allow up to five minutes for routing changes to take effect. Check saved model/version,
+deployment-name and SKU overrides before reprovisioning an older environment. See
+[Model router deployment settings](https://learn.microsoft.com/azure/foundry/openai/how-to/model-router#optional-customize-deployment-settings).
 
 ### If Container Apps is not possible
 
@@ -131,6 +168,9 @@ add people to the group later; nothing has to be redeployed).
 | Foundry User | Foundry resource | Stages 1-13 |
 | Search Index Data Reader | Search service | Stage 8 |
 | Foundry Project Manager | Foundry resource | Stage 14 (deploy a hosted agent) |
+| Monitoring Metrics Publisher | Application Insights | Send traces with the signed-in identity (Stage 10) |
+| Monitoring Reader | Application Insights | View the shared monitoring resource and traces |
+| Log Analytics Reader | Log Analytics workspace | Query the shared lab's logs |
 
 Guests from another tenant need to be invited into the tenant first, and sign in with
 `az login --tenant <tenant-id>`. The person who ran `azd up` gets all the roles above.
@@ -155,7 +195,10 @@ and the lab's `src/.env` filled in.
 
 ### 1. Model deployments
 
-- A chat model (for example `gpt-5.4-mini`) for the agents and the Foundry evaluators.
+- A `model-router` deployment (version `2025-11-18`, Global Standard or Data Zone Standard) for the agents
+  and the Foundry evaluators. Use **balanced** routing and the unrestricted available model pool by
+  default; **quality** and **cost** are optional shared deployment profiles. Use the existing deployment
+  name in `AZURE_AI_MODEL_DEPLOYMENT_NAME` rather than creating a duplicate.
 - An embedding model (for example `text-embedding-3-small`) for Foundry Memory.
 
 ### 2. Foundry IQ knowledge base (Stage 8)
@@ -245,6 +288,21 @@ azd ai connection create supportbuddy-runbooks-kb --kind remote-tool \
 ```
 
 `toolbox.py` refers to these two connection names.
+
+#### Shared Application Insights (Stage 10)
+
+The instructor also creates a workspace-based Application Insights resource in the lab resource group,
+reusing its Log Analytics workspace. Keep both even if the network MCP server runs elsewhere.
+Under the Foundry project's **Observability > Traces** settings, connect that Application Insights
+resource. Assign the monitoring roles in the table above to the instructor and participants.
+Give participants `SUPPORTBUDDY_TRACING=true` and `SUPPORTBUDDY_TRACE_CONTENT=false` for their `src/.env`;
+do not distribute the connection string.
+
+With Option A these steps are automatic, including the `supportbuddy-appinsights` project connection.
+For an existing environment, the setup hook requires `APPLICATIONINSIGHTS_RESOURCE_ID` alongside the
+other required azd values and refuses to report success if tracing cannot be connected.
+See the [Stage 10 tracing exercise](../docs/workshop.md#optional-trace-the-prompt-agent-and-approval-flow)
+for a fresh-conversation verification and troubleshooting queries.
 
 ### 5. Foundry Memory store (Stage 11)
 

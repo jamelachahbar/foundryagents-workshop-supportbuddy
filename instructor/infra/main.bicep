@@ -23,9 +23,15 @@ param principalType string = 'User'
 param participantsGroupId string = ''
 
 @description('Chat model for the agents and the evaluators.')
-param chatModelName string = 'gpt-5.4-mini'
-param chatModelVersion string = '2026-03-17'
+param chatModelName string = 'model-router'
+param chatModelVersion string = '2025-11-18'
+@description('Deployment name handed to participants. Match an existing deployment when reusing an environment.')
+param chatModelDeploymentName string = 'model-router'
+@allowed(['GlobalStandard', 'DataZoneStandard'])
 param chatModelSku string = 'GlobalStandard'
+@description('Model-router routing profile. No model subset is specified, so all available models in the router version are eligible.')
+@allowed(['balanced', 'quality', 'cost'])
+param chatModelRoutingMode string = 'balanced'
 @description('Capacity in thousands of tokens per minute, shared by all participants.')
 param chatModelCapacity string = '100'
 
@@ -63,7 +69,14 @@ module lab 'resources.bicep' = {
     principalId: principalId
     principalType: principalType
     participantsGroupId: participantsGroupId
-    chatModel: { name: chatModelName, version: chatModelVersion, sku: chatModelSku, capacity: int(chatModelCapacity) }
+    chatModel: {
+      name: chatModelName
+      version: chatModelVersion
+      deploymentName: chatModelDeploymentName
+      sku: chatModelSku
+      capacity: int(chatModelCapacity)
+      routingMode: chatModelRoutingMode
+    }
     embeddingModel: { name: embeddingModelName, version: embeddingModelVersion, sku: embeddingModelSku, capacity: embeddingModelCapacity }
     externalNetworkMcpUrl: externalNetworkMcpUrl
     networkMcpExists: networkMcpExists
@@ -80,3 +93,4 @@ output FOUNDRY_PROJECT_ID string = lab.outputs.projectId
 output SUPPORTBUDDY_GUARDRAIL_ID string = lab.outputs.guardrailId
 output NETWORK_MCP_URL string = lab.outputs.networkMcpUrl
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = lab.outputs.registryEndpoint
+output APPLICATIONINSIGHTS_RESOURCE_ID string = lab.outputs.applicationInsightsResourceId

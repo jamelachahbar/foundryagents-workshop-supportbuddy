@@ -14,9 +14,13 @@ from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import httpx
+from opentelemetry import trace
+from opentelemetry.propagate import inject
+from opentelemetry.trace import StatusCode
 
 from contact_centre.conversations import Conversation, ConversationStore
 from lab_backend import backend
+from lab_telemetry import record_approval, record_event, record_input, tracer
 
 HANDOVER_TOOL = "escalate_to_human"
 SUPPORTBUDDY_PATH = "/ag-ui/supportbuddy/{who}"
@@ -48,19 +52,43 @@ Runner = Callable[[str, dict[str, Any]], AsyncIterator[dict[str, Any]]]
 
 
 def tool_name(name: str) -> str:
-    """Toolbox tools carry a prefix (network___check_equipment); the contact centre ignores it."""
-    return name.split("___")[-1]
+    """Foundry can render a toolbox namespace with triple underscores or a dot."""
+    name = name.split("___")[-1]
+    for namespace in ("network", "runbooks"):
+        prefix = f"{namespace}."
+        if name.startswith(prefix):
+            return name[len(prefix):]
+    return name
+
+
+def _tool_json(text: str) -> Any:
+    """Foundry may append a duplicate structuredResponse JSON document to the text result."""
+    text = text.lstrip()
+    value, end = json.JSONDecoder().raw_decode(text)
+    remainder = text[end:].strip()
+    if remainder:
+        duplicate = json.loads(remainder)
+        if not isinstance(duplicate, dict) or duplicate != {"structuredResponse": value}:
+            raise ValueError("Conflicting or unsupported extra JSON in a tool result.")
+    return value
 
 
 def tool_result(content: Any) -> dict[str, Any] | None:
-    """A tool result as a dict: plain JSON from a local tool, or an MCP result whose content holds the JSON text."""
+    """Unwrap local JSON and nested MCP text envelopes, including Foundry's outer content list."""
     try:
-        value = json.loads(content) if isinstance(content, str) else content
-        if isinstance(value, dict) and isinstance(value.get("content"), list) and "_meta" in value:
-            texts = [item.get("text") for item in value["content"] if isinstance(item, dict) and item.get("text")]
-            value = json.loads(texts[0]) if texts else value.get("structuredContent")
-        if isinstance(value, list) and value and isinstance(value[0], dict) and "text" in value[0]:
-            value = json.loads(value[0]["text"])
+        value = _tool_json(content) if isinstance(content, str) else content
+        while True:
+            if isinstance(value, dict) and isinstance(value.get("content"), list):
+                if value.get("isError"):
+                    return None
+                structured = value.get("structuredContent")
+                if isinstance(structured, dict):
+                    return structured
+                value = value["content"]
+            if isinstance(value, list) and value and isinstance(value[0], dict) and "text" in value[0]:
+                value = _tool_json(value[0]["text"])
+                continue
+            break
     except (ValueError, TypeError):
         return None
     return value if isinstance(value, dict) else None
@@ -70,12 +98,30 @@ def http_runner(base_url: str) -> Runner:
     """Call an AG-UI endpoint and yield its events."""
 
     async def run(path: str, body: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
-        async with httpx.AsyncClient(base_url=base_url, timeout=httpx.Timeout(300, connect=10)) as client:
-            async with client.stream("POST", path, json=body, headers={"Accept": "text/event-stream"}) as response:
-                response.raise_for_status()
-                async for line in response.aiter_lines():
-                    if line.startswith("data:"):
-                        yield json.loads(line[5:])
+        span = tracer.start_span("supportbuddy.turn", attributes={
+            "gen_ai.conversation.id": body["threadId"],
+            "supportbuddy.run.id": body["runId"],
+            "supportbuddy.agent.route": path.rsplit("/", 1)[0],
+        })
+        try:
+            record_input(span, body)
+            headers = {"Accept": "text/event-stream"}
+            # Do not keep a contextvars token attached across an async-generator yield.
+            inject(headers, context=trace.set_span_in_context(span))
+            async with httpx.AsyncClient(base_url=base_url, timeout=httpx.Timeout(300, connect=10)) as client:
+                async with client.stream("POST", path, json=body, headers=headers) as response:
+                    response.raise_for_status()
+                    async for line in response.aiter_lines():
+                        if line.startswith("data:"):
+                            event = json.loads(line[5:])
+                            record_event(span, event)
+                            yield event
+        except Exception as error:
+            span.record_exception(error)
+            span.set_status(StatusCode.ERROR)
+            raise
+        finally:
+            span.end()
 
     return run
 
@@ -117,8 +163,11 @@ class ContactCentre:
     async def customer_approval(self, conversation: Conversation, interrupt_id: str, approved: bool) -> None:
         approval = self._pending_approval(conversation.transcript, interrupt_id)
         approval["status"] = "approved" if approved else "rejected"
+        record_approval(conversation.id, approval, approved)
         self.store.publish_message(conversation, approval)
-        resume = [{"interruptId": interrupt_id, "status": "resolved", "payload": {"approved": approved}}]
+        resume = self._approval_resume(conversation.transcript, approval)
+        if resume is None:
+            return
         await self._run_supportbuddy(conversation, resume=resume)
 
     # ----- advisor side ----------------------------------------------------------------------
@@ -182,16 +231,23 @@ class ContactCentre:
     async def assist_approval(self, conversation: Conversation, advisor: str, interrupt_id: str, approved: bool) -> None:
         approval = self._pending_approval(conversation.assist_transcript, interrupt_id)
         approval["status"] = "approved" if approved else "rejected"
+        record_approval(conversation.id, approval, approved)
+        approval["advisor"] = advisor
         self.store.publish_assist(conversation, approval)
-        if approved:
+        resume = self._approval_resume(conversation.assist_transcript, approval)
+        if resume is None:
+            return
+        for decision in self._approval_batch(conversation.assist_transcript, approval):
+            if decision["status"] != "approved":
+                continue
             # The customer sees every action taken on their service, and who approved it.
-            done = DONE_TEXT.get(approval["tool"], f"ran {approval['tool']} on your service.")
-            self.store.add(conversation, "system", f"{advisor} {done}")
+            done = DONE_TEXT.get(decision["tool"], f"ran {decision['tool']} on your service.")
+            approver = decision["advisor"]
+            self.store.add(conversation, "system", f"{approver} {done}")
             conversation.agent_history.append({
                 "id": uuid.uuid4().hex, "role": "assistant",
-                "content": f"(Human advisor {advisor} {done} This is done; do not run it again.)",
+                "content": f"(Human advisor {approver} {done} This is done; do not run it again.)",
             })
-        resume = [{"interruptId": interrupt_id, "status": "resolved", "payload": {"approved": approved}}]
         await self._run_assist(conversation, resume=resume)
 
     # ----- AG-UI -----------------------------------------------------------------------------
@@ -322,6 +378,7 @@ class ContactCentre:
                             "approval",
                             APPROVAL_TEXT.get(name, f"Allow {name}?"),
                             interrupt_id=interrupt["id"],
+                            approval_batch=body["runId"],
                             tool=name,
                             arguments=call.get("arguments") or {},
                             status="pending",
@@ -331,6 +388,29 @@ class ContactCentre:
         except httpx.HTTPError as error:
             add("system", "Sorry, the assistant is not reachable right now. Please try again.", error=str(error))
         return handover
+
+    @staticmethod
+    def _approval_batch(transcript: list[dict[str, Any]], approval: dict[str, Any]) -> list[dict[str, Any]]:
+        return [
+            message for message in transcript
+            if message["role"] == "approval" and message["approval_batch"] == approval["approval_batch"]
+        ]
+
+    @classmethod
+    def _approval_resume(
+        cls, transcript: list[dict[str, Any]], approval: dict[str, Any]
+    ) -> list[dict[str, Any]] | None:
+        batch = cls._approval_batch(transcript, approval)
+        if any(message["status"] == "pending" for message in batch):
+            return None
+        return [
+            {
+                "interruptId": message["interrupt_id"],
+                "status": "resolved",
+                "payload": {"approved": message["status"] == "approved"},
+            }
+            for message in batch
+        ]
 
     @staticmethod
     def _pending_approval(transcript: list[dict[str, Any]], interrupt_id: str) -> dict[str, Any]:

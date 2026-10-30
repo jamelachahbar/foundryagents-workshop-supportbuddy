@@ -15,7 +15,7 @@ import pytest
 import uvicorn
 from fastapi.testclient import TestClient
 
-from contact_centre.centre import ASSIST_PATH, ContactCentre
+from contact_centre.centre import ASSIST_PATH, ContactCentre, tool_name
 from contact_centre.server import create_app
 from lab_backend import backend
 
@@ -65,6 +65,18 @@ def run(coroutine):
     return asyncio.run(coroutine)
 
 
+@pytest.mark.parametrize("name, expected", [
+    ("network___identify_customer", "identify_customer"),
+    ("network.identify_customer", "identify_customer"),
+    ("runbooks.knowledge_base_retrieve", "knowledge_base_retrieve"),
+    ("another_namespace___custom_tool", "custom_tool"),
+    ("restart_modem", "restart_modem"),
+    ("unrelated.custom_tool", "unrelated.custom_tool"),
+])
+def test_tool_names_preserve_local_names_and_normalize_toolbox_namespaces(name, expected):
+    assert tool_name(name) == expected
+
+
 def test_supportbuddy_answers_with_progress_and_streamed_text():
     agents = ScriptedAgents(
         tool("c1", "network___identify_customer", {"found": True})
@@ -93,10 +105,11 @@ def test_supportbuddy_answers_with_progress_and_streamed_text():
     assert conversation.identified is None
 
 
-def test_desk_learns_the_customer_supportbuddy_identified():
+@pytest.mark.parametrize("name", ["network___identify_customer", "network.identify_customer"])
+def test_desk_learns_the_customer_supportbuddy_identified(name):
     found = {"found": True, "customer": {"customer_id": "CUST-1003", "name": "Sofia Costa"}}
     agents = ScriptedAgents(
-        [{"type": "TOOL_CALL_START", "toolCallId": "c1", "toolCallName": "network___identify_customer"},
+        [{"type": "TOOL_CALL_START", "toolCallId": "c1", "toolCallName": name},
          {"type": "TOOL_CALL_RESULT", "toolCallId": "c1", "content": json.dumps([{"type": "text", "text": json.dumps(found)}])}]
         + text("m1", "Found you.") + [{"type": "RUN_FINISHED"}]
     )
@@ -115,6 +128,74 @@ def test_tool_results_are_read_from_local_tools_and_from_the_foundry_toolbox():
     assert tool_result(json.dumps(data)) == data
     assert tool_result(json.dumps(toolbox)) == data
     assert tool_result("not json") is None
+
+
+@pytest.mark.parametrize("with_meta", [False, True])
+def test_desk_reads_nested_foundry_customer_results(with_meta):
+    found = {"found": True, "customer": {"customer_id": "CUST-1003", "name": "Sofia Costa"}}
+    envelope = {"content": [{"type": "text", "text": json.dumps(found)}], "isError": False}
+    if with_meta:
+        envelope["_meta"] = {"tool_configuration": {"type": "mcp"}}
+    output = [{"type": "text", "text": json.dumps(envelope), "additional_properties": {}}]
+    agents = ScriptedAgents(
+        tool("c1", "network___identify_customer", output)
+        + text("m1", "Your line is healthy.") + [{"type": "RUN_FINISHED"}]
+    )
+    centre = ContactCentre(agents, signs_in=False, agent_label="prompt agent")
+    conversation = centre.start(None)
+    run(centre.customer_message(conversation, "My Wi-Fi is slow"))
+    assert conversation.identified == found["customer"]
+    assert not conversation.busy
+    assert conversation.handover is None
+
+    centre.take(conversation, "Lea")
+    centre.advisor_message(conversation, "Lea", "Hello, I can help.")
+    run(centre.customer_message(conversation, "Thank you"))
+    assert conversation.mode == "advisor"
+    assert len(agents.calls) == 1
+    assert any(m["role"] == "advisor" and m["text"] == "Hello, I can help." for m in conversation.transcript)
+
+
+def test_tool_results_support_structured_mcp_output_and_ignore_errors():
+    from contact_centre.centre import tool_result
+
+    found = {"found": True, "customer": {"customer_id": "CUST-1003"}}
+    assert tool_result({"content": [], "structuredContent": found}) == found
+    assert tool_result({"content": [{"type": "text", "text": "not json"}]}) is None
+    assert tool_result({"content": [], "structuredContent": found, "isError": True}) is None
+
+
+@pytest.mark.parametrize("serialized", [False, True])
+def test_desk_reads_foundry_text_with_duplicate_structured_response(serialized):
+    found = {"found": True, "customer": {"customer_id": "CUST-1005", "name": "Claire Hoffmann"}}
+    output = [{
+        "type": "text",
+        "text": json.dumps(found, indent=2) + "\n" + json.dumps({"structuredResponse": found}, indent=2) + "\n",
+        "additional_properties": {},
+    }]
+    content = json.dumps(output) if serialized else output
+    agents = ScriptedAgents([
+        {"type": "TOOL_CALL_START", "toolCallId": "c1", "toolCallName": "network___identify_customer"},
+        {"type": "TOOL_CALL_RESULT", "toolCallId": "c1", "content": content},
+        {"type": "RUN_FINISHED"},
+    ])
+    centre = ContactCentre(agents, signs_in=False, agent_label="prompt agent")
+    conversation = centre.start(None)
+    run(centre.customer_message(conversation, "I'm CUST-1005, nothing loads."))
+    assert conversation.identified == found["customer"]
+
+
+@pytest.mark.parametrize("suffix", [
+    "not json",
+    '{"unrelated": true}',
+    '{"structuredResponse": {"customer": {"customer_id": "CUST-1002"}}}',
+    '{"structuredResponse": {"found": true}} trailing',
+])
+def test_tool_results_reject_conflicting_or_malformed_extra_json(suffix):
+    from contact_centre.centre import tool_result
+
+    output = [{"type": "text", "text": '{"found": true}\n' + suffix}]
+    assert tool_result(output) is None
 
 
 def test_handover_moves_the_conversation_to_a_human_advisor_and_back():
@@ -211,6 +292,58 @@ def test_customer_approval_resumes_the_run():
         run(centre.customer_approval(conversation, "approval-1", False))
     with pytest.raises(LookupError):
         run(centre.customer_approval(conversation, "unknown", True))
+
+
+@pytest.mark.parametrize("assist", [False, True])
+@pytest.mark.parametrize("decisions", [(True, False), (False, True), (True, True), (False, False)])
+def test_approval_batch_waits_for_all_decisions_and_does_not_replay_previous_batches(assist, decisions):
+    def interrupted(*ids):
+        return [{
+            "type": "RUN_FINISHED",
+            "outcome": {"type": "interrupt", "interrupts": [
+                {"id": call_id, "metadata": {"agent_framework": {
+                    "function_call": {"name": "restart_modem", "arguments": {"customer_id": "CUST-1002"}}
+                }}}
+                for call_id in ids
+            ]},
+        }]
+
+    agents = ScriptedAgents(
+        interrupted("approval-1", "approval-2"),
+        interrupted("approval-3"),
+        text("done", "Finished.") + [{"type": "RUN_FINISHED"}],
+    )
+    centre = ContactCentre(agents, signs_in=False, agent_label="test")
+    conversation = centre.start(None)
+    if assist:
+        run(centre.assist(conversation, "Lea", "Restart the modem"))
+    else:
+        run(centre.customer_message(conversation, "Restart the modem"))
+
+    def decide(call_id, approved):
+        if assist:
+            return centre.assist_approval(conversation, "Lea", call_id, approved)
+        return centre.customer_approval(conversation, call_id, approved)
+
+    run(decide("approval-2", decisions[1]))
+    assert len(agents.calls) == 1
+    assert not conversation.busy and not conversation.assist_busy
+    if assist:
+        assert not any(m["role"] == "system" and "restarted" in m["text"] for m in conversation.transcript)
+    with pytest.raises(ValueError):
+        run(decide("approval-2", decisions[1]))
+
+    run(decide("approval-1", decisions[0]))
+    assert len(agents.calls) == 2
+    assert agents.calls[1][1]["resume"] == [
+        {"interruptId": f"approval-{index}", "status": "resolved", "payload": {"approved": approved}}
+        for index, approved in enumerate(decisions, 1)
+    ]
+    run(decide("approval-3", False))
+    assert len(agents.calls) == 3
+    assert agents.calls[2][1]["resume"] == [
+        {"interruptId": "approval-3", "status": "resolved", "payload": {"approved": False}}
+    ]
 
 
 def test_assist_works_for_the_advisor_only():
