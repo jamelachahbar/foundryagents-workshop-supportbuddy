@@ -1,9 +1,17 @@
 // Operator desk: the human advisor's workspace.
-const state = { conversations: new Map(), actions: [], selected: null };
+const state = { conversations: new Map(), actions: [], selected: null, enhanced: false };
 const ORDER = { waiting: 0, advisor: 1, agent: 2, closed: 3 };
 const advisor = () => $("#advisor").value.trim() || "Advisor";
 const reply = composer($("#text"), $("#composer"));
 const ask = composer($("#assist-text"), $("#assist-form"));
+
+fetch("/api/config").then((response) => {
+  if (!response.ok) throw new Error("Could not load contact-centre configuration.");
+  return response.json();
+}).then((config) => {
+  state.enhanced = Boolean(config.evidence_panel);
+  renderDetail();
+}).catch((error) => { $("#assist-error").textContent = error.message; });
 
 listen("/api/desk/events", (event) => {
   if (event.type === "snapshot") {
@@ -31,7 +39,7 @@ listen("/api/desk/events", (event) => {
     if (c.id === state.selected) renderControls();
   } else if (event.type === "message") {
     upsertInto(c.transcript, event.message);
-    if (c.id === state.selected) upsertMessage($("#messages"), event.message, "desk");
+    if (c.id === state.selected) upsertMessage($("#messages"), event.message, "desk", null, showDetails);
     renderQueue();
   } else if (event.type === "assist") {
     upsertInto(c.assist, event.message);
@@ -95,16 +103,18 @@ function renderActions() {
 }
 
 function renderDetail() {
+  closeEvidenceDialog();
   const c = state.conversations.get(state.selected);
   $("#pick").hidden = Boolean(c);
   $("#detail").hidden = !c;
   if (!c) {
+    updateTraceConversation(null);
     $("#assist").replaceChildren();
     $("#assist-empty").hidden = false;
     return;
   }
   $("#messages").replaceChildren();
-  for (const message of c.transcript) upsertMessage($("#messages"), message, "desk");
+  for (const message of c.transcript) upsertMessage($("#messages"), message, "desk", null, showDetails);
   $("#assist").replaceChildren();
   for (const message of c.assist) addAssist(message);
   renderControls();
@@ -115,6 +125,8 @@ function renderDetail() {
 function renderControls() {
   const c = state.conversations.get(state.selected);
   if (!c) return;
+  updateTraceConversation(c);
+  $("#traces").hidden = !state.enhanced;
   const who = customerOf(c);
   $("#title").textContent = `${c.handover?.handover_id ?? "Conversation"} - ${who ? `${who}${c.identified?.name ? ` (${c.identified.name})` : ""}` : "customer not identified yet"}`;
   const pill = $("#mode");
@@ -141,23 +153,51 @@ function renderControls() {
   $("#assist-text").disabled = assistOff;
   $("#assist-typing").textContent = c.assist_busy ? "The assist agent is working" : "";
   $("#assist-empty").hidden = c.assist.length > 0;
+  if (state.enhanced) {
+    for (const button of document.querySelectorAll(".use-suggested-reply")) button.disabled = !mine || c.assist_busy;
+  }
 }
 
 function addAssist(message) {
   $("#assist-empty").hidden = true;
   upsertMessage($("#assist"), message, "assist", approveAssist);
   // A suggested reply can be copied into the reply box; the advisor still decides what to send.
-  if (message.role === "agent" && message.text.includes("Suggested reply:")) {
+  const draft = state.enhanced ? message.reply_draft
+    : message.text.includes("Suggested reply:") ? message.text.split("Suggested reply:").pop().trim() : null;
+  if (message.role === "agent" && draft) {
     const bubble = $(`#assist [data-id="${CSS.escape(message.id)}"] .bubble`);
-    const use = el("button", "secondary", "Use as reply");
+    const use = el("button", "secondary use-suggested-reply", state.enhanced ? "Use suggested reply" : "Use as reply");
+    use.type = "button";
+    const c = state.conversations.get(state.selected);
+    use.disabled = state.enhanced && (c?.mode !== "advisor" || c.assist_busy);
     use.addEventListener("click", () => {
-      $("#text").value = message.text.split("Suggested reply:").pop().trim();
+      const c = state.conversations.get(state.selected);
+      if (state.enhanced && c?.mode !== "advisor") {
+        $("#assist-error").textContent = "Take this conversation before using a suggested reply.";
+        return;
+      }
+      if (state.enhanced && $("#text").value.trim()) {
+        $("#assist-error").textContent = "Your composer already contains a draft. Send it or clear it before using this suggestion.";
+        return;
+      }
+      if (draft.length > $("#text").maxLength) {
+        $("#assist-error").textContent = "This suggested reply exceeds the message limit. Edit or copy a shorter portion manually.";
+        return;
+      }
+      $("#assist-error").textContent = "";
+      $("#text").value = draft;
       reply.fit();
       $("#text").focus();
     });
     bubble.append(use);
   }
 }
+
+function showDetails(message, capability) {
+  showEvidenceDetails(message, capability);
+}
+
+$("#traces").addEventListener("click", () => showEvidenceDetails(null, null));
 
 async function act(action, body = {}) {
   $("#error").textContent = "";

@@ -1,4 +1,17 @@
+import json
+
 import pytest
+
+
+@pytest.fixture
+def runbook_mcp_result():
+    documents = [{"ref_id": 0, "title": "<img src=x onerror=alert(1)>", "content": "private text"}]
+    reference = {
+        "kind": "reference", "ref_id": 0, "mimeType": "application/json",
+        "uri": "https://example.invalid/synthetic-source",
+        "sourceData": {"id": "RB-09", "title": documents[0]["title"], "content": documents[0]["content"]},
+    }
+    return [{"type": "text", "text": json.dumps(documents) + "\n" + json.dumps(reference)}]
 
 
 @pytest.fixture(autouse=True)

@@ -27,6 +27,9 @@ async function init() {
 }
 
 function showStart() {
+  closeEvidenceDialog();
+  updateTraceConversation(null);
+  $("#traces").hidden = true;
   $("#start").hidden = false;
   $("#messages").hidden = $("#dock").hidden = $("#new").hidden = true;
   $("#mode").textContent = "";
@@ -77,11 +80,11 @@ function connect(id) {
       $("#start").hidden = true;
       $("#messages").hidden = $("#dock").hidden = $("#new").hidden = false;
       $("#messages").replaceChildren();
-      for (const message of event.conversation.transcript) upsertMessage($("#messages"), message, "customer", approve);
+      for (const message of event.conversation.transcript) upsertMessage($("#messages"), message, "customer", approve, showDetails);
       scrollToEnd($("#messages"));
       renderState();
     } else if (event.type === "message") {
-      upsertMessage($("#messages"), event.message, "customer", approve);
+      upsertMessage($("#messages"), event.message, "customer", approve, showDetails);
     } else if (event.type === "conversation") {
       Object.assign(state.conversation, event.summary);
       renderState();
@@ -90,7 +93,7 @@ function connect(id) {
   state.source.onerror = () => {
     // A conversation that no longer exists (the contact centre restarted): start again.
     if (state.source.readyState === EventSource.CLOSED) {
-      sessionStorage.removeItem(STORAGE_KEY);
+      // Navigation can also close the stream. Keep the saved ID until a new chat replaces it.
       showStart();
     }
   };
@@ -98,6 +101,8 @@ function connect(id) {
 
 function renderState() {
   const c = state.conversation;
+  updateTraceConversation(c);
+  $("#traces").hidden = !state.config.evidence_panel;
   const pill = $("#mode");
   pill.className = `pill ${c.mode}`;
   pill.textContent = c.mode === "advisor" ? `${c.advisor} (human advisor)` : MODE_LABEL[c.mode];
@@ -131,7 +136,14 @@ async function approve(message, approved) {
   }
 }
 
+function showDetails(message, capability) {
+  showEvidenceDetails(message, capability);
+}
+
+$("#traces").addEventListener("click", () => showEvidenceDetails(null, null));
+
 async function startOver() {
+  closeEvidenceDialog();
   const c = state.conversation;
   if (c && c.mode !== "closed") {
     // Tell the contact centre, so the operator desk sees that the customer left.
@@ -145,5 +157,13 @@ async function startOver() {
 
 $("#restart").addEventListener("click", startOver);
 $("#new").addEventListener("click", startOver);
+
+// A navigation closes SSE too; it must not be mistaken for a missing server conversation.
+window.addEventListener("pagehide", () => {
+  if (state.source) {
+    state.source.onerror = null;
+    state.source.close();
+  }
+});
 
 init();

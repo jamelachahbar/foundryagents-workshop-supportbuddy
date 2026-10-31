@@ -54,7 +54,8 @@ def _events(response):
 
 
 @pytest.mark.parametrize("approved", [True, False])
-def test_remote_mcp_history_is_not_replayed_as_local_functions_after_approval(monkeypatch, approved):
+@pytest.mark.parametrize("evidence_panel", [False, True])
+def test_remote_mcp_history_is_not_replayed_as_local_functions_after_approval(monkeypatch, approved, evidence_panel):
     requests = []
     actions = []
     conversation_ids = []
@@ -108,7 +109,9 @@ def test_remote_mcp_history_is_not_replayed_as_local_functions_after_approval(mo
         project_endpoint="https://foundry.example/api/projects/test", agent_name="test-prompt",
         credential=AzureCliCredential(), tools=[restart_modem], default_options={"store": True},
     )
-    centre = ContactCentre(lambda path, body: None, signs_in=False, agent_label="test")
+    centre = ContactCentre(
+        lambda path, body: None, signs_in=False, agent_label="test", evidence_panel=evidence_panel,
+    )
     other_path = "/ag-ui/supportbuddy/other"
     app = create_app(centre, {PATH: agent, other_path: agent})
     with TestClient(app) as client:

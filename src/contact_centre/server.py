@@ -13,6 +13,7 @@ Run it from the src folder, with the agent of your current stage:
     uv run python -m contact_centre                       # your main.py
     uv run python -m contact_centre solutions.stage_9_toolbox
     uv run python -m contact_centre --prompt-agent        # your Foundry prompt agent (Stage 10)
+    uv run python -m contact_centre solutions.stage_9_toolbox --evidence-panel  # optional AG-UI lab
 Then open http://127.0.0.1:8070
 """
 
@@ -190,7 +191,10 @@ def create_app(
 
     @app.get("/api/config")
     async def config() -> dict[str, Any]:
-        return {"agent": centre.agent_label, "signs_in": centre.signs_in, "customers": customers or []}
+        return {
+            "agent": centre.agent_label, "signs_in": centre.signs_in, "customers": customers or [],
+            **({"evidence_panel": True} if centre.evidence_panel else {}),
+        }
 
     @app.post("/api/conversations")
     async def start(request: Request) -> dict[str, Any]:
@@ -307,6 +311,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="SupportBuddy contact centre (Stage 7 and later).")
     parser.add_argument("module", nargs="?", default="main", help="Stage file to run, e.g. main or solutions.stage_9_toolbox.")
     parser.add_argument("--prompt-agent", action="store_true", help="Use your Foundry prompt agent (Stage 10) instead.")
+    parser.add_argument("--evidence-panel", action="store_true", help="Optional AG-UI lab: show live diagnostic evidence.")
     args = parser.parse_args()
 
     from contact_centre.assist import build_assist_agent
@@ -330,7 +335,10 @@ def main() -> None:
         else:
             agents[SUPPORTBUDDY_PATH.format(who="guest")] = stage_agent(args.module)
 
-    centre = ContactCentre(http_runner(f"http://127.0.0.1:{port}"), signs_in=signs_in, agent_label=label)
+    centre = ContactCentre(
+        http_runner(f"http://127.0.0.1:{port}"), signs_in=signs_in, agent_label=label,
+        evidence_panel=args.evidence_panel,
+    )
     app = create_app(centre, agents, customers=customers)
     print(
         f"\nContact centre for {label}"

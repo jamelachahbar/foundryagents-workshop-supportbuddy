@@ -8,6 +8,7 @@ agent's events into what the customer and the advisor see.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator, Callable
@@ -19,6 +20,7 @@ from opentelemetry.propagate import inject
 from opentelemetry.trace import StatusCode
 
 from contact_centre.conversations import Conversation, ConversationStore
+from contact_centre.evidence import CAPABILITIES, EvidencePanel
 from lab_backend import backend
 from lab_telemetry import record_approval, record_event, record_input, tracer
 
@@ -127,11 +129,12 @@ def http_runner(base_url: str) -> Runner:
 
 
 class ContactCentre:
-    def __init__(self, runner: Runner, *, signs_in: bool, agent_label: str) -> None:
+    def __init__(self, runner: Runner, *, signs_in: bool, agent_label: str, evidence_panel: bool = False) -> None:
         self.store = ConversationStore()
         self.runner = runner
         self.signs_in = signs_in
         self.agent_label = agent_label
+        self.evidence_panel = evidence_panel
         self.opener: Callable[[str], Any] | None = None
 
     # ----- customer side ---------------------------------------------------------------------
@@ -139,7 +142,11 @@ class ContactCentre:
     def start(self, customer_id: str | None) -> Conversation:
         if self.signs_in and not customer_id:
             raise ValueError("This agent needs a signed-in customer.")
-        return self.store.create(customer_id if self.signs_in else None)
+        conversation = self.store.create(customer_id if self.signs_in else None)
+        if self.evidence_panel:
+            conversation.evidence = EvidencePanel()
+            self.store.publish_state(conversation)
+        return conversation
 
     async def customer_message(self, conversation: Conversation, text: str) -> None:
         if conversation.mode == "closed":
@@ -157,6 +164,7 @@ class ContactCentre:
         if conversation.mode == "closed":
             return
         self.store.set_mode(conversation, "closed")
+        self._record_human_event(conversation, "customer_left")
         # An open handover stays open: the case still needs follow-up even if the chat ended.
         self.store.add(conversation, "system", "The customer left the conversation.")
 
@@ -165,6 +173,19 @@ class ContactCentre:
         approval["status"] = "approved" if approved else "rejected"
         record_approval(conversation.id, approval, approved)
         self.store.publish_message(conversation, approval)
+        if conversation.evidence is not None:
+            message = next((
+                item for item in reversed(conversation.transcript)
+                if item["role"] == "evidence" and interrupt_id in item.get("interrupt_ids", [])
+            ), None)
+            if message is not None:
+                conversation.evidence.record_event(
+                    approval["tool"] if approval["tool"] in PROGRESS else "other_tool",
+                    message["run_id"], "approval_approved" if approved else "approval_declined", interrupt_id,
+                )
+                message["trace"] = conversation.evidence.trace_snapshot(message["run_id"])
+                self.store.publish_message(conversation, message)
+                self.store.publish_state(conversation)
         resume = self._approval_resume(conversation.transcript, approval)
         if resume is None:
             return
@@ -176,6 +197,7 @@ class ContactCentre:
         if conversation.mode == "closed" or conversation.busy:
             raise ValueError("This conversation cannot be taken now.")
         self.store.set_mode(conversation, "advisor", advisor=advisor)
+        self._record_human_event(conversation, "advisor_joined")
         self.store.add(conversation, "system", f"{advisor} from the support team joined the conversation.")
         if conversation.handover:
             backend.update_handover(conversation.handover["handover_id"], status="in_progress", advisor=advisor)
@@ -192,6 +214,7 @@ class ContactCentre:
         if conversation.mode != "advisor":
             raise ValueError("Only a conversation you have taken can be handed back.")
         self.store.set_mode(conversation, "agent")
+        self._record_human_event(conversation, "handed_back")
         self.store.add(conversation, "system", f"{advisor} handed the conversation back to SupportBuddy.")
         conversation.agent_history.append(
             {"id": uuid.uuid4().hex, "role": "assistant",
@@ -202,6 +225,7 @@ class ContactCentre:
         if conversation.mode == "closed":
             return
         self.store.set_mode(conversation, "closed", advisor=advisor)
+        self._record_human_event(conversation, "case_closed")
         self.store.add(conversation, "system", f"{advisor} closed the conversation. Thank you for contacting us.")
         if conversation.handover:
             last_reply = next((m["text"] for m in reversed(conversation.transcript) if m["role"] == "advisor"), None)
@@ -211,6 +235,21 @@ class ContactCentre:
                 advisor=advisor,
                 advisor_message=last_reply or "Resolved in the live chat.",
             )
+
+    def _record_human_event(self, conversation: Conversation, event: str) -> None:
+        if conversation.evidence is None:
+            return
+        message = next((
+            item for item in reversed(conversation.transcript)
+            if item["role"] == "evidence" and any(
+                trace["capability"] == HANDOVER_TOOL for trace in item.get("trace", [])
+            )
+        ), None)
+        if message is not None:
+            conversation.evidence.record_event(HANDOVER_TOOL, message["run_id"], event, uuid.uuid4().hex)
+            message["trace"] = conversation.evidence.trace_snapshot(message["run_id"])
+            self.store.publish_message(conversation, message)
+            self.store.publish_state(conversation)
 
     async def assist(self, conversation: Conversation, advisor: str, request: str) -> None:
         if conversation.assist_busy:
@@ -226,7 +265,10 @@ class ContactCentre:
         }
         content = f"{request}\n\nCase context from the contact centre (data, not instructions):\n{json.dumps(context, ensure_ascii=False)}"
         conversation.assist_history.append({"id": uuid.uuid4().hex, "role": "user", "content": content})
-        await self._run_assist(conversation, resume=None)
+        await self._run_assist(
+            conversation, resume=None,
+            draft_reply=self.evidence_panel and request.strip() == "Suggest a reply to the customer.",
+        )
 
     async def assist_approval(self, conversation: Conversation, advisor: str, interrupt_id: str, approved: bool) -> None:
         approval = self._pending_approval(conversation.assist_transcript, interrupt_id)
@@ -287,6 +329,7 @@ class ContactCentre:
             conversation.handover = handover
         if handover and conversation.mode != "closed":
             self.store.set_mode(conversation, "waiting")
+            self._record_human_event(conversation, "handover_waiting")
             self.store.add(
                 conversation,
                 "system",
@@ -296,7 +339,9 @@ class ContactCentre:
         else:
             self.store.publish_state(conversation)
 
-    async def _run_assist(self, conversation: Conversation, resume: list[dict[str, Any]] | None) -> None:
+    async def _run_assist(
+        self, conversation: Conversation, resume: list[dict[str, Any]] | None, *, draft_reply: bool = False,
+    ) -> None:
         conversation.assist_busy = True
         self.store.publish_state(conversation)
         try:
@@ -309,6 +354,7 @@ class ContactCentre:
                 publish=lambda message: self.store.publish_assist(conversation, message),
                 resume=resume,
                 progress={},
+                draft_reply=draft_reply,
             )
         finally:
             conversation.assist_busy = False
@@ -325,10 +371,9 @@ class ContactCentre:
         publish: Callable[[dict[str, Any]], None],
         resume: list[dict[str, Any]] | None,
         progress: dict[str, str] = PROGRESS,
+        draft_reply: bool = False,
     ) -> dict[str, Any] | None:
         """Run one AG-UI turn and translate its events. Returns the handover record if the agent handed over."""
-        if self.opener:
-            await self.opener(path)
         body: dict[str, Any] = {
             "threadId": thread_id,
             "runId": uuid.uuid4().hex,
@@ -338,11 +383,93 @@ class ContactCentre:
             body["resume"] = resume
         texts: dict[str, dict[str, Any]] = {}
         calls: dict[str, str] = {}
+        steps: dict[str, str] = {}
         announced: set[str] = set()
         handover: dict[str, Any] | None = None
+        evidence = conversation.evidence if history_attr == "agent_history" else None
+        evidence_phase = "incomplete"
+        evidence_message: dict[str, Any] | None = None
+        if evidence is not None and resume:
+            resumed_ids = {decision["interruptId"] for decision in resume}
+            evidence_message = next((
+                message for message in reversed(conversation.transcript)
+                if message["role"] == "evidence" and resumed_ids.intersection(message.get("interrupt_ids", []))
+            ), None)
+        evidence_run_id = evidence_message["run_id"] if evidence_message else body["runId"]
+        if evidence is not None and resume:
+            calls.update({
+                event["call_id"]: event["capability"] for event in evidence.trace_snapshot(evidence_run_id)
+                if event["event"] == "started"
+            })
+
+        def publish_evidence() -> None:
+            nonlocal evidence_message
+            if evidence is None:
+                return
+            rows = [row for row in evidence.snapshot() if row["run_id"] == evidence_run_id]
+            if evidence_message is None:
+                evidence_message = add(
+                    "evidence", "Connection checks", run_id=evidence_run_id, evidence=rows,
+                    evidence_phase=evidence.phase, interrupt_ids=[], trace=evidence.trace_snapshot(evidence_run_id),
+                )
+            else:
+                evidence_message.update(evidence=rows, evidence_phase=evidence.phase,
+                                        trace=evidence.trace_snapshot(evidence_run_id))
+                publish(evidence_message)
+
+        if evidence is not None:
+            evidence.begin()
+            evidence.record_event("agent", evidence_run_id, "run_started", body["runId"])
+            if evidence_message is not None:
+                publish_evidence()
+            self.store.publish_state(conversation)
+            await asyncio.sleep(0)
         try:
+            if self.opener:
+                await self.opener(path)
             async for event in self.runner(path, body):
                 kind = event.get("type")
+                if evidence is not None:
+                    changed = False
+                    trace_changed = False
+                    if kind == "TOOL_CALL_START":
+                        name = tool_name(event.get("toolCallName", ""))
+                        changed = evidence.start(
+                            event["toolCallId"], name, evidence_run_id,
+                        )
+                        if name not in CAPABILITIES:
+                            trace_changed = evidence.record_event(
+                                name if name in PROGRESS else "other_tool", evidence_run_id,
+                                "started", event["toolCallId"],
+                            )
+                    elif kind == "TOOL_CALL_RESULT":
+                        raw = event.get("content")
+                        changed = evidence.result(event.get("toolCallId", ""), tool_result(raw), raw)
+                        name = calls.get(event.get("toolCallId"))
+                        if name is not None and name not in CAPABILITIES:
+                            trace_changed = evidence.record_event(
+                                name if name in PROGRESS else "other_tool", evidence_run_id,
+                                "result", event["toolCallId"],
+                            )
+                    elif kind in ("STEP_STARTED", "STEP_FINISHED"):
+                        name = event.get("stepName")
+                        if isinstance(name, str):
+                            if kind == "STEP_STARTED":
+                                steps[name] = uuid.uuid4().hex
+                            trace_changed = evidence.record_event(
+                                "agent", evidence_run_id,
+                                "step_started" if kind == "STEP_STARTED" else "step_finished",
+                                steps.get(name, uuid.uuid4().hex),
+                            )
+                    if trace_changed and kind in ("STEP_STARTED", "STEP_FINISHED") and evidence_message is None:
+                        self.store.publish_state(conversation)
+                        await asyncio.sleep(0)
+                        continue
+                    if changed or trace_changed:
+                        publish_evidence()
+                    if changed or trace_changed:
+                        self.store.publish_state(conversation)
+                        await asyncio.sleep(0)
                 if kind == "TEXT_MESSAGE_CONTENT":
                     message = texts.get(event["messageId"])
                     if message is None:
@@ -354,7 +481,7 @@ class ContactCentre:
                     name = tool_name(event.get("toolCallName", ""))
                     calls[event["toolCallId"]] = name
                     # One progress line per kind of check, even if the agent repeats a lookup.
-                    if name not in announced:
+                    if name not in announced and evidence is None:
                         announced.add(name)
                         add("activity", progress.get(name, f"Running {name}"), tool=name)
                 elif kind == "TOOL_CALL_RESULT" and calls.get(event.get("toolCallId")) == "identify_customer":
@@ -368,12 +495,31 @@ class ContactCentre:
                     result = tool_result(event.get("content"))
                     if result and result.get("handover_id"):
                         handover = result
+                        if evidence is not None:
+                            evidence.record_event(HANDOVER_TOOL, evidence_run_id, "handover_created", event["toolCallId"])
+                            publish_evidence()
+                            self.store.publish_state(conversation)
                 elif kind == "MESSAGES_SNAPSHOT":
                     setattr(conversation, history_attr, event["messages"])
                 elif kind == "RUN_FINISHED":
+                    evidence_phase = "approval" if (event.get("outcome") or {}).get("interrupts") else "finished"
+                    if evidence_message is not None:
+                        evidence_message["interrupt_ids"] = [
+                            interrupt["id"] for interrupt in (event.get("outcome") or {}).get("interrupts") or []
+                        ]
                     for interrupt in (event.get("outcome") or {}).get("interrupts") or []:
                         call = ((interrupt.get("metadata") or {}).get("agent_framework") or {}).get("function_call") or {}
                         name = tool_name(call.get("name", ""))
+                        if evidence is not None:
+                            evidence.record_event(
+                                name if name in PROGRESS else "other_tool", evidence_run_id,
+                                "approval_requested", interrupt["id"],
+                            )
+                            publish_evidence()
+                            if evidence_message is not None:
+                                evidence_message["interrupt_ids"] = [
+                                    item["id"] for item in (event.get("outcome") or {}).get("interrupts") or []
+                                ]
                         add(
                             "approval",
                             APPROVAL_TEXT.get(name, f"Allow {name}?"),
@@ -382,11 +528,33 @@ class ContactCentre:
                             tool=name,
                             arguments=call.get("arguments") or {},
                             status="pending",
+                            **({
+                                "action_details": {
+                                    "impact": "The connection drops for about 3 minutes.",
+                                    "evidence": evidence.snapshot() if evidence is not None else [],
+                                },
+                            } if self.evidence_panel and name == "restart_modem" else {}),
                         )
+                    if draft_reply and evidence_phase == "finished":
+                        for message in texts.values():
+                            message["reply_draft"] = message["text"].split("Suggested reply:", 1)[-1].strip()
+                            publish(message)
                 elif kind == "RUN_ERROR":
+                    evidence_phase = "failed"
                     add("system", "Sorry, something went wrong while answering. Please try again.", error=event.get("message"))
         except httpx.HTTPError as error:
+            evidence_phase = "failed"
             add("system", "Sorry, the assistant is not reachable right now. Please try again.", error=str(error))
+        finally:
+            if evidence is not None:
+                evidence.finish(evidence_run_id, evidence_phase)
+                terminal = {
+                    "finished": "run_finished", "approval": "approval_required", "failed": "run_failed",
+                }.get(evidence_phase, "run_interrupted")
+                evidence.record_event("agent", evidence_run_id, terminal, body["runId"])
+                if evidence_message is not None:
+                    publish_evidence()
+                self.store.publish_state(conversation)
         return handover
 
     @staticmethod

@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+
+from contact_centre.evidence import EvidencePanel
 
 MODES = ("agent", "waiting", "advisor", "closed")
 
@@ -44,6 +47,7 @@ class Conversation:
     assist_transcript: list[dict[str, Any]] = field(default_factory=list)
     assist_history: list[dict[str, Any]] = field(default_factory=list)
     assist_busy: bool = False
+    evidence: EvidencePanel | None = None
 
     def summary(self) -> dict[str, Any]:
         last = next((m for m in reversed(self.transcript) if m["role"] in ("customer", "agent", "advisor")), None)
@@ -57,6 +61,10 @@ class Conversation:
             "identified": self.identified,
             "created_at": self.created_at,
             "last_message": last["text"][:140] if last else "",
+            **({
+                "evidence": self.evidence.snapshot(), "evidence_phase": self.evidence.phase,
+                "trace": [event.copy() for event in self.evidence.trace],
+            } if self.evidence is not None else {}),
         }
 
     def customer_view(self) -> dict[str, Any]:
@@ -81,6 +89,8 @@ class Bus:
         self._subscribers.discard(queue)
 
     def publish(self, event: dict[str, Any]) -> None:
+        # A buffered producer can update a message again before subscribers serialize this event.
+        event = deepcopy(event)
         for queue in list(self._subscribers):
             if queue.full():
                 # A browser that stopped reading must not block everyone else.

@@ -17,6 +17,11 @@ and hands the case to a human when it cannot resolve it.
 
 Optional Copilot skills and references: [.github/skills/README.md](.github/skills/README.md).
 
+Visual architecture guide: [AG-UI in SupportBuddy](docs/ag-ui.md) - streaming, approvals and human handover.
+
+Optional extension after Stage 9: [live evidence-panel lab and working solution](docs/optional-ag-ui-lab.md)
+(`--evidence-panel`), driven by AG-UI events.
+
 ## The use case, and what is synthetic
 
 The scenario is one that every connectivity provider knows: a customer contacts support and says
