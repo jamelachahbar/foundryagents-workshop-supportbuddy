@@ -1,9 +1,11 @@
+<!-- markdownlint-disable MD033 -->
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
     <img alt="SupportBuddy - Connectivity Agent Lab" src="docs/assets/logo.svg" width="640">
   </picture>
 </p>
+<!-- markdownlint-enable MD033 -->
 
 # Build an enterprise connectivity-support agent with Microsoft Foundry
 
