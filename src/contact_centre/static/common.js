@@ -225,6 +225,17 @@ function customerProgress(event) {
   return messages[event.event] ?? "A support activity update was received.";
 }
 
+function shortIssue(findings) {
+  const text = findings.filter((row) => row.signal === "attention").map((row) => row.finding).join("; ");
+  if (text.includes("Not responding")) return "Modem not responding";
+  if (text.includes("Sync down")) return "Line sync down";
+  if (text.includes("Sync unstable")) return "Line sync unstable";
+  if (text.includes("packet loss")) return "Packet loss observed";
+  if (text.includes("open incidents returned")) return "Open area incident";
+  if (text.includes("Customer not identified")) return "Account not identified";
+  return "Issue observed";
+}
+
 function renderCustomerProgress(panel, trace) {
   const log = panel.querySelector(".evidence-progress");
   log.hidden = !trace.length;
@@ -275,6 +286,13 @@ function drawEvidenceLinks(map) {
     if (kind === "workflow") {
       const midpoint = (a.y + b.y) / 2;
       d = `M ${a.x} ${a.y + a.radius} C ${a.x} ${midpoint}, ${b.x} ${midpoint}, ${b.x} ${b.y - b.radius}`;
+    } else if (kind === "guidance") {
+      const rail = bounds.width - 4;
+      const bottom = a.y + a.radius + 16;
+      const corner = Math.min(12, Math.abs(bottom - b.y) / 2, Math.max(0, rail - b.x - b.radius));
+      d = `M ${a.x} ${a.y + a.radius} Q ${a.x} ${bottom} ${a.x + 16} ${bottom}`
+        + ` H ${rail - corner} Q ${rail} ${bottom} ${rail} ${bottom - corner}`
+        + ` V ${b.y + corner} Q ${rail} ${b.y} ${rail - corner} ${b.y} H ${b.x + b.radius}`;
     } else if (kind === "connection" && Math.abs(a.y - b.y) < 2) {
       const direction = Math.sign(b.x - a.x);
       d = `M ${a.x + direction * a.radius} ${a.y} H ${b.x - direction * b.radius}`;
@@ -295,6 +313,11 @@ function drawEvidenceLinks(map) {
       });
     }
     link.setAttribute("d", d);
+    const length = link.getTotalLength();
+    if (length > 0) {
+      link.style.setProperty("--evidence-dash", `${4 / length} ${6 / length}`);
+      link.style.setProperty("--evidence-flow-offset", String(-20 / length));
+    }
     const revealing = link.classList.contains("revealing");
     link.setAttribute("class", `evidence-link ${kind}${revealing ? " revealing" : ""}${a.checking || b.checking ? " checking" : ""}`);
   }
@@ -337,6 +360,8 @@ function renderEvidence(panel, rows, phase = "idle", onDetails, trace = []) {
   flow.setAttribute("aria-label", "Logical connection topology; not a discovered network map");
   const branches = el("ul", "evidence-branches");
   branches.setAttribute("aria-label", "Support activities; dashed links are workflow associations");
+  let completedChecks = 0;
+  let observedIssues = 0;
   for (const capability of capabilities) {
     const { label, icon: iconPath } = TOPOLOGY_TOOLS[capability] ?? GENERIC_TOOL;
     const findings = rows.filter((row) => row.capability === capability);
@@ -348,15 +373,27 @@ function renderEvidence(panel, rows, phase = "idle", onDetails, trace = []) {
       : findings.some((row) => row.status === "completed") ? "completed"
       : findings[findings.length - 1].status;
     const attention = findings.some((row) => row.signal === "attention");
+    if (status === "completed") {
+      completedChecks += 1;
+      if (attention) observedIssues += 1;
+    }
     const node = el("li", `evidence-node ${status}${attention ? " attention" : ""}`);
     node.dataset.capability = capability;
     node.setAttribute("aria-busy", String(active));
     const head = el("button", "evidence-node-head");
     head.type = "button";
-    head.setAttribute("aria-label", `${label}: ${TOOL_STATES[status] ?? "Incomplete"}. Open diagnostic inspector`);
+    const issue = attention ? shortIssue(findings) : "";
+    head.setAttribute("aria-label", `${label}: ${TOOL_STATES[status] ?? "Incomplete"}.${issue ? ` ${issue}.` : ""} Open diagnostic inspector`);
     head.setAttribute("aria-controls", "diagnostic-panel");
     head.addEventListener("click", () => {
       if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        head.getAnimations().filter((animation) => !(animation instanceof CSSTransition))
+          .forEach((animation) => animation.cancel());
+        head.animate([
+          { transform: "scale(1)" },
+          { transform: "scale(1.035)", offset: .5 },
+          { transform: "scale(1)" },
+        ], { duration: 650, iterations: 2, easing: "ease-in-out" });
         marker.animate([
           { boxShadow: "0 0 0 0 transparent" },
           { boxShadow: "0 0 0 8px color-mix(in srgb, currentColor 25%, transparent)", offset: .5 },
@@ -370,29 +407,56 @@ function renderEvidence(panel, rows, phase = "idle", onDetails, trace = []) {
     const icon = evidenceSvg("svg", { viewBox: "0 0 24 24", focusable: "false" });
     icon.append(evidenceSvg("path", { d: iconPath }));
     marker.append(icon);
+    const badge = el("span", `evidence-badge ${status}`);
+    const badgeIcon = evidenceSvg("svg", { viewBox: "0 0 24 24", focusable: "false" });
+    badgeIcon.append(evidenceSvg("path", {
+      d: status === "checking" ? "M12 5v7l4 3" : status === "failed" ? "M7 7l10 10 M17 7 7 17"
+        : status === "completed" && !attention || status === "joined" ? "m6 12 4 4 8-9"
+        : "M12 5v9 M12 18h.01",
+    }));
+    badge.append(badgeIcon);
+    marker.append(badge);
     head.append(marker, el("strong", null, label),
       el("span", `evidence-state evidence-status ${status}`, TOOL_STATES[status] ?? TOOL_STATES.incomplete),
       el("span", "evidence-detail-hint", "Inspect"));
-    if (attention) head.append(el("span", "evidence-attention", "Issue observed"));
+    if (attention) head.append(el("span", "evidence-attention", issue));
+    if (capability === "knowledge_base_retrieve") node.append(el("span", "evidence-section-label", "Guidance used"));
     node.append(head);
     (["identify_customer", "check_equipment", "get_line_status", "get_known_incidents", "knowledge_base_retrieve"]
       .includes(capability) ? flow : branches).append(node);
   }
   if (!panel.querySelector(".evidence-flow")) {
     const map = el("div", "evidence-map");
+    const resize = new ResizeObserver(() => {
+      if (map.isConnected) drawEvidenceLinks(map);
+      else resize.disconnect();
+    });
+    resize.observe(map);
     map.append(evidenceSvg("svg", { class: "evidence-links", "aria-hidden": "true", focusable: "false" }), flow, branches);
+    const pathLabel = el("span", "evidence-section-label evidence-path-label", "Connection path");
+    map.insertBefore(pathLabel, flow);
     const log = el("ol", "evidence-progress");
     log.setAttribute("role", "log");
     log.setAttribute("aria-label", "Progress updates");
     log.setAttribute("aria-live", "polite");
     log.setAttribute("aria-relevant", "additions");
-    panel.replaceChildren(
-      heading,
-      el("p", "muted", "Logical support topology \u00b7 Live AG-UI evidence"),
-      map,
-      el("p", "evidence-empty", "No diagnostic tool events were reported for this turn."),
+    const details = el("details", "evidence-progress-details");
+    const summary = el("summary", null, "Show progress details");
+    details.append(
+      summary,
       el("p", "evidence-footnote", "Solid links: logical connection path. Dashed links: guidance and support activities, not execution order. Not a discovered network; completed does not mean fixed."),
       log,
+    );
+    details.addEventListener("toggle", () => {
+      summary.textContent = details.open ? "Hide progress details" : "Show progress details";
+      if (details.open) log.scrollTop = log.scrollHeight;
+    });
+    panel.replaceChildren(
+      heading,
+      el("p", "evidence-overview"),
+      map,
+      el("p", "evidence-empty", "No diagnostic tool events were reported for this turn."),
+      details,
     );
   } else {
     // Preserve unchanged nodes so a result from one tool does not restart another tool's animation.
@@ -416,6 +480,10 @@ function renderEvidence(panel, rows, phase = "idle", onDetails, trace = []) {
     if (!live.isEqualNode(heading.lastChild)) live.replaceWith(heading.lastChild);
   }
   const map = panel.querySelector(".evidence-map");
+  panel.querySelector(".evidence-overview").textContent =
+    `${completedChecks} ${completedChecks === 1 ? "check" : "checks"} completed \u00b7 ${observedIssues} ${observedIssues === 1 ? "issue" : "issues"} observed`;
+  panel.querySelector(".evidence-path-label").hidden = !capabilities.some((capability) =>
+    ["identify_customer", "check_equipment", "get_line_status", "get_known_incidents"].includes(capability));
   const empty = !panel.querySelector(".evidence-node");
   map.hidden = empty;
   const notice = panel.querySelector(".evidence-empty");

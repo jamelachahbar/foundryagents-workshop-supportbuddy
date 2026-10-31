@@ -154,11 +154,29 @@ def test_text_deltas_reach_both_browsers_before_the_answer_and_run_finish(applic
                 button = chat.locator('[data-capability="check_equipment"] button')
                 button.hover()
                 assert button.evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
+                chat.wait_for_function("""() => Math.abs(parseFloat(getComputedStyle(
+                    document.querySelector('[data-capability="check_equipment"] button')
+                ).scale) - 1.035) < .001""")
+                assert button.evaluate("(node) => getComputedStyle(node).transitionDuration") == "0.28s"
                 button.click()
                 playwright.expect(chat.locator("#diagnostic-panel")).to_be_visible()
                 marker = button.locator(".evidence-marker")
                 assert marker.evaluate("(node) => node.getAnimations().some((animation) => animation.effect.getTiming().iterations === 2)")
                 assert marker.evaluate("(node) => getComputedStyle(node).color") == "rgb(242, 165, 22)"
+                pulse = button.evaluate("""(node) => {
+                    const animation = node.getAnimations().find((item) => item.effect.getTiming().iterations === 2);
+                    if (!animation) return null;
+                    animation.pause();
+                    animation.currentTime = 325;
+                    const peak = new DOMMatrixReadOnly(getComputedStyle(node).transform).a;
+                    animation.currentTime = 650;
+                    const settled = new DOMMatrixReadOnly(getComputedStyle(node).transform).a;
+                    animation.finish();
+                    return {peak, settled};
+                }""")
+                assert pulse is not None
+                assert pulse["peak"] == pytest.approx(1.035, abs=.001)
+                assert pulse["settled"] == pytest.approx(1, abs=.001)
                 chat.keyboard.press("Escape")
                 button.press("Tab")
                 chat.keyboard.press("Shift+Tab")
@@ -169,6 +187,8 @@ def test_text_deltas_reach_both_browsers_before_the_answer_and_run_finish(applic
                 chat.emulate_media(reduced_motion="reduce")
                 button.click()
                 assert marker.evaluate("(node) => node.getAnimations().length") == 0
+                assert button.evaluate("(node) => node.getAnimations().length") == 0
+                assert button.evaluate("(node) => getComputedStyle(node).scale") == "1"
                 assert button.evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
             assert len(calls) == 1
             assert failures == []
@@ -296,6 +316,8 @@ def test_topology_status_colors_distinguish_tool_success_from_detected_issues(ap
         try:
             page = browser.new_page()
             page.goto(base + "/chat")
+            page.locator("#begin").click()
+            playwright.expect(page.locator("#dock")).to_be_visible()
             cases = [
                 ("checking", "unknown", "Checking", "rgb(142, 203, 255)"),
                 ("completed", "observed", "Completed", "rgb(120, 223, 167)"),
@@ -323,6 +345,17 @@ def test_topology_status_colors_distinguish_tool_success_from_detected_issues(ap
                     ) == "rgb(120, 223, 167)"
                 if signal == "attention":
                     playwright.expect(page.locator(".evidence-attention")).to_have_text("Issue observed")
+                completed = int(status == "completed")
+                issue = int(status == "completed" and signal == "attention")
+                playwright.expect(page.locator(".evidence-overview")).to_have_text(
+                    f"{completed} {'check' if completed == 1 else 'checks'} completed · "
+                    f"{issue} {'issue' if issue == 1 else 'issues'} observed",
+                )
+                badge = page.locator(".evidence-badge")
+                if status == "previous":
+                    playwright.expect(badge).to_be_hidden()
+                else:
+                    playwright.expect(badge).to_be_visible()
         finally:
             browser.close()
 
@@ -401,6 +434,25 @@ def test_diagram_parallel_activity_stable_nodes_and_reduced_motion(application, 
             playwright.expect(page.locator(".evidence-node")).to_have_count(2)
             playwright.expect(page.locator(".evidence-link.guidance")).to_have_count(1)
             assert page.locator(".evidence-link.connection").count() == 0
+            for width in (1280, 390):
+                page.set_viewport_size({"width": width, "height": 900})
+                for expanded in (False, True):
+                    page.evaluate("""(expanded) => {
+                        document.querySelector(".evidence-progress-details").open = expanded;
+                        drawEvidenceLinks(document.querySelector(".evidence-map"));
+                    }""", expanded)
+                    gap = page.evaluate("""() => {
+                        const map = document.querySelector(".evidence-map").getBoundingClientRect();
+                        const bottom = Math.max(...[...document.querySelectorAll(".evidence-link")].map((link) => {
+                            const box = link.getBBox();
+                            const point = new DOMPoint(box.x, box.y + box.height).matrixTransform(link.getScreenCTM());
+                            return point.y;
+                        }));
+                        const summary = document.querySelector(".evidence-progress-details summary").getBoundingClientRect();
+                        return {gap: summary.top - bottom, contained: bottom <= map.bottom};
+                    }""")
+                    assert gap["contained"]
+                    assert gap["gap"] >= 24
             page.evaluate('window.diagramRows = []; window.drawDiagram("finished")')
             playwright.expect(page.locator(".evidence-map")).to_be_hidden()
             playwright.expect(page.locator(".evidence-node")).to_have_count(0)
@@ -449,6 +501,15 @@ def test_topology_appears_before_buffered_provider_results_and_preserves_wire_up
             playwright.expect(page.locator(".evidence-flow .evidence-status")).to_have_text(["Completed"] * 5)
             assert page.locator(".evidence").evaluate("(node) => getComputedStyle(node).backgroundColor") == "rgba(0, 0, 0, 0)"
             assert page.locator(".evidence").evaluate("(node) => getComputedStyle(node).borderTopWidth") == "0px"
+            playwright.expect(page.locator(".evidence-overview")).to_have_text("5 checks completed · 1 issue observed")
+            playwright.expect(page.locator('[data-capability="check_equipment"] .evidence-attention')).to_have_text("Modem not responding")
+            playwright.expect(page.locator(".evidence-path-label")).to_have_text("Connection path")
+            playwright.expect(page.locator('[data-capability="knowledge_base_retrieve"] .evidence-section-label')).to_have_text("Guidance used")
+            assert page.locator('[data-capability="knowledge_base_retrieve"] button').evaluate(
+                "(node) => node.getBoundingClientRect().height"
+            ) < 100
+            assert "Looks fine" not in page.locator(".evidence").inner_text()
+            assert page.get_by_role("button", name="Replay", exact=True).count() == 0
             states = page.evaluate("window.streamStates")
             assert any(any(row["status"] == "checking" for row in state["evidence"]) for state in states)
             assert len({state["id"] for state in states}) == 1
@@ -467,10 +528,29 @@ def test_topology_appears_before_buffered_provider_results_and_preserves_wire_up
             assert page.locator('[data-capability="check_equipment"].attention').count() == 1
             assert page.locator(".evidence-link.connection").count() == 3
             assert page.locator(".evidence-link.guidance").count() == 1
+            assert "Q" in page.locator(".evidence-link.guidance").get_attribute("d")
+            assert "C" in page.locator(".evidence-link.workflow").get_attribute("d")
+            for link in page.locator(".evidence-link.guidance, .evidence-link.workflow").all():
+                dash = link.evaluate("""(node) => {
+                    const values = node.style.getPropertyValue("--evidence-dash").split(" ").map(Number);
+                    return values.map((value) => value * node.getTotalLength());
+                }""")
+                assert dash == pytest.approx([4, 6])
             assert page.locator(".evidence-flow").evaluate(
                 "(node) => getComputedStyle(node).gridTemplateColumns.split(' ').length"
             ) == 4
-            page.locator(".evidence").screenshot(path=str(tmp_path / "topology-desktop.png"))
+            page.mouse.move(5, 5)
+            page.locator(".evidence").screenshot(path=str(tmp_path / "topology-desktop.png"), animations="disabled")
+            page.locator(".evidence-progress-details summary").click()
+            playwright.expect(page.locator(".evidence-progress")).to_be_visible()
+            page.set_viewport_size({"width": 1280, "height": 1400})
+            page.locator(".evidence").screenshot(path=str(tmp_path / "progress-expanded.png"), animations="disabled")
+            page.locator(".evidence-progress-details summary").click()
+            page.set_viewport_size({"width": 1280, "height": 1000})
+            page.locator("#traces").click()
+            playwright.expect(page.locator(".diagnostic-event")).to_have_count(16)
+            page.screenshot(path=str(tmp_path / "trace-drawer-desktop.png"), animations="disabled")
+            page.get_by_role("button", name="Close traces").click()
             page.set_viewport_size({"width": 390, "height": 844})
             assert page.locator(".evidence-flow").evaluate(
                 "(node) => getComputedStyle(node).gridTemplateColumns.split(' ').length"
@@ -528,6 +608,16 @@ def test_topology_reveals_nodes_and_links_at_real_tool_starts_in_both_views(appl
                     playwright.expect(page.locator(".evidence-links path")).to_have_count(link_count)
                     playwright.expect(page.locator(".evidence-progress .progress-event.started")).to_have_count(index + 1)
                     assert page.locator(".evidence-progress").get_attribute("aria-live") == "polite"
+                    if index == 0:
+                        playwright.expect(page.locator(".evidence-progress")).to_be_hidden()
+                        playwright.expect(page.locator(".evidence-footnote")).to_be_hidden()
+                        summary = page.locator(".evidence-progress-details summary")
+                        summary.focus()
+                        summary.press("Enter")
+                        playwright.expect(page.locator(".evidence-progress")).to_be_visible()
+                        playwright.expect(summary).to_have_text("Hide progress details")
+                    else:
+                        assert page.locator(".evidence-progress-details").evaluate("(node) => node.open")
                     assert page.locator(".evidence-node.checking").count() == 1
                     assert page.locator(".evidence-status.not_checked").count() == 0
                     if index:
@@ -658,9 +748,18 @@ def test_new_tools_render_individual_branches_progress_logs_and_animated_connect
             playwright.expect(page.locator(".evidence-live")).to_have_text("Agent turn finished")
             playwright.expect(unknown.locator(".evidence-status")).to_have_text(["Result received"] * 2)
             playwright.expect(page.locator(".progress-event")).to_have_count(20)
+            playwright.expect(page.locator(".evidence-progress")).to_be_hidden()
+            page.locator(".evidence-progress-details summary").click()
+            playwright.expect(page.locator(".evidence-progress")).to_be_visible()
+            expanded_height = page.locator(".evidence").evaluate("(node) => node.getBoundingClientRect().height")
+            page.locator(".evidence-progress-details summary").click()
+            playwright.expect(page.locator(".evidence-progress")).to_be_hidden()
+            collapsed_height = page.locator(".evidence").evaluate("(node) => node.getBoundingClientRect().height")
+            assert expanded_height - collapsed_height >= 200
             page.reload()
             playwright.expect(unknown).to_have_count(2)
             playwright.expect(page.locator(".progress-event")).to_have_count(20)
+            playwright.expect(page.locator(".evidence-progress")).to_be_hidden()
             assert "private" not in page.locator(".evidence").inner_text()
             assert page.locator(".evidence script").count() == 0
             page.set_viewport_size({"width": 390, "height": 844})

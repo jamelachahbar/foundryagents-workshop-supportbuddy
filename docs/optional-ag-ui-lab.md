@@ -71,6 +71,27 @@ requests remain unchanged. A later agent turn gets its own card; earlier cards r
 findings. Approval continuation updates the same card rather than creating another one.
 No new Azure resources, prompt-agent publication or toolbox version is needed.
 
+### Current UI screenshots
+
+These screenshots were captured from the current application in Chromium using scripted AG-UI
+events and synthetic lab data. They illustrate the optional mode, not the default numbered stages
+or a live model's timing. Animations were allowed to settle for the captures.
+
+**Default compact view:** the connection path, guidance and human-handover node remain visible;
+logs and explanatory text stay collapsed, with space between the trace and the disclosure.
+
+![Optional AG-UI topology with status badges, compact guidance, waiting advisor and collapsed progress details](assets/ag-ui/topology-collapsed.png)
+
+**Details on demand:** expanding the disclosure reveals the safe progress log without adding
+another diagnostic run. This capture shows the latest entries in the independently scrolling log.
+
+![Expanded progress details below the topology, with clear separation from the connecting traces](assets/ag-ui/progress-expanded.png)
+
+**Trace drawer:** the desktop chat makes room for the conversation-wide event timeline.
+The answer remains in chat; node clicks can filter the drawer to one capability and turn.
+
+![Customer chat alongside the live conversation trace drawer, showing the topology, answer and waiting handover](assets/ag-ui/trace-drawer.png)
+
 ### What you should see, event by event
 
 The topology is revealed by **tool activity**, not by a timer or by parsing the final answer.
@@ -125,9 +146,10 @@ The same `--evidence-panel` switch enables three controlled-UI improvements insp
    There is no modal backdrop or focus trap; the desktop chat remains interactive beside the drawer.
    No extra diagnostic runs or model calls are made. Customer identity details remain limited
    to identified/not identified; runbooks expose a document count, not raw documents or source URLs.
-   Node buttons stay transparent even on hover. Clicking briefly pulses the icon in its existing
-   status color; keyboard focus uses an outline around the icon rather than a filled tile.
-   Reduced-motion preferences disable the click pulse.
+   Node buttons stay transparent and gently grow by 3.5% on hover, settling smoothly when the pointer
+   leaves. Clicking gives the whole node a brief grow-and-settle pulse, alongside the icon's existing
+   status-colored halo. Keyboard focus uses an outline around the icon rather than a filled tile.
+   Reduced-motion preferences disable hover scaling and click pulses.
 2. **Review a restart approval.** The optional approval card includes the expected connection
    interruption and any observed modem evidence, labelled with its evidence status.
    The original pending tool arguments remain visible and define the requested target;
@@ -182,6 +204,13 @@ using the actual run outcome and approval interrupts. Reduced-motion preferences
 ### Customer-facing logs and interaction principles
 
 The borderless topology includes a **Progress updates** log in chat, mirrored on the desk.
+The log and link explanations are **collapsed by default** under **Show progress details**, keeping
+the agent's answer closer to the diagram. Expand it with a click or keyboard activation; **Hide
+progress details** collapses it again. Its open/closed state survives streamed updates within that
+page, while browser reload starts collapsed. Node inspectors and the trace drawer remain available
+without expanding the log.
+The diagram reserves bottom space for its guidance trace and leaves at least 24px between that
+trace and the progress disclosure, including on narrow screens and with details expanded.
 It records friendly tool starts, validated diagnostic completions, unprojected results, interruptions,
 approval requests/decisions and human ownership transitions. If the adapter emits optional
 `STEP_STARTED` / `STEP_FINISHED` events, they appear as generic processing steps; internal step names
@@ -245,6 +274,19 @@ be sent without imposing a fake duration on a tool. If the provider buffers even
 indicator remains visible until those events arrive; the topology is not created early to hide buffering.
 
 ### Relationship to the official AG-UI examples
+
+The visual reference also borrows ideas from the user-shared **SupportBuddy Topology** mockup:
+a compact **checks completed / issues observed** summary, corner status badges, short issue labels
+and a distinct **Guidance used** row. Counts represent completed diagnostic capabilities, not
+the number of devices returned, and exclude neutral unprojected tool results. Failed or still-running
+checks are not counted as completed. Guidance remains a compact, borderless branch beneath the
+labelled connection path, rather than another tall checklist column.
+The original smooth workflow traces are retained, with rounded guidance turns and consistent
+small dash spacing on desktop and mobile. Trace animations are not replaced by oversized
+mockup-style dashed rails.
+Unlike the mockup, we do not use **Looks fine** as a health guarantee or add a **Replay** control
+that could be mistaken for another diagnostic run. Node inspection, real event streaming,
+collapsed details and human-ownership transitions remain the application-owned behavior.
 
 The [official Dojo](https://dojo.ag-ui.com/) showcases controlled generative UI:
 application-owned components rendered from agent activity. The

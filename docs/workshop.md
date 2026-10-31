@@ -1218,6 +1218,11 @@ From the moment of the handover, the contact centre stops sending the customer's
 a person owns the conversation. When the advisor hands it back, SupportBuddy continues with the whole
 history, including what the advisor said.
 
+**Optional extension after Stage 9:** the [AG-UI topology lab](optional-ag-ui-lab.md) adds progressive
+nodes, smooth connecting traces, collapsed progress details and a live trace drawer behind
+`--evidence-panel`. It is separate from this numbered exercise; keep the normal commands below
+unless you deliberately enable it. See its [current UI screenshots](optional-ag-ui-lab.md#current-ui-screenshots).
+
 ### Your task
 
 From now on you work with three terminals, all in `src`:

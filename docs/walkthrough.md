@@ -374,6 +374,15 @@ The approval card appears in the **customer** chat.
 live; no state-changing tool runs without an explicit approval. Stop the contact centre (`Ctrl+C`) before
 Stage 9; it must restart to pick up a new `main.py`.
 
+**Optional, after Stage 9:** try the separate [AG-UI topology lab](optional-ag-ui-lab.md).
+Its opt-in view adds smooth traces, compact guidance, on-demand logs and a real trace drawer.
+The numbered Stage 7 screenshots above still show the regular experience without `--evidence-panel`.
+
+![Optional AG-UI extension: compact topology with human handover and progress details collapsed](assets/ag-ui/topology-collapsed.png)
+
+This optional screenshot uses scripted events and synthetic lab data, not a live model run.
+See the [full screenshot guide](optional-ag-ui-lab.md#current-ui-screenshots) for details and the drawer.
+
 ---
 
 ## 3. Enterprise-ready (Stages 8-13)

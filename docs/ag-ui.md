@@ -37,6 +37,18 @@ and [WCAG's animation guidance](https://www.w3.org/WAI/WCAG22/Understanding/anim
 show real observed activity, make uncertainty and ownership explicit, preserve human decisions,
 and keep the experience usable without motion.
 
+## Current SupportBuddy UI
+
+The optional topology keeps its progress details collapsed by default, with smooth traces,
+status badges and a compact guidance row. The real side drawer shows the observed event timeline
+alongside the chat and answer:
+
+![Current optional SupportBuddy topology and conversation trace drawer beside the customer chat](assets/ag-ui/trace-drawer.png)
+
+Captured from the application's offline Chromium tests using synthetic scripted events; this
+is not a live-provider timing capture. See the [optional lab screenshots](./optional-ag-ui-lab.md#current-ui-screenshots)
+for collapsed and expanded progress views. The regular workshop UI is unchanged without the switch.
+
 ## Official AG-UI visuals
 
 The following images are embedded from the official AG-UI documentation, not redrawn or stored in
