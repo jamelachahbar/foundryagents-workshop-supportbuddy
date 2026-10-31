@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-    <img alt="SupportBuddy - Connectivity Agent Lab" src="assets/logo.svg" width="560">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <img alt="SupportBuddy - Connectivity Agent Lab" src="assets/logo.png" width="560">
   </picture>
 </p>
 
