@@ -1,8 +1,8 @@
 <!-- markdownlint-disable MD033 -->
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.svg">
-    <img alt="SupportBuddy - Connectivity Agent Lab" src="docs/assets/logo.svg" width="640">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/logo-dark.png">
+    <img alt="SupportBuddy - Connectivity Agent Lab" src="docs/assets/logo.png" width="640">
   </picture>
 </p>
 <!-- markdownlint-enable MD033 -->
