@@ -44,7 +44,11 @@ def tools() -> list:
     toolbox = toolbox_settings()
     tools = [
         # One MCP connection for every Foundry-managed tool. Token scope: https://ai.azure.com/.default
-        FoundryToolbox(AzureCliCredential(), url=toolbox["TOOLBOX_ENDPOINT"]),
+        FoundryToolbox(
+            AzureCliCredential(), url=toolbox["TOOLBOX_ENDPOINT"],
+            # Guardrail metadata can be the only structuredContent; keep the runbook text too.
+            tool_result_content="both",
+        ),
         escalate_to_human,
         get_handover_status,
         restart_modem,

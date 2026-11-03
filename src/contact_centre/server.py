@@ -13,7 +13,7 @@ Run it from the src folder, with the agent of your current stage:
     uv run python -m contact_centre                       # your main.py
     uv run python -m contact_centre solutions.stage_9_toolbox
     uv run python -m contact_centre --prompt-agent        # your Foundry prompt agent (Stage 10)
-    uv run python -m contact_centre solutions.stage_9_toolbox --evidence-panel  # optional AG-UI lab
+    uv run python -m contact_centre ag_ui_lab --evidence-panel  # independent optional AG-UI lab
 Then open http://127.0.0.1:8070
 """
 
@@ -40,6 +40,7 @@ from opentelemetry import context, propagate
 
 from contact_centre.centre import ASSIST_PATH, SUPPORTBUDDY_PATH, UNIDENTIFIED, ContactCentre, http_runner
 from lab_backend import backend
+from lab_telemetry import configure_local_tracing
 from runtime_settings import app_url
 
 logger = logging.getLogger("contact_centre")
@@ -309,7 +310,10 @@ def _sse(centre: ContactCentre, first: dict[str, Any], visible: Callable[[dict[s
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="SupportBuddy contact centre (Stage 7 and later).")
-    parser.add_argument("module", nargs="?", default="main", help="Stage file to run, e.g. main or solutions.stage_9_toolbox.")
+    parser.add_argument(
+        "module", nargs="?", default="main",
+        help="Agent module, e.g. main, solutions.stage_9_toolbox, or ag_ui_lab for the independent optional lab.",
+    )
     parser.add_argument("--prompt-agent", action="store_true", help="Use your Foundry prompt agent (Stage 10) instead.")
     parser.add_argument("--evidence-panel", action="store_true", help="Optional AG-UI lab: show live diagnostic evidence.")
     args = parser.parse_args()
@@ -334,6 +338,7 @@ def main() -> None:
                 agents[SUPPORTBUDDY_PATH.format(who=customer["customer_id"])] = stage_agent(args.module, customer["customer_id"])
         else:
             agents[SUPPORTBUDDY_PATH.format(who="guest")] = stage_agent(args.module)
+        configure_local_tracing()
 
     centre = ContactCentre(
         http_runner(f"http://127.0.0.1:{port}"), signs_in=signs_in, agent_label=label,

@@ -39,6 +39,26 @@ INSTRUCTIONS = Path(__file__).parent / "solutions" / "stage_10_prompt_agent.inst
 INSTRUCTIONS_WITH_FUNCTIONS = Path(__file__).parent / "solutions" / "stage_10_prompt_agent_functions.instructions.md"
 # Your Python functions: declared in the definition, run by the application (never by Foundry).
 LOCAL_FUNCTIONS = [escalate_to_human, get_handover_status, restart_modem]
+FUNCTION_ELIGIBILITY = {
+    "escalate_to_human": (
+        "Use only for an explicit human request, failed identification after one retry, actual failed "
+        "required diagnostics, a completed diagnosis requiring handover, or a problem persisting after "
+        "applicable steps. Checks not attempted yet are NOT failed or unavailable checks: call the "
+        "remaining network diagnostics instead. Successful identification alone does not justify handover. "
+        "An identified customer reporting an outage needs line status, area incidents and equipment checks "
+        "before a diagnostic handover decision. Record only tools actually attempted."
+    ),
+    "get_handover_status": (
+        "Use only when the customer explicitly asks about an existing, confirmed HO-... reference. "
+        "Do not call during initial diagnosis or invent a reference."
+    ),
+    "restart_modem": (
+        "Use only after an explicit customer request or acceptance of a remote restart AND successful "
+        "diagnostics establishing line up, no open area incident, unreachable modem, and an applicable "
+        "retrieved restart procedure. A symptom report is not consent. Never restart during an area outage "
+        "or with uncollected diagnostic evidence. Framework approval is additionally required."
+    ),
+}
 
 
 def prompt_agent_name() -> str:
@@ -48,7 +68,8 @@ def prompt_agent_name() -> str:
 def function_declaration(function) -> FunctionTool:  # noqa: ANN001
     """The name, description and JSON schema of a local function, without its code."""
     spec = function.to_json_schema_spec()["function"]
-    return FunctionTool(name=spec["name"], description=spec["description"], parameters=spec["parameters"], strict=False)
+    description = f"{spec['description']}\n\nEligibility: {FUNCTION_ELIGIBILITY[spec['name']]}"
+    return FunctionTool(name=spec["name"], description=description, parameters=spec["parameters"], strict=False)
 
 
 def create(project: AIProjectClient, model: str, toolbox_endpoint: str, with_functions: bool = False) -> None:
@@ -85,6 +106,7 @@ def connect_prompt_agent(*, devui: bool = False, name: str | None = None) -> Fou
         credential=AsyncAzureCliCredential(),
         tools=[f for f in LOCAL_FUNCTIONS if f.name in declared] or None,
         default_options={"store": True},
+        additional_properties={"evaluation_instructions": latest.definition.get("instructions")},
         middleware=[HideFinalTextReplay()] if devui else None,
     )
 

@@ -11,7 +11,7 @@ never read `.env` or the DevUI token.
 
 | Skill | Use it for | Example request |
 | --- | --- | --- |
-| [SupportBuddy lab coach](supportbuddy-lab-coach/SKILL.md) | Detect your stage, review your changes against the checkpoint, hints, catching up | "Which stage am I at and what is missing?" |
+| [SupportBuddy lab coach](supportbuddy-lab-coach/SKILL.md) | Detect your stage, review checkpoints, hints, catching up | "Which stage am I at and what is missing?" |
 | [SupportBuddy lab troubleshoot](supportbuddy-lab-troubleshoot/SKILL.md) | Errors while running the lab: sign-in, DevUI, ports, MCP, toolbox, knowledge base | "I get a 404 on the toolbox URL, why?" |
 
 Type `/` in Copilot Chat to call one directly, for example `/supportbuddy-lab-coach check my Stage 5`.

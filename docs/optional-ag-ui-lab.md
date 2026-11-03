@@ -4,16 +4,46 @@
 
 | | |
 | --- | --- |
-| Placement | Optional extension after Stage 9; also compatible with the Stage 10 prompt agent |
+| Placement | Independent optional lab once the Stage 9 Azure toolbox is ready; your working files may be at any stage |
 | Duration | About 30-45 minutes; allow more time for the test challenges |
 | Prerequisites | Working customer chat and operator desk; completed diagnostics and runbook retrieval |
 | Azure changes | None |
-| Agent changes | None: keep the tools, instructions, routing model and approval rules |
+| Agent changes | No edits to numbered stages; a dedicated baseline uses its own instructions and the existing live Stage 9 tools |
 | Deliverable | An opt-in, progressively revealed connection topology shared by customer chat and advisor desk |
 
 This lab includes a **working reference solution**, disabled by default. You can run it immediately,
 then use the steps below as an implementation walkthrough or rebuild the feature as an exercise.
 The [AG-UI visual guide](./ag-ui.md) explains the architecture first.
+
+## What makes this an AG-UI lab?
+
+**Learning goal: use structured agent events to make execution visible, interactive and controllable,
+instead of treating the agent as a box that returns one final answer.**
+
+AG-UI (Agent-User Interaction Protocol) connects the **agent runtime to the contact-centre application**.
+The regular lab already uses it for streaming, approvals and handover. This optional lab extends what
+the application does with those same events:
+
+| Observed AG-UI event | Application behavior |
+| --- | --- |
+| `TOOL_CALL_START` | Reveal the corresponding topology node and show it running. |
+| `TOOL_CALL_RESULT` | Project validated evidence into the node, or show an explicit failure. |
+| `TEXT_MESSAGE_CONTENT` | Stream the agent's answer into the customer chat. |
+| `RUN_FINISHED` with an approval interrupt | Show Approve/Decline; send the decision back through the existing resume flow. |
+| Successful result from `escalate_to_human` | Route the conversation to the advisor queue; a tool request alone is not a handover. |
+
+Keep the boundaries clear:
+
+- **MCP** connects the agent to the remote diagnostic and runbook tools.
+- **AG-UI** carries execution events between the agent and the contact centre.
+- **Our application** consumes those events and sends filtered browser updates. It owns the diagram,
+  customer chat, advisor desk and routing; AG-UI does not provide those screens.
+
+**The model does not draw the diagram.** Application code renders observed events, without parsing the
+final answer, repeating diagnostics or adding model calls. This is event-driven UI, not model-generated
+HTML or an implementation of AG-UI `STATE_DELTA` / `STATE_SNAPSHOT`.
+The optional **Traces** drawer is an application event timeline, not the DevUI OpenTelemetry panel
+or Foundry/Application Insights telemetry.
 
 ## What is new, and what stays unchanged
 
@@ -39,17 +69,44 @@ not the optional panel. **Do not enable the switch for the numbered stages unles
 want this extension.** It is a startup option for the whole contact-centre process, not a prompt,
 toolbox setting or per-message instruction.
 
-## Run the reference solution
+## Run independently of your current stage
 
-From `src`, choose one command:
+From `src`, run:
 
 ```bash
-# Stage 9 reference: no changes to your participant exercise files
-uv run python -m contact_centre solutions.stage_9_toolbox --evidence-panel
-
-# Or your existing Stage 10 published prompt agent
-uv run python -m contact_centre --prompt-agent --evidence-panel
+uv run python -m contact_centre ag_ui_lab --evidence-panel
 ```
+
+### Which agent runs?
+
+**The customer talks to the dedicated optional-lab SupportBuddy: a local, code-first Agent Framework
+agent defined by [ag_ui_lab.py](../src/ag_ui_lab.py) and
+[ag_ui_lab.instructions.md](../src/ag_ui_lab.instructions.md).**
+Its agent loop and Python support functions run in your terminal/Codespace. Its configured model
+and live Stage 9 toolbox/runbooks run in Azure. AG-UI connects this local agent to the contact centre.
+
+This is **not** your current-stage `main.py` agent, the Stage 10 published prompt agent, or the Stage 14
+deployed hosted agent. The contact centre also starts a separate **local advisor-assist agent** for
+the human advisor's private workspace; it does not answer the customer directly.
+
+**Do not copy a solution over your working files or restore an earlier stage.** This command selects
+[ag_ui_lab.py](../src/ag_ui_lab.py) and its own
+[ag_ui_lab.instructions.md](../src/ag_ui_lab.instructions.md), not `main.py`,
+`main.instructions.md`, the Stage 14 hosted agent or your published prompt agent.
+The baseline does not load Stage 11 customer context/providers or Stage 13 Python middleware.
+It reuses the Stage 9 reference **tool factory**, not that stage's instructions, so its remote toolbox,
+local support functions, restart approval and contact-centre routing remain the real lab integrations.
+
+| Isolated from your current stage | Still shared and required |
+| --- | --- |
+| Working Python and instructions; later-stage context and middleware; published prompt-agent edits | Your model deployment, lab prefix, Azure sign-in and existing Stage 9 toolbox/runbook services |
+| New process and new conversation history | Toolbox default version, Azure guardrails and remote-service availability |
+
+This is a **live Azure lab**, not an offline replay or local-runbook substitute.
+The normal Azure setup needs no local MCP server. If your environment deliberately uses
+`NETWORK_TOOLS=local`, keep its network MCP server running as in Stage 9.
+Missing cloud resources, real blocked tool results or service failures still need diagnosis;
+the independent baseline does not bypass guardrails or create replacement resources.
 
 Open the printed **Customer chat** and **Operator desk** links. If another contact centre is already
 running, stop it first or use `CONTACT_CENTRE_PORT=8071` before the command to run on a different port.
@@ -70,6 +127,49 @@ a browser reload without rerunning the tools. Without `--evidence-panel`, the ex
 requests remain unchanged. A later agent turn gets its own card; earlier cards retain their original
 findings. Approval continuation updates the same card rather than creating another one.
 No new Azure resources, prompt-agent publication or toolbox version is needed.
+
+### If runbook guidance shows Failed
+
+A red runbook node means the result was an error, blocked, malformed or unsupported by the display
+projector; it does **not** by itself prove your current-stage instructions caused the problem.
+The projector accepts valid runbook documents/source references accompanied by explicit
+**unblocked** guardrail metadata, including separate text blocks. Metadata alone is not a successful
+retrieval, and blocked or invalid annotations still produce **Failed**. Raw documents and metadata
+are not exposed in the customer inspector.
+
+After updating the code, stop the old contact centre, start the dedicated command above, refresh
+both pages and create a **New conversation**. If retrieval still fails, inspect the terminal/provider
+error and the live toolbox/knowledge-base configuration; do not rewrite your numbered-stage prompt
+or remove the guardrail just to turn the node green.
+
+For `CUST-1005`, a handover is expected even with successful runbook retrieval: the customer reports
+total loss of internet despite healthy-looking diagnostics. The panel reports observed checks; it
+does not decide that the connection is fixed.
+
+### Optional comparison with another agent
+
+To deliberately compare the UI with your published Stage 10 definition:
+
+```bash
+uv run python -m contact_centre --prompt-agent --evidence-panel
+```
+
+This comparison is **not** isolated from portal edits or publication changes. Its definition must
+declare the local function tools to demonstrate approval and live handover.
+Likewise, specifying `main` explicitly uses your current stage. Keep `ag_ui_lab` as the default
+command for this optional exercise.
+
+**Model-dependent live comparison failure:** the function-enabled prompt agent has been observed to call
+handover/status functions immediately after customer identification, before attempting line, incident
+and equipment checks. This occurred with the evidence panel both disabled and enabled. Adding
+eligibility guidance to function descriptions did not resolve the diagnostic cases in the observed
+retest. This is not a successful outage/modem checkpoint, even if the UI correctly displays the
+handover. Do not treat an unattempted check as a failed check or assume the topology caused the
+agent's decision. A later participant run improved after switching the published model deployment
+from `supportbuddy-chat` to `model-router`; see the
+[observed model-choice comparison](workshop.md#model-choice-matters-an-observed-model-router-improvement).
+This does not guarantee every scenario or routed model passes. Use the independent baseline for
+the optional exercise and evaluate managed-agent behavior separately.
 
 ### Current UI screenshots
 
@@ -389,17 +489,14 @@ This is event-driven UI built on AG-UI tool events. It does **not** implement AG
 
 ## Step 1: see the events before building the panel
 
-From `src`, start your working Stage 9 reference:
+From `src`, start the independent baseline without the optional display:
 
 ```bash
-uv run python -m contact_centre solutions.stage_9_toolbox
+uv run python -m contact_centre ag_ui_lab
 ```
 
-Or, if you have already published the Stage 10 prompt agent:
-
-```bash
-uv run python -m contact_centre --prompt-agent
-```
+Use the **same module** with and without `--evidence-panel` when comparing behavior.
+Do not switch to `main` or publish a prompt-agent definition for this exercise.
 
 Open the printed chat and desk links. In a new conversation, send:
 
@@ -419,6 +516,8 @@ Find these existing pieces:
 **Checkpoint:** explain why the browser cannot simply subscribe to the Python client's existing
 AG-UI stream. The contact centre consumes that stream and publishes separate, filtered application
 events to the browser.
+Identify a tool-start event, its result and the resulting UI change. Explain which part comes from
+AG-UI and which part our application renders; a final answer or animated diagram alone is not the protocol.
 
 ## Step 2: separate display evidence from agent histories
 
@@ -564,11 +663,11 @@ Do not add a fixed section above either transcript.
 The reference solution's opt-in launch command is:
 
 ```bash
-uv run python -m contact_centre solutions.stage_9_toolbox --evidence-panel
+uv run python -m contact_centre ag_ui_lab --evidence-panel
 ```
 
-The same switch can be combined with `--prompt-agent`. The exercise does not require another stage
-file because the agent itself is unchanged.
+The same switch can be combined with `--prompt-agent` for the deliberate comparison described above.
+Toggling the switch on the independent `ag_ui_lab` baseline does not change its tools or instructions.
 
 ## Step 6: prove the panel adds information without changing behavior
 
@@ -591,6 +690,8 @@ are nondeterministic and may not select every tool in every turn.
 | Requested advisor reply | Successful completion enables a private draft button; copy only, no automatic send or overwriting an existing draft |
 | Buffered tool events | Distinct start/result message snapshots survive the SSE queue, even if the provider sends a burst |
 | Foundry runbook sources | Document JSON followed by reference JSON displays a validated document count, not false failure |
+| Guardrail metadata with valid runbooks | Explicitly unblocked annotations do not hide documents; blocked/invalid annotations or metadata without documents remain failures |
+| Any participant stage | `ag_ui_lab` loads its own instructions and live reference tools without reading or overwriting working stage files |
 | Follow-up diagnostic turn | New inline card; earlier findings and sequence position preserved |
 | CUST-1002, no internet | Show returned line/modem evidence without asserting the issue is fixed |
 | CUST-1001, area outage | Show returned outage evidence; the panel itself neither offers nor performs a restart |
@@ -613,7 +714,7 @@ projection, isolation and reconnect tests. Keep the existing approval/continuati
 From `src`:
 
 ```bash
-uv run pytest -c pyproject.toml ../tests/test_evidence_panel.py ../tests/test_contact_centre.py ../tests/test_prompt_agent_continuation.py -q
+uv run pytest -c pyproject.toml ../tests/test_ag_ui_lab.py ../tests/test_evidence_panel.py ../tests/test_contact_centre.py ../tests/test_prompt_agent_continuation.py -q
 ```
 
 The reference also includes optional real-browser checks. To run them without adding Playwright to

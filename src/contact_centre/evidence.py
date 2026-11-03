@@ -37,14 +37,29 @@ def _resource(value: Any, prefix: str) -> bool:
     return isinstance(value, str) and re.fullmatch(rf"{prefix}-[0-9]{{4,12}}", value) is not None
 
 
+def _guardrail_metadata(value: Any) -> bool:
+    if not isinstance(value, dict) or "raiPostToolAnnotations" not in value:
+        return False
+    annotations = value["raiPostToolAnnotations"]
+    if not isinstance(annotations, dict) or annotations.get("blocked") is not False:
+        raise ValueError("Blocked or invalid retrieval annotations")
+    return set(value) == {"raiPostToolAnnotations"}
+
+
 def _retrieval_json(text: str) -> Any:
     decoder = json.JSONDecoder()
-    text = text.lstrip()
-    documents, end = decoder.raw_decode(text)
-    remainder = text[end:].strip()
-    references: set[int] = set()
+    remainder = text.lstrip()
+    values = []
     while remainder:
-        reference, end = decoder.raw_decode(remainder)
+        value, end = decoder.raw_decode(remainder)
+        if not _guardrail_metadata(value):
+            values.append(value)
+        remainder = remainder[end:].strip()
+    if not values:
+        raise ValueError("Missing retrieval documents")
+    documents = values[0]
+    references: set[int] = set()
+    for reference in values[1:]:
         if not isinstance(reference, dict):
             raise ValueError("Invalid retrieval reference")
         if reference != {"structuredResponse": documents}:
@@ -61,7 +76,6 @@ def _retrieval_json(text: str) -> Any:
                     or not isinstance(source.get("content"), str) or reference.get("isError")):
                 raise ValueError("Unsupported retrieval reference")
             references.add(ref_id)
-        remainder = remainder[end:].strip()
     return documents
 
 
@@ -73,9 +87,10 @@ def _retrieval_count(content: Any) -> int | None:
             except ValueError:
                 return None
         elif isinstance(content, dict):
-            if content.get("isError"):
+            if content.get("isError") or _guardrail_metadata(content):
                 return None
-            if content.get("structuredContent") is not None:
+            structured = content.get("structuredContent")
+            if structured is not None and not _guardrail_metadata(structured):
                 content = content["structuredContent"]
             elif "response" in content:
                 content = content["response"]
@@ -87,8 +102,9 @@ def _retrieval_count(content: Any) -> int | None:
             if all(isinstance(item, dict) and isinstance(item.get("title"), str)
                    and isinstance(item.get("content"), str) for item in content):
                 return len(content)
-            if len(content) == 1 and isinstance(content[0], dict) and content[0].get("type") == "text":
-                content = content[0].get("text")
+            if all(isinstance(item, dict) and item.get("type") == "text"
+                   and isinstance(item.get("text"), str) for item in content):
+                content = "\n".join(item["text"] for item in content)
             elif len(content) == 1 and isinstance(content[0], dict) and isinstance(content[0].get("content"), list):
                 content = content[0]["content"]
             else:

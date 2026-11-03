@@ -82,6 +82,73 @@ def test_retrieval_accepts_document_json_followed_by_foundry_source_references(r
     assert "private" not in json.dumps(row) and "example.invalid" not in json.dumps(row)
 
 
+@pytest.fixture
+def annotated_runbooks(runbook_mcp_result):
+    def wrap(envelope, blocked=False):
+        annotation = {"raiPostToolAnnotations": {"blocked": blocked}}
+        text = {"type": "text", "text": json.dumps(annotation)}
+        if envelope == "structured":
+            return {"isError": False, "content": runbook_mcp_result, "structuredContent": annotation}
+        if envelope == "before":
+            return [text, *runbook_mcp_result]
+        if envelope == "after":
+            return [*runbook_mcp_result, text]
+        if envelope == "joined":
+            return [{"type": "text", "text": runbook_mcp_result[0]["text"] + "\n" + text["text"]}]
+        return {**annotation, "response": [{"content": runbook_mcp_result}]}
+
+    return wrap
+
+
+@pytest.mark.parametrize("envelope", ["structured", "before", "after", "joined", "response"])
+def test_retrieval_retains_documents_alongside_unblocked_guardrail_metadata(annotated_runbooks, envelope):
+    _, conversation, _ = run_script([
+        start("kb", "runbooks___knowledge_base_retrieve"), result("kb", annotated_runbooks(envelope)),
+    ])
+    row = conversation.evidence.snapshot()[0]
+    assert row["status"] == "completed"
+    assert row["finding"] == "Retrieval completed; 1 documents returned"
+    assert "private" not in json.dumps(row) and "example.invalid" not in json.dumps(row)
+
+
+@pytest.mark.parametrize("envelope", ["structured", "before", "after", "joined", "response"])
+@pytest.mark.parametrize("blocked", [True, "false", None])
+def test_retrieval_does_not_hide_blocked_or_invalid_guardrail_metadata(annotated_runbooks, envelope, blocked):
+    _, conversation, _ = run_script([
+        start("kb", "runbooks___knowledge_base_retrieve"), result("kb", annotated_runbooks(envelope, blocked)),
+    ])
+    assert conversation.evidence.snapshot()[0]["status"] == "failed"
+
+
+def test_guardrail_metadata_alone_is_not_a_successful_retrieval():
+    raw = [{"type": "text", "text": json.dumps({"raiPostToolAnnotations": {"blocked": False}})}]
+    _, conversation, _ = run_script([start("kb", "knowledge_base_retrieve"), result("kb", raw)])
+    assert conversation.evidence.snapshot()[0]["status"] == "failed"
+
+
+def test_successful_annotated_runbooks_do_not_prevent_inconclusive_case_handover(annotated_runbooks):
+    checks = [
+        ("identify_customer", backend.identify_customer(customer_id="CUST-1005")),
+        ("get_line_status", backend.get_line_status("LINE-2005")),
+        ("get_known_incidents", backend.get_known_incidents(postcode="MV-0005")),
+        ("check_equipment", backend.check_equipment("CUST-1005")),
+        ("knowledge_base_retrieve", annotated_runbooks("after")),
+    ]
+    events = []
+    for name, value in checks:
+        events += [start(name, name), result(name, value)]
+    handover = backend.escalate_to_human(
+        reported_problem="No internet on any device", capabilities_checked=[name for name, _ in checks],
+        evidence=["Diagnostics do not explain the reported outage"], unresolved_issue="Inconclusive evidence",
+        recommended_next_investigation="Human investigation", customer_id="CUST-1005",
+    )
+    events += [start("handover", "escalate_to_human"), result("handover", handover)]
+    _, conversation, _ = run_script(events)
+    assert all(row["status"] == "completed" for row in conversation.evidence.snapshot())
+    assert conversation.mode == "waiting"
+    assert conversation.handover["handover_id"] == handover["handover_id"]
+
+
 @pytest.mark.parametrize("suffix", [
     "not-json", '{"error": "failed"}',
     '{"kind":"reference","ref_id":99,"mimeType":"application/json","sourceData":{}}',

@@ -314,17 +314,37 @@ Foundry Memory calls the embedding and chat deployments with managed identities:
 OpenAI User** on the Foundry resource to both the **project's** and the **Foundry resource's** managed identity.
 Without it, memory searches and updates fail with `401` and the agent silently remembers nothing.
 
+### Evaluation preparation (Stage 12)
+
+Reserve Azure usage for live agent runs and additional Foundry quality judges. Participants keep
+their Stage 11 identity/memory and Stage 9 toolbox; evaluation does not provision new agent capabilities.
+
+- Use the [Stage 12 task list](../docs/workshop.md#stage-12-evaluation): baseline, one new quality case
+  with `ground_truth`, published-definition comparison, then a measured prompt improvement.
+- Worked references are `src/solutions/stage_12_extra_case.jsonl` and
+  `src/solutions/stage_12_eval_improvement.*`; see the [improvement guide](../docs/evaluation-improvement.md).
+- Additional harmful-content scoring and fixed-sample scorer calibration are optional. A red unsafe
+  calibration control is expected detection, not a SupportBuddy failure.
+- Record outstanding safety findings for Stage 13; do not mistake missing/skipped scores for passes.
+  New sessions do not reset memory or synthetic handovers, so account for state during comparisons.
+
 ### 6. Guardrail (Stage 13)
 
 `guardrail.json` is the default policy plus **Indirect Attack** detection.
 
 ```bash
 az rest --method put \
-  --url "https://management.azure.com/<foundry account resource ID>/raiPolicies/supportbuddy-guardrail?api-version=2025-06-01" \
+  --url "https://management.azure.com<foundry-account-resource-id>/raiPolicies/supportbuddy-guardrail?api-version=2025-06-01" \
   --body @instructor/guardrail.json
 ```
 
-Give participants the policy's full resource ID: `<foundry account resource ID>/raiPolicies/supportbuddy-guardrail`.
+Replace `<foundry-account-resource-id>` with the account ID including its leading `/`.
+Give participants the policy's full resource ID: `<foundry-account-resource-id>/raiPolicies/supportbuddy-guardrail`.
+Participants attach this existing policy to their toolbox and merge middleware into their own agent;
+they should not overwrite the prompt improvements they measured in Stage 12.
+The [Stage 13 checkpoint](../docs/workshop.md#stage-13-guardrails) requires an offline proof of their
+actual middleware wiring, the live safety cases and a full regression. A safe model reply alone
+does not identify the layer that prevented unsafe behavior.
 
 ### 7. Participant roles and clean up
 

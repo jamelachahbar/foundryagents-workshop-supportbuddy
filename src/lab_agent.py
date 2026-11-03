@@ -40,6 +40,7 @@ from azure.identity import AzureCliCredential
 from dotenv import load_dotenv
 
 from devui_branding import serve_branded
+from lab_telemetry import configure_local_tracing
 from runtime_settings import app_url
 
 AGENT_BASE_NAME = "supportbuddy"
@@ -243,6 +244,7 @@ class HideFinalTextReplay(AgentMiddleware):
 def run(agent: Agent) -> None:
     """Open the agent in DevUI, or answer one prompt in the console when a prompt is given."""
     args = _parse_args()
+    configure_local_tracing()
 
     if args.prompt:
         # Windows consoles and pipes may default to a legacy code page; model output is Unicode.

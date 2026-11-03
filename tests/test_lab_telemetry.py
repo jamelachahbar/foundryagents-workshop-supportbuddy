@@ -2,8 +2,11 @@
 
 import asyncio
 import json
+import subprocess
+import sys
+from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 import httpx
 import pytest
@@ -54,6 +57,7 @@ def test_setup_once_and_content_requires_explicit_opt_in(monkeypatch, spans, cap
     telemetry.configure_tracing(project)
     telemetry.configure_tracing(project)
     setup.assert_called_once()
+    assert setup.call_args.kwargs["service_name"] == "supportbuddy-prompt-client"
     assert setup.call_args.kwargs["enable_sensitive_data"] is capture
     assert setup.call_args.kwargs["enable_message_events"] is capture
     assert telemetry._capture_content is capture
@@ -75,6 +79,126 @@ def test_invalid_capture_flag_fails_explicitly(monkeypatch, spans):
     monkeypatch.setenv("SUPPORTBUDDY_TRACE_CONTENT", "maybe")
     with pytest.raises(ValueError, match="must be true or false"):
         telemetry.configure_tracing(Mock())
+
+
+def test_disabled_local_tracing_does_not_create_project_client(monkeypatch, spans):
+    client, credential = Mock(), Mock()
+    monkeypatch.setattr(telemetry, "AIProjectClient", client)
+    monkeypatch.setattr(telemetry, "AzureCliCredential", credential)
+    telemetry.configure_local_tracing()
+    client.assert_not_called()
+    credential.assert_not_called()
+
+
+def test_local_tracing_uses_linked_project_and_configures_once(monkeypatch, spans):
+    import lab_agent
+
+    monkeypatch.setenv("SUPPORTBUDDY_TRACING", "true")
+    endpoint = "https://example.services.ai.azure.com/api/projects/lab"
+    monkeypatch.setattr(lab_agent, "load_settings", lambda: {"AZURE_AI_PROJECT_ENDPOINT": endpoint})
+    client, credential = MagicMock(), MagicMock()
+    monkeypatch.setattr(telemetry, "AIProjectClient", client)
+    monkeypatch.setattr(telemetry, "AzureCliCredential", credential)
+
+    def configured(project, *, service_name):
+        assert project is client.return_value.__enter__.return_value
+        assert service_name == "supportbuddy-local"
+        telemetry._configured = True
+
+    setup = Mock(side_effect=configured)
+    monkeypatch.setattr(telemetry, "configure_tracing", setup)
+    telemetry.configure_local_tracing()
+    telemetry.configure_local_tracing()
+    client.assert_called_once_with(endpoint=endpoint, credential=credential.return_value.__enter__.return_value)
+    setup.assert_called_once()
+    client.return_value.__exit__.assert_called_once()
+    credential.return_value.__exit__.assert_called_once()
+
+
+def test_local_tracing_connection_failure_is_not_swallowed(monkeypatch, spans):
+    import lab_agent
+
+    monkeypatch.setenv("SUPPORTBUDDY_TRACING", "true")
+    monkeypatch.setattr(lab_agent, "load_settings", lambda: {"AZURE_AI_PROJECT_ENDPOINT": "https://example.test"})
+    client = MagicMock()
+    client.return_value.__enter__.side_effect = ValueError("No monitoring connection")
+    monkeypatch.setattr(telemetry, "AIProjectClient", client)
+    monkeypatch.setattr(telemetry, "AzureCliCredential", MagicMock())
+    with pytest.raises(ValueError, match="No monitoring connection"):
+        telemetry.configure_local_tracing()
+    assert not telemetry._configured
+
+
+def test_devui_initializes_local_tracing_before_serving(monkeypatch):
+    import lab_agent
+
+    calls = Mock()
+    monkeypatch.setattr(lab_agent, "configure_local_tracing", calls.tracing)
+    monkeypatch.setattr(lab_agent, "_parse_args", lambda: SimpleNamespace(prompt=None))
+    monkeypatch.setattr(lab_agent, "_devui_token", lambda: "offline-test-token")
+    monkeypatch.setattr(lab_agent, "serve_branded", calls.serve)
+    monkeypatch.setattr(lab_agent, "_async_providers", lambda _: [])
+    lab_agent.run(Mock())
+    assert [call[0] for call in calls.mock_calls] == ["tracing", "serve"]
+
+
+@pytest.mark.parametrize("prompt_agent", [False, True])
+def test_contact_centre_initializes_tracing_for_local_modules_only(monkeypatch, prompt_agent):
+    import lab_agent
+    import prompt_agent as published
+    from contact_centre import assist, server
+
+    monkeypatch.setattr(sys, "argv", ["contact_centre", *(["--prompt-agent"] if prompt_agent else ["hosted_agent"])])
+    monkeypatch.setattr(assist, "build_assist_agent", lambda _: Mock())
+    monkeypatch.setattr(lab_agent, "stage_signs_in", lambda _: False)
+    monkeypatch.setattr(lab_agent, "stage_agent", lambda _: Mock())
+    monkeypatch.setattr(published, "connect_prompt_agent", lambda: Mock())
+    monkeypatch.setattr(published, "prompt_agent_name", lambda: "lab-test-supportbuddy-prompt")
+    monkeypatch.setattr(server, "create_app", lambda *args, **kwargs: Mock())
+    calls = Mock()
+    monkeypatch.setattr(server, "configure_local_tracing", calls.tracing)
+    monkeypatch.setattr(server.uvicorn, "run", calls.serve)
+    server.main()
+    assert [call[0] for call in calls.mock_calls] == (["serve"] if prompt_agent else ["tracing", "serve"])
+
+
+def test_devui_keeps_azure_exporter_and_payload_opt_out():
+    script = """
+import asyncio
+import os
+from unittest.mock import Mock, patch
+from agent_framework.observability import OBSERVABILITY_SETTINGS
+from opentelemetry import trace
+from opentelemetry.sdk._logs.export import InMemoryLogRecordExporter
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+import lab_telemetry
+from devui_branding import SupportBuddyDevServer
+
+os.environ["SUPPORTBUDDY_TRACING"] = "true"
+os.environ["SUPPORTBUDDY_TRACE_CONTENT"] = "false"
+exporter = InMemorySpanExporter()
+project = Mock()
+project.telemetry.get_application_insights_connection_string.return_value = "unused"
+with patch.object(lab_telemetry, "AzureMonitorTraceExporter", return_value=exporter), \\
+     patch.object(lab_telemetry, "AzureMonitorLogExporter", return_value=InMemoryLogRecordExporter()):
+    lab_telemetry.configure_tracing(project, service_name="supportbuddy-local")
+provider = trace.get_tracer_provider()
+server = SupportBuddyDevServer(auth_token="offline-test-token")
+asyncio.run(server._ensure_executor())
+assert trace.get_tracer_provider() is provider
+assert not OBSERVABILITY_SETTINGS.SENSITIVE_DATA_ENABLED
+with trace.get_tracer("test").start_as_current_span("local-ui-test"):
+    pass
+provider.force_flush()
+(span,) = exporter.get_finished_spans()
+assert span.name == "local-ui-test"
+assert span.resource.attributes["service.name"] == "supportbuddy-local"
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script], cwd=Path(__file__).resolve().parents[1] / "src",
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 @pytest.mark.parametrize("capture", [False, True])

@@ -27,7 +27,7 @@ def _flag(name: str) -> bool:
     return value == "true"
 
 
-def configure_tracing(project: AIProjectClient) -> None:
+def configure_tracing(project: AIProjectClient, *, service_name: str = "supportbuddy-prompt-client") -> None:
     """Resolve the project's linked resource without storing a connection string locally."""
     global _configured, _capture_content
     if not _flag("SUPPORTBUDDY_TRACING") or _configured:
@@ -36,7 +36,7 @@ def configure_tracing(project: AIProjectClient) -> None:
     connection_string = project.telemetry.get_application_insights_connection_string()
     credential = AzureCliCredential()
     configure_otel_providers(
-        service_name="supportbuddy-prompt-client",
+        service_name=service_name,
         resource_attributes={"deployment.environment.name": "workshop"},
         exporters=[
             AzureMonitorTraceExporter(
@@ -52,7 +52,20 @@ def configure_tracing(project: AIProjectClient) -> None:
     )
     _capture_content = capture
     _configured = True
-    logger.warning("SupportBuddy tracing enabled; synthetic message/tool content capture: %s.", capture)
+    logger.warning("SupportBuddy tracing enabled (%s); synthetic message/tool content capture: %s.", service_name, capture)
+
+
+def configure_local_tracing() -> None:
+    """Export local code-first runs to the project's existing monitoring connection."""
+    if not _flag("SUPPORTBUDDY_TRACING") or _configured:
+        return
+    from lab_agent import load_settings
+
+    settings = load_settings()
+    with AzureCliCredential() as credential, AIProjectClient(
+        endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=credential,
+    ) as project:
+        configure_tracing(project, service_name="supportbuddy-local")
 
 
 def record_event(span: Span, event: dict[str, Any]) -> None:

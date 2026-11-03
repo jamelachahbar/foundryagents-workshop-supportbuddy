@@ -9,8 +9,9 @@ runtime and an application. It is not a model, a tool server, or a ready-made ch
 This guide describes the implementation in this repository. All customers, diagnostics, handovers
 and modem restarts are synthetic lab constructs.
 
-Want to build on it? Try the [optional live evidence-panel lab](./optional-ag-ui-lab.md) after Stage 9.
-It includes a working `--evidence-panel` reference solution and is separate from the numbered workshop.
+Want to build on it? Try the [optional live evidence-panel lab](./optional-ag-ui-lab.md) once the Stage 9
+Azure toolbox is ready. Its `ag_ui_lab` baseline has independent instructions and a working
+`--evidence-panel` solution; it does not require changing your current numbered stage.
 The optional logical connection topology first appears inline when a tool starts or requests approval,
 then reveals customer/modem/line/network nodes and a runbook-guidance branch as their tools
 start. Active tools are named and pulse; results update the same nodes.
@@ -313,12 +314,22 @@ definition, try a modem problem, watch diagnostic progress, and inspect an appro
 The prompt-agent definition must declare the optional local functions to demonstrate approval and
 live handover.
 
+For the optional topology exercise independent of your current stage, use:
+
+```bash
+uv run python -m contact_centre ag_ui_lab --evidence-panel
+```
+
+This selects dedicated instructions with the live Stage 9 reference tools. It does not read your
+working stage or change the toolbox, published prompt agent or hosted deployment.
+
 | File | Responsibility |
 | --- | --- |
 | [server.py](../src/contact_centre/server.py) | Register AG-UI endpoints, prompt-agent snapshots, browser APIs and browser SSE streams |
 | [centre.py](../src/contact_centre/centre.py) | Send AG-UI requests, consume events, collect approvals and route conversations |
 | [conversations.py](../src/contact_centre/conversations.py) | Conversation state, separate customer/assist views and application event bus |
 | [assist.py](../src/contact_centre/assist.py) | Advisor's private code-first assist agent |
+| [ag_ui_lab.py](../src/ag_ui_lab.py) | Independent optional-lab baseline with its own instructions and live reference tools |
 | [prompt_agent.py](../src/prompt_agent.py) | Connect the published Foundry prompt agent and local function implementations |
 | [support_tools.py](../src/tools/support_tools.py) | Local tool implementations, including the approval-gated restart |
 | [test_prompt_agent_continuation.py](../tests/test_prompt_agent_continuation.py) | Real-adapter regressions for approval, rejection, follow-up and session isolation |

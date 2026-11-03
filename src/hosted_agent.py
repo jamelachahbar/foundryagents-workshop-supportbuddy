@@ -33,7 +33,9 @@ from tools.support_tools import escalate_to_human, get_handover_status, restart_
 
 def tools() -> list:
     return [
-        FoundryToolbox(AsyncDefaultAzureCredential(), url=toolbox_settings()["TOOLBOX_ENDPOINT"]),
+        FoundryToolbox(
+            AsyncDefaultAzureCredential(), url=toolbox_settings()["TOOLBOX_ENDPOINT"], tool_result_content="both",
+        ),
         # Executed here; prompt-agent function tools execute in the calling application.
         escalate_to_human,
         get_handover_status,

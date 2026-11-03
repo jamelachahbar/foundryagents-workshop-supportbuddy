@@ -22,7 +22,8 @@ Optional Copilot skills and references: [.github/skills/README.md](.github/skill
 Visual architecture guide: [AG-UI in SupportBuddy](docs/ag-ui.md) - streaming, approvals and human handover.
 
 Optional extension after Stage 9: [live evidence-panel lab and working solution](docs/optional-ag-ui-lab.md)
-(`--evidence-panel`), driven by AG-UI events.
+(`--evidence-panel`), driven by AG-UI events. Run `uv run python -m contact_centre ag_ui_lab --evidence-panel`
+from `src/`; its dedicated instructions leave your current stage untouched.
 
 ## The use case, and what is synthetic
 
@@ -74,7 +75,7 @@ system or record.
 | 9 | Foundry Toolbox | one governed, versioned MCP endpoint; credentials in project connections |
 | 10 | Prompt agent | Foundry-managed orchestration: compare the default tools and optional application-executed functions |
 | 11 | Foundry Memory + signed-in customer | remember preferences and past problems, outside the runtime |
-| 12 | Evaluation: rule-based checks + Foundry evaluators | measure decisions, tool use, citations and safety |
+| 12 | Evaluation: rule-based checks + Foundry evaluators | measure decisions, tool use, citations and safety; [improve prompts from results](docs/evaluation-improvement.md) |
 | 13 | Guardrails: Foundry guardrail + code middleware | layered defence against jailbreaks and poisoned tool data |
 | **Part 3** | **Run your code in Foundry** | |
 | 14 | Hosted agent | the same Agent Framework code, deployed and run by Foundry |
@@ -106,12 +107,13 @@ src/knowledge_base.py             create / query the Foundry IQ knowledge base (
 src/toolbox.py                    create / inspect your Foundry Toolbox (Stages 9, 13)
 src/memory_store.py               create / inspect / forget the Foundry Memory store (Stage 11)
 src/evaluate.py, src/evals/       evaluation dataset and runner (Stage 12)
+src/safety_calibrate.py           optional fixed-sample scorer calibration, not an agent evaluation
 src/prompt_agent.py               SupportBuddy as a Foundry prompt agent (Stage 10)
 src/hosted_agent.py               SupportBuddy as a Foundry hosted agent (Stage 14)
 src/lab_backend/                  synthetic back-office + data/scenarios.json (fictional data)
 src/contact_centre/               customer chat, operator desk and advisor assist agent, over AG-UI (Stage 7)
 src/mcp_server/                   synthetic MCP server (Stage 6) and its Dockerfile (shared copy, Stage 9)
-src/solutions/                    runnable reference for each stage that changes the agent code (10, 12 and 14 use the scripts above)
+src/solutions/                    runnable stage references, including the Stage 12 improved prompt (10 and 14 use the scripts above)
 src/preflight.py                  checks your environment before the workshop
 tests/                            offline tests (no Azure needed)
 ```

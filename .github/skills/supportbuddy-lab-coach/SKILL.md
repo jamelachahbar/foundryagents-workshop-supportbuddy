@@ -52,6 +52,9 @@ When the participant asks to skip ahead or catch up to Stage N:
    `cp solutions/stage_N_<name>.py main.py` and
    `cp solutions/stage_N_<name>.instructions.md main.instructions.md`.
    Stage 10 has no `.py` solution; the participant keeps their Stage 9 files.
+   Stage 12 has an optional `stage_12_eval_improvement` reference, not a required Python edit.
+   For Stage 13, prefer merging middleware and instructions so measured Stage 12 prompt changes are
+   retained; warn that copying the reference instructions replaces those improvements.
 3. List the prerequisites of Stage N they still need (stage map), then remind them to restart.
 
 ## Do not

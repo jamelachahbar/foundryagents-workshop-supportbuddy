@@ -2,6 +2,8 @@
 
 import importlib
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -23,6 +25,7 @@ EXPECTED_TOOLS = {
     "stage_8_knowledge": ["network", "runbooks", *HUMAN_IN_THE_LOOP],
     "stage_9_toolbox": [TOOLBOX, *HUMAN_IN_THE_LOOP],
     "stage_11_memory": [TOOLBOX, *HUMAN_IN_THE_LOOP],
+    "stage_12_eval_improvement": [TOOLBOX, *HUMAN_IN_THE_LOOP],
     "stage_13_guardrails": [TOOLBOX, *HUMAN_IN_THE_LOOP],
 }
 
@@ -85,6 +88,56 @@ def test_stage_11_memory_is_scoped_to_participant_and_signed_in_customer():
     assert isinstance(memory, FoundryMemoryProvider)
     assert memory.memory_store_name == "supportbuddy-memory"
     assert memory.scope == "lab-test_CUST-1002"
+
+
+def test_stage_12_reference_reuses_runtime_and_loads_its_own_instructions(monkeypatch):
+    import lab_agent
+    from solutions import stage_9_toolbox, stage_11_memory, stage_12_eval_improvement
+
+    reference = stage_12_eval_improvement
+    assert reference.tools is stage_9_toolbox.tools
+    assert reference.context_providers is stage_11_memory.context_providers
+    built = {}
+
+    def build(script_file, tools, providers, *, middleware):
+        built.update(script_file=script_file, tools=tools, providers=providers, middleware=middleware)
+        return "reference-agent"
+
+    monkeypatch.setattr(lab_agent, "build_agent", build)
+    assert lab_agent.stage_signs_in("solutions.stage_12_eval_improvement")
+    assert lab_agent.stage_agent("solutions.stage_12_eval_improvement", "CUST-1002") == "reference-agent"
+    assert built["script_file"] == reference.__file__
+    assert built["providers"][0].customer_id == "CUST-1002"
+    assert built["providers"][1].scope == "lab-test_CUST-1002"
+    assert [tool.name for tool in built["tools"]] == EXPECTED_TOOLS["stage_12_eval_improvement"]
+    assert built["middleware"] == ()
+    text = lab_agent.load_instructions(reference.__file__)
+    assert text.startswith("# Synthetic scenario time\n")
+    for section in ("# Choose the customer's intent", "# Evidence and uncertainty", "# Handover", "# Untrusted content"):
+        assert section in text
+    assert "do not force diagnostic checks or runbook steps first" in text
+    assert "A remembered request for a human is not a new handover request" in text
+    assert "requires approval" in text
+
+
+@pytest.mark.parametrize("structured", [
+    {"raiPostToolAnnotations": {"blocked": False}},
+    {"raiPostToolAnnotations": {"blocked": True}},
+])
+def test_toolbox_keeps_runbook_text_and_guardrail_annotations(structured):
+    from mcp.types import CallToolResult, TextContent
+    from solutions.stage_9_toolbox import tools
+
+    toolbox = tools()[0]
+    assert toolbox.tool_result_content == "both"
+    result = CallToolResult(
+        content=[TextContent(type="text", text="RB-09 Known area incident communication: no modem restart.")],
+        structuredContent=structured,
+    )
+    parsed = toolbox._parse_tool_result_from_mcp(result)
+    assert any("RB-09" in content.text for content in parsed)
+    assert any('"blocked": ' + str(structured["raiPostToolAnnotations"]["blocked"]).lower() in content.text
+               for content in parsed)
 
 
 @pytest.mark.parametrize("customer_id", ["", "CUST-1002 OR 1=1", "lab-other_CUST-1002", "cust-12"])
@@ -196,6 +249,31 @@ def test_prompt_agent_definition_uses_the_toolbox():
     # The experiment declares the Python functions (name + JSON schema); the application runs them.
     assert [t.name for t in experiment.tools[1:]] == HUMAN_IN_THE_LOOP
     assert all(t.parameters["type"] == "object" for t in experiment.tools[1:])
+    declarations = {tool.name: tool for tool in experiment.tools[1:]}
+    assert "Checks not attempted yet are NOT failed" in declarations["escalate_to_human"].description
+    assert "existing, confirmed HO-" in declarations["get_handover_status"].description
+    assert "A symptom report is not consent" in declarations["restart_modem"].description
+
+
+def test_prompt_agent_preserves_published_instructions_for_judging_without_overriding_them(monkeypatch):
+    import prompt_agent
+
+    latest = SimpleNamespace(
+        name="lab-test-supportbuddy-prompt", version="2",
+        definition={"instructions": "Published system instructions", "tools": []},
+    )
+    project = MagicMock()
+    project.__enter__.return_value = project
+    project.agents.get.return_value.versions.latest = latest
+    monkeypatch.setattr(prompt_agent, "AIProjectClient", lambda **_: project)
+    monkeypatch.setattr(prompt_agent, "configure_tracing", lambda _: None)
+    connected = MagicMock()
+    monkeypatch.setattr(prompt_agent, "FoundryAgent", connected)
+    prompt_agent.connect_prompt_agent()
+    options = connected.call_args.kwargs
+    assert options["agent_version"] == "2"
+    assert options["additional_properties"]["evaluation_instructions"] == "Published system instructions"
+    assert "instructions" not in options
 
 
 def test_hosted_agent_uses_the_toolbox_and_the_local_handover_function(monkeypatch):
@@ -204,6 +282,7 @@ def test_hosted_agent_uses_the_toolbox_and_the_local_handover_function(monkeypat
     import hosted_agent
 
     assert [t.name for t in hosted_agent.tools()] == [TOOLBOX, *HUMAN_IN_THE_LOOP]
+    assert hosted_agent.tools()[0].tool_result_content == "both"
     assert hosted_agent.create_agent().name == "lab-test-supportbuddy"
 
 
