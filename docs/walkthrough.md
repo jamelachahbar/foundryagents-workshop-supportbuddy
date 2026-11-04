@@ -1,11 +1,14 @@
 # SupportBuddy lab walkthrough
 
-A click-by-click run of the whole lab, from an empty Azure subscription to a hosted agent, with what you
-should see at every step. Use it to:
+A click-by-click participant run of the lab, from a prepared shared environment to a hosted agent,
+with what you should see at every step. Use it to:
 
 - dry-run the lab before a workshop (instructor or organizer);
 - catch up quickly as a participant;
 - check that a new lab environment works end to end.
+
+Instructors provision the shared Azure environment using [instructor/setup.md](../instructor/setup.md)
+before following this walkthrough as a participant. Provisioning commands live in that guide, not here.
 
 This guide takes the **fast path**: at each stage you copy the reference solution over your agent instead
 of writing the change yourself. The concepts, the code walkthroughs and the "Your task" exercises are in the
@@ -25,7 +28,7 @@ See [The scenario clock](workshop.md#the-scenario-clock) and the
 
 | Part | Stages | Runs where |
 | --- | --- | --- |
-| [0. Lab environment](#0-lab-environment) | | Azure, once per group |
+| [0. Lab environment](#0-lab-environment) | | Instructor handoff; participants do not provision Azure |
 | [1. Your laptop](#1-your-laptop) | | Your laptop |
 | [2. Build the agent](#2-build-the-agent-stages-1-7) | 1-7 | Agent on your laptop, model in Foundry |
 | [3. Enterprise-ready](#3-enterprise-ready-stages-8-13) | 8-13 | Agent on your laptop or in Foundry, tools in Foundry |
@@ -45,70 +48,21 @@ Details: [The agents in this lab](workshop.md#the-agents-in-this-lab).
 
 ## 0. Lab environment
 
-> Done **once** for the whole group by the instructor or an organizer, or by you in your own subscription.
-> Skip to [1. Your laptop](#1-your-laptop) if someone gave you the `.env` values.
+**Participants:** the shared Azure environment is already prepared for you. Do not run
+`azd up` or the instructor's setup hook to start this walkthrough. Ask your instructor for:
 
-You need an Azure subscription where you are **Owner** (or Contributor + User Access Administrator), and on
-your machine: Git, [uv](https://docs.astral.sh/uv/), the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
-and the [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd).
-Docker is not needed.
+- The Azure tenant ID and confirmation that your account has the required workshop roles.
+- The shared settings to put in `src/.env`, including the Foundry project endpoint and model deployment name.
+- The guardrail resource ID for Stage 13 and the project resource ID for Stage 14; keep these for later.
 
-```powershell
-git clone <this repository> supportbuddy
-cd supportbuddy/instructor
+Once you have the handout, continue to [1. Your laptop](#1-your-laptop). You do not need
+Owner or Contributor permissions to provision the shared resources; the instructor handles that work.
 
-az login                       # add --tenant <tenant-id> for another tenant
-azd auth login
-azd env new supportbuddy-lab   # names the resource group rg-supportbuddy-lab
-azd env set AZURE_LOCATION swedencentral
-azd env set AZURE_SEARCH_LOCATION francecentral
-azd up
-```
+**Instructors and personal-environment owners:** first complete
+[instructor/setup.md](../instructor/setup.md), including the local prerequisites-only bootstrap
+and shared Azure provisioning. Then return here and follow the participant steps using your handout.
 
-Optional before `azd up` (details in [instructor/setup.md](../instructor/setup.md)):
-
-| Setting | When |
-| --- | --- |
-| `azd env set PARTICIPANTS_GROUP_ID <entra-group-object-id>` | Give every participant their roles at once |
-| `azd env set AZURE_RESOURCE_TAGS "SecurityControl=Ignore;owner=<you>"` | Your policies require tags |
-| `azd env set EXTERNAL_NETWORK_MCP_URL <url or none>` | Container Apps is not allowed in this subscription |
-
-`azd up` provisions the resources, runs `setup_lab.py` (connections, knowledge base, memory store), then
-builds the MCP server in Azure Container Registry and deploys it. It ends with:
-
-```text
-SupportBuddy lab: finishing the setup
-  connection supportbuddy-runbooks-kb: ok
-  connection supportbuddy-network-mcp: ok
-  knowledge base supportbuddy-runbooks: ok
-  memory store supportbuddy-memory: ok
-
-Give the participants these lines for src/.env (each adds their own WORKSHOP_RESOURCE_PREFIX):
-
-AZURE_AI_PROJECT_ENDPOINT=https://sb-foundry-<suffix>.services.ai.azure.com/api/projects/supportbuddy
-AZURE_AI_MODEL_DEPLOYMENT_NAME=model-router
-MOCK_MCP_URL=http://127.0.0.1:8000/mcp
-AZURE_AI_SEARCH_ENDPOINT=https://sb-search-<suffix>.search.windows.net
-FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks
-AZURE_AI_EMBEDDING_DEPLOYMENT_NAME=supportbuddy-embedding
-FOUNDRY_MEMORY_STORE_NAME=supportbuddy-memory
-
-Stage 13 guardrail ID:
-/subscriptions/<sub>/resourceGroups/rg-supportbuddy-lab/providers/Microsoft.CognitiveServices/accounts/sb-foundry-<suffix>/raiPolicies/supportbuddy-guardrail
-
-Stage 14 project resource ID (azd ai agent init --project-id):
-/subscriptions/<sub>/resourceGroups/rg-supportbuddy-lab/providers/Microsoft.CognitiveServices/accounts/sb-foundry-<suffix>/projects/supportbuddy
-
-Shared network MCP server (Stage 9): https://supportbuddy-network-mcp.<env>.swedencentral.azurecontainerapps.io/mcp
-
-SUCCESS: Your application was provisioned and deployed to Azure in 20 minutes 8 seconds.
-```
-
-Azure AI Search Basic takes the longest (about 15 minutes). Keep the printed block: it is what every
-participant puts in `src/.env`, plus the guardrail ID (Stage 13) and the project resource ID (Stage 14).
-Print it again at any time from `instructor`: `uv run --project ../src python setup_lab.py`.
-
-The project is now in the Foundry portal ([ai.azure.com](https://ai.azure.com)), with the two model deployments:
+The prepared project appears in the Foundry portal ([ai.azure.com](https://ai.azure.com)):
 
 ![The lab project in the Foundry portal](assets/walkthrough/portal-project-home.png)
 
@@ -120,14 +74,37 @@ The project is now in the Foundry portal ([ai.azure.com](https://ai.azure.com)),
 
 ## 1. Your laptop
 
+Clone or extract the repository supplied by your instructor. Open a terminal in its root folder.
+You do not need to clone it again if you already have the checkout.
+
+**Windows participants:** open PowerShell and run:
+
 ```powershell
-git clone <this repository> supportbuddy
-cd supportbuddy/src
-uv sync
-Copy-Item .env.template .env      # macOS / Linux: cp .env.template .env
+.\setup-windows.ps1 -VenvPath '.venv-windows'
 ```
 
-Open `src/.env` and paste the values from the lab environment. Set your own prefix:
+Do not add `-PrerequisitesOnly`: participants need the full setup. The script installs missing
+tools, creates or reuses the Windows venv, prompts for the handout's `.env` values and tenant ID,
+signs you in and runs preflight. It pauses between checkpoints so you can continue or stop.
+Replace `.venv-windows` with your chosen Windows venv name if different. For optional feed/proxy
+parameters or an environment already installed, see
+[Windows setup](workshop.md#windows-one-command-setup). Keep Windows and devcontainer venvs separate.
+
+After setup, paste its printed commands to select `src/` and your Windows venv. Repeat the
+environment selection in each new terminal. No activation is needed. If all five checkpoints
+passed, skip the manual configuration and preflight below and continue at the terminal table.
+
+**macOS/Linux or devcontainer participants:** with uv and Azure CLI installed, start from
+the repository root and run:
+
+```bash
+cd src
+uv sync --python 3.12
+if [ ! -f .env ]; then cp .env.template .env; fi
+```
+
+Open `src/.env` and paste the values from the instructor's handout. Preserve an existing
+configuration rather than overwriting it. Set your own prefix:
 
 ```text
 WORKSHOP_RESOURCE_PREFIX=lab-<alias>      # 2-8 lowercase letters or digits, for example lab-jdoe
@@ -148,6 +125,53 @@ uv run python preflight.py
 
 Ready for the lab.
 ```
+
+### Returning after closing terminals (Windows)
+
+Your venv and `src/.env` remain on disk, but terminal settings such as
+`UV_PROJECT_ENVIRONMENT` and `DEVUI_PORT` do not carry into a new PowerShell session.
+Closing a server's terminal also stops that process. Do not rerun setup or copy the `.env`
+template just to resume the lab.
+
+**In every new PowerShell terminal**, open the repository root and paste:
+
+```powershell
+Set-Location .\src
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv-windows'
+if (-not (Test-Path (Join-Path $env:UV_PROJECT_ENVIRONMENT 'Scripts\python.exe'))) {
+  throw 'Windows venv not found. Check the name you used during setup before continuing.'
+}
+uv run --no-sync python -c "import sys; print(sys.executable)"
+```
+
+Replace `.venv-windows` with your actual Windows venv name, such as `.venv2`. If the terminal
+already starts in `src/`, skip `Set-Location .\src`. Never run the lab from the venv's
+`Scripts` folder or point Windows at the devcontainer's Linux `.venv`.
+
+**Checkpoint:** the last command prints the Python executable inside your chosen Windows
+venv, for example `...\src\.venv-windows\Scripts\python.exe`. Selecting
+`UV_PROJECT_ENVIRONMENT` is enough for `uv run`; you do not need to activate the venv.
+`--no-sync` uses the dependencies already installed instead of updating them.
+
+Then start only the processes needed for your current stage, each in a separate prepared terminal:
+
+| Terminal purpose | Command from `src/` | When needed |
+| --- | --- | --- |
+| Local network MCP server | `uv run --no-sync python -m mcp_server.server` | Stages 6-8; also later local code-first agents with `NETWORK_TOOLS=local`. |
+| Agent in DevUI | `uv run --no-sync python main.py` | When testing your current stage in DevUI. |
+| Contact centre | `uv run --no-sync python -m contact_centre` | Stage 7 scenarios, or later contact-centre exercises. Start a new conversation after restarting it. |
+
+Do not launch a second copy if the required server is still running in another terminal.
+If you previously selected another DevUI port, set it again in the agent's terminal before launch:
+
+```powershell
+$env:DEVUI_PORT = '8091'
+```
+
+Azure sign-in can remain cached across sessions. Rerun sign-in only if it has expired or
+preflight reports an authentication problem. Restore any company-required feed/proxy settings
+only when needed; no custom index is required merely to reuse an installed venv. If you rebuilt
+the devcontainer or deleted the venv, follow setup again rather than using these resume-only commands.
 
 You work from the `src` folder from now on. From Stage 7 you use three terminals:
 
@@ -173,6 +197,9 @@ over `main.py` and `main.instructions.md`, run it, and check the result.
 
 ### Stage 1: Agent only
 
+<details>
+<summary>Steps, commands and screenshots</summary>
+
 [Concepts and exercise](workshop.md#stage-1-agent-only)
 
 ```powershell
@@ -189,7 +216,12 @@ DevUI opens in your browser. The first time, paste the token printed in the term
 **Check:** the agent does not guess a cause; it says it cannot check systems yet and asks for a customer
 ID, e-mail or phone number. Stop DevUI with `Ctrl+C` before the next stage.
 
+</details>
+
 ### Stage 2: Customer identification
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-2-customer-identification)
 
@@ -212,7 +244,12 @@ Please send me another identifier, such as your customer ID or e-mail address.
 **Check:** one `identify_customer` call with the identifier from the prompt; for an unknown number the agent
 asks for another identifier instead of inventing a customer.
 
+</details>
+
 ### Stage 3: Back-office investigation
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-3-back-office-investigation)
 
@@ -233,7 +270,12 @@ Agent: Your internet line is up and working normally ... What I couldn't check y
 
 **Check:** two calls in order; the second uses the `line_id` returned by the first.
 
+</details>
+
 ### Stage 4: Technical diagnostic
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-4-technical-diagnostic)
 
@@ -256,7 +298,12 @@ Agent: Merci. J'ai bien retrouvé votre dossier.
 
 **Check:** the agent answers in French, reports a healthy line and a modem that does not answer the ping.
 
+</details>
+
 ### Stage 5: Correlation
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-5-correlation)
 
@@ -275,7 +322,12 @@ the right shows the four tool calls.
 **not** suggest restarting the modem. Try `Hello, I'm customer CUST-1005. I have no internet at all since this
 morning, nothing loads on any device.`: every check is healthy, so it says it cannot determine the cause.
 
+</details>
+
 ### Stage 6: MCP
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-6-mcp)
 
@@ -306,11 +358,45 @@ errors, and there's no known incident in your area, so a human advisor needs to 
 **Check:** same tools, same answers as Stage 5, but now each call goes over HTTP to the MCP server (its terminal
 logs every request). The instructions did not change.
 
+#### Keep the MCP server running through Stage 8
+
+| What you are running | Does the local network MCP server need to stay up? |
+| --- | --- |
+| Stage 6 agent | **Yes**: diagnostics use `http://127.0.0.1:8000/mcp` by default. |
+| Stage 7 DevUI or contact centre | **Yes**: keep the same server running in its own terminal. |
+| Stage 8 agent | **Yes**: network checks are still local; runbook retrieval is in Azure. |
+| Stage 9 and later code-first agents, normal Azure setup | **No**: the toolbox uses the instructor's shared Azure network MCP server. |
+| Stage 9 and later code-first agents with `NETWORK_TOOLS=local` | **Yes**: the toolbox supplies runbooks, but diagnostics still use your local MCP server. |
+
+When a stage says to stop or restart **DevUI** or the **contact centre**, stop only that
+process with `Ctrl+C`; leave the MCP server's terminal running through Stages 6-8. These are
+separate processes: MCP uses port **8000**, DevUI **8090** by default, and the contact centre **8070**.
+
+If you jump directly to Stage 7 or 8, or reopen your terminals, first start the server from
+`src/` in a dedicated terminal:
+
+```powershell
+uv run python -m mcp_server.server
+```
+
+Use the same Windows venv selection as your agent in each terminal; see
+[Returning after closing terminals](#returning-after-closing-terminals-windows). Keep one server instance running,
+not one per stage. If port 8000 is already occupied by your lab MCP server, reuse it rather
+than starting another copy. A connection-refused error for `127.0.0.1:8000` usually means
+the server is not running or the configured `MOCK_MCP_URL` points to the wrong address.
+
+</details>
+
 ### Stage 7: Answer, act or hand over
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-7-answer-act-or-hand-over)
 
-Keep the MCP server running. In a **third terminal**:
+Keep the **Stage 6 MCP server running in its own terminal** throughout this stage. If it
+is not running, start it using the command in Stage 6 first. In a **third terminal**, also
+opened in `src/` with your Windows venv selected when applicable:
 
 ```powershell
 Copy-Item solutions/stage_7_answer_or_handoff.py main.py
@@ -374,31 +460,18 @@ The approval card appears in the **customer** chat.
 live; no state-changing tool runs without an explicit approval. Stop the contact centre (`Ctrl+C`) before
 Stage 9; it must restart to pick up a new `main.py`.
 
-**Optional, after Stage 9:** try the separate [AG-UI topology lab](optional-ag-ui-lab.md).
-Its opt-in view adds smooth traces, compact guidance, on-demand logs and a real trace drawer.
-The numbered Stage 7 screenshots above still show the regular experience without `--evidence-panel`.
+**Optional extension, available after Stage 9:** [AG-UI topology lab](#optional-ag-ui-topology-lab-after-stage-9).
 
-Once the Stage 9 Azure toolbox is ready, launch the independent baseline from `src/`:
-
-```powershell
-uv run python -m contact_centre ag_ui_lab --evidence-panel
-```
-
-It uses its own instructions and the live reference tools, not your working stage or hosted agent.
-You can keep later-stage changes untouched. Restart the contact centre and start a **New conversation**;
-do not restore Stage 9 files. The Azure toolbox, runbooks and guardrails remain shared, so real service
-errors still appear. See the [runbook-failure explanation](optional-ag-ui-lab.md#if-runbook-guidance-shows-failed).
-
-![Optional AG-UI extension: compact topology with human handover and progress details collapsed](assets/ag-ui/topology-collapsed.png)
-
-This optional screenshot uses scripted events and synthetic lab data, not a live model run.
-See the [full screenshot guide](optional-ag-ui-lab.md#current-ui-screenshots) for details and the drawer.
+</details>
 
 ---
 
 ## 3. Enterprise-ready (Stages 8-13)
 
 ### Stage 8: Knowledge (Foundry IQ)
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-8-knowledge-foundry-iq)
 
@@ -427,7 +500,12 @@ uv run python knowledge_base.py ask "wifi slow upstairs, cable works"
 - RB-04 Fibre outage / loss of signal
 ```
 
-Then give the agent the knowledge base as a second MCP tool (the MCP server from Stage 6 still runs):
+The standalone `knowledge_base.py ask` command above queries Azure directly and does not need
+the local network MCP server. The **full Stage 8 agent does**: keep the Stage 6 server running,
+or start it in another terminal before launching the agent. Stop any previous DevUI/contact-centre
+process before loading the Stage 8 files; do not stop the MCP server.
+
+Then give the agent the knowledge base as a second MCP tool:
 
 The Stage 8 solution stores the dictionary returned by `knowledge_settings()` in `knowledge_config`
 and passes its endpoint and knowledge base name to `runbook_knowledge_base(...)` using the explicit
@@ -446,7 +524,12 @@ In DevUI: `Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202
 **Check:** after the four diagnostics, the agent calls `knowledge_base_retrieve` and cites
 `[RB-03 Wi-Fi interference]` and usually `[RB-11 Mesh / extender placement]`.
 
+</details>
+
 ### Stage 9: Foundry Toolbox
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-9-foundry-toolbox)
 
@@ -480,8 +563,10 @@ In the portal, **Build > Tools > Toolboxes** lists it; **Tools** lists the two c
 
 ![The participant's toolbox in the Foundry portal](assets/walkthrough/portal-toolboxes.png)
 
-For the normal Azure setup, stop the local MCP server (terminal 1): Foundry calls the shared copy in
-Azure. With `NETWORK_TOOLS=local`, leave terminal 1 running instead.
+For the normal Azure setup, once the toolbox lists the `network___` tools above, stop the
+local MCP server with `Ctrl+C` **in the terminal running `mcp_server.server`**: the Stage 9
+agent uses Foundry's shared Azure copy instead. With `NETWORK_TOOLS=local`, keep that local
+server running for this stage and later local code-first agents. Do not start a second copy.
 
 ```powershell
 Copy-Item solutions/stage_9_toolbox.py main.py
@@ -511,7 +596,34 @@ prompts and expected outcomes.
 > `NETWORK_TOOLS=local` to `.env`: the toolbox then holds the runbooks only, and the network tools still come
 > from your laptop (keep terminal 1 running).
 
+#### Optional: AG-UI topology lab (after Stage 9)
+
+Try the separate [AG-UI topology lab](optional-ag-ui-lab.md).
+Its opt-in view adds smooth traces, compact guidance, on-demand logs and a real trace drawer.
+The numbered Stage 7 screenshots show the regular experience without `--evidence-panel`.
+
+Once the Stage 9 Azure toolbox is ready, launch the independent baseline from `src/`:
+
+```powershell
+uv run python -m contact_centre ag_ui_lab --evidence-panel
+```
+
+It uses its own instructions and the live reference tools, not your working stage or hosted agent.
+You can keep later-stage changes untouched. Restart the contact centre and start a **New conversation**;
+do not restore Stage 9 files. The Azure toolbox, runbooks and guardrails remain shared, so real service
+errors still appear. See the [runbook-failure explanation](optional-ag-ui-lab.md#if-runbook-guidance-shows-failed).
+
+![Optional AG-UI extension: compact topology with human handover and progress details collapsed](assets/ag-ui/topology-collapsed.png)
+
+This optional screenshot uses scripted events and synthetic lab data, not a live model run.
+See the [full screenshot guide](optional-ag-ui-lab.md#current-ui-screenshots) for details and the drawer.
+
+</details>
+
 ### Stage 10: Prompt agent
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-10-prompt-agent)
 
@@ -589,7 +701,11 @@ owns the conversation. Manual takeover is contact-centre routing, not an agent-c
 
 In Foundry, open **Build > Agents**, select the name recorded in step 1, and chat in the playground:
 
-![The prompt agent in the Foundry playground, with runbook citations](assets/walkthrough/portal-prompt-agent-playground.png)
+![Baseline prompt agent using model-router: CUST-1003 Wi-Fi guidance with RB-03 and RB-11 citations, toolbox only](assets/walkthrough/portal-prompt-agent-playground.png)
+
+This is the **baseline without additional function tools**: the toolbox provides network diagnostics
+and runbooks. The agent recommends steps but cannot execute a remote restart or record a handover.
+Your agent name and version may differ from this example.
 
 Change one instruction sentence with an observable effect, such as requesting a shorter answer, and
 save the new version. Keep the **Synthetic scenario time** and synthetic-data boundaries unchanged.
@@ -631,6 +747,18 @@ Start **new conversations** in both clients. In the contact centre, send
 The advisor can then take it. Compare this with the default definition's recommendation: this time
 the tool actually records a synthetic handover.
 
+**Customer view, functions enabled:** the line-fault case produces a recorded handover and the
+chat enters **Waiting for a human advisor**. This example uses `HO-9008`; your reference will differ.
+
+![Stage 10 with functions: CUST-1004 receives handover HO-9008 and waits for a human advisor](assets/walkthrough/stage-10-functions-chat-handover.png)
+
+**Operator view of the same handover:** `HO-9008` appears in the queue with the diagnostics and
+customer conversation. The advisor can select **Take conversation** without asking the customer
+to repeat the evidence. The **Approved actions** list shows earlier restarts for other customers,
+not an action performed for this line-fault case.
+
+![Stage 10 with functions: operator desk shows the recorded CUST-1004 handover waiting to be taken](assets/walkthrough/stage-10-functions-desk-handover.png)
+
 **Comparison checkpoint:** record both versions and their observed behavior, confirm the tool-driven
 handover, and explain how it differs from manual takeover. For restart approval, rejection and
 explicit-human-request checks, follow the workshop's
@@ -666,7 +794,12 @@ rerun the scenario and approval/rejection checks. See the
 The workshop also includes a [routing diagram and explanation](workshop.md#how-model-router-works),
 based on Microsoft's [Model Router documentation](https://learn.microsoft.com/azure/foundry/openai/concepts/model-router).
 
+</details>
+
 ### Stage 11: Memory
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-11-memory)
 
@@ -755,7 +888,12 @@ erases what was remembered.
 > **Take conversation** allows manual takeover but does not automatically attach or update a
 > remembered handover.
 
+</details>
+
 ### Stage 12: Evaluation
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-12-evaluation)
 
@@ -876,7 +1014,12 @@ when merging its prompt into a later-stage agent. A higher score still needs an 
 
 After the improvement exercise, continue with the guardrails stage below.
 
+</details>
+
 ### Stage 13: Guardrails
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-13-guardrails)
 
@@ -942,9 +1085,14 @@ protection evidence. A safe reply alone does not identify whether code, platform
 model's instructions prevented the unsafe behavior. The optional live three-layer presentation in
 the main guide is not required for this checkpoint.
 
+</details>
+
 ---
 
 ## 4. Hosted agent (Stage 14)
+
+<details>
+<summary>Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-14-hosted-agent)
 
@@ -1119,6 +1267,8 @@ If local traces are not visible through the portal filters, use the linked **App
 Logs** and the [local-agent query and permissions checklist](workshop.md#export-the-local-ui-traces-to-foundry).
 Keep content capture off for real data; only opt into `SUPPORTBUDDY_TRACE_CONTENT=true` when debugging
 synthetic payloads.
+
+</details>
 
 ---
 

@@ -357,22 +357,128 @@ The full list is in `src/pyproject.toml`.
 Clone or extract the repository, open **PowerShell** in its root folder, then run:
 
 ```powershell
-.\setup-windows.ps1
+.\setup-windows.ps1 -VenvPath '.venv-windows'
 ```
 
+If your network requires an approved package feed, replace the placeholder with the URL
+supplied by IT and use this instead. Keep internal feed URLs in local, uncommitted notes:
+
+```powershell
+.\setup-windows.ps1 -VenvPath '.venv-windows' -PackageIndexUrl '<approved-package-index-url>'
+```
+
+| Parameter | What to enter |
+| --- | --- |
+| `-VenvPath` | Your Windows venv folder name, such as `.venv-windows` (the default) or `.venv2`. Relative paths are created under `src/`. Never choose the devcontainer's `.venv`. |
+| `-PackageIndexUrl` | Optional approved HTTPS package-feed URL. Omit unless your network requires a custom feed. |
+| `-Proxy` | Optional corporate HTTP(S) proxy URL supplied by IT. Different from the package-feed URL; omit if not required. |
+| `-PrerequisitesOnly` | Instructor bootstrap only: install local tools and Python dependencies, then stop before `.env`, Azure sign-in and preflight. Participants normally omit this switch. |
+
+To use a corporate network proxy, append `-Proxy 'http://proxy.example.com:8080'` to either
+command, replacing the example with the URL supplied by IT. Settings apply to this terminal,
+not machine-wide. Each successful setup checkpoint lets you choose Y to continue or N to stop.
+
+**Already have the Windows environment?**
+
+No reinstall or index setting is needed if setup already installed the lab dependencies.
+From the repository root, use your existing Windows venv:
+
+```powershell
+Set-Location .\src
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv2'
+uv run --no-sync python main.py
+```
+
+Replace `.venv2` with the name you chose during setup (`.venv-windows` by default).
+If your terminal is already in `src/`, skip `Set-Location .\src`. If it is inside
+`src/.venv2/Scripts`, run `Set-Location ..\..` first to return to `src/`, then run the
+last two commands above. Repeat the environment setting in each new terminal.
+
+`--no-sync` runs with the packages already installed in the selected venv without syncing
+dependencies. It leaves the devcontainer's `.venv` untouched. Windows and Linux must use
+separate venvs. If your Windows venv is already activated, you can instead run
+`uv run --active --no-sync python main.py` from `src/`.
+
 The script installs missing **uv, Azure CLI and azd** using winget, installs the Foundry extension,
-and uses uv to obtain **Python 3.12** and create **`src/.venv`** with the lab dependencies.
+and uses uv to obtain **Python 3.12** and create **`src/.venv-windows`** with the lab dependencies.
 Python packages stay in this virtual environment; the CLI tools and uv-managed Python live outside it.
 No Docker, GitHub account or Copilot is needed. You still need VS Code (or your preferred editor).
 
 When prompted, fill in `src/.env` using the instructor's handout, save and close Notepad, then
 enter the Azure tenant ID. The script signs you in and runs preflight. Existing `.env` values
-are preserved when rerunning it. After setup, run the lab's `uv run ...` commands from `src/`;
-no virtual-environment activation is needed.
+are preserved when rerunning it. Each successful checkpoint asks whether to continue (Y) or stop (N).
+After setup, copy the printed commands into PowerShell. They select `src/` and set
+`UV_PROJECT_ENVIRONMENT` to your chosen venv before running the lab. Repeat them in each new
+terminal; no virtual-environment activation is needed. Never run from a venv's `Scripts` folder.
+
+Windows and the Linux devcontainer must use separate venvs. The Windows default leaves the
+devcontainer's `.venv` untouched. To choose another name, run this from the repository root:
+
+```powershell
+.\setup-windows.ps1 -VenvPath '.venv2'
+```
+
+This creates or reuses `src/.venv2`. To use it in a new PowerShell terminal, start in the
+repository root and paste:
+
+```powershell
+Set-Location .\src
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv2'
+uv run python main.py
+```
+
+If you already activated a Windows venv, you can instead run `uv run --active python main.py`
+from `src/`. `--active` is a uv option and must appear before `python`, not after `main.py`.
+
+If uv warns that `VIRTUAL_ENV` does not match the project environment, it is ignoring the
+activated venv. If Windows then reports `lib64: Access is denied`, it may be trying to
+replace the devcontainer's Linux `.venv`. Do not delete that shared environment. From `src/`,
+select your Windows venv explicitly:
+
+```powershell
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv2'
+uv run python main.py
+```
+
+Replace `.venv2` with your chosen Windows venv name (`.venv-windows` by default).
+Repeat the setting in each new terminal. If already inside a venv's `Scripts` folder,
+return to `src/` first. Do not use `uv run python main.py --active`: that passes the option
+to your Python program, not uv.
 
 winget may request installer approval or elevation. If winget, downloads or PowerShell scripts are
 blocked by company policy, ask IT to approve/pre-install the tools; do not change the company policy.
-For a private Python feed, set `$env:UV_INDEX_URL` in the same PowerShell window first.
+
+**Optional: approved package feed**
+
+Only configure an index when your network or company policy requires one. Choosing a venv
+does not require a custom index. Ask IT for the approved URL, replace the placeholder below,
+and run from the repository root. Do not commit internal feed URLs or credentials:
+
+```powershell
+.\setup-windows.ps1 -VenvPath '.venv2' -PackageIndexUrl '<approved-package-index-url>'
+```
+
+The feed remains set in the current PowerShell session, not machine-wide. In a new terminal,
+set it again only if your network requires it:
+
+```powershell
+$env:UV_DEFAULT_INDEX = '<approved-package-index-url>'
+```
+
+For another approved feed, replace the URL. Otherwise leave your existing uv index configuration unchanged.
+
+For a corporate HTTP(S) proxy, pass its URL:
+
+```powershell
+.\setup-windows.ps1 -Proxy 'http://proxy.example.com:8080'
+```
+
+Replace the example URL with your company's proxy. This sets `HTTP_PROXY` and `HTTPS_PROXY`
+for tools that support them, preserves existing `NO_PROXY` entries and adds localhost bypasses,
+and enables Windows certificate trust for uv. Settings remain in the current PowerShell session;
+no machine-wide settings change. Without `-Proxy`, existing settings are left unchanged.
+If TLS still fails, ask IT to check proxy access and install the corporate CA certificate in
+Windows trust. Certificate verification remains enabled.
 
 ### Manual setup (all platforms)
 
@@ -433,6 +539,47 @@ All commands run from the `src` folder.
 
 DevUI is your developer view for every stage: it shows each tool call, its arguments and its result. The
 contact centre shows what the customer and the human advisor would see. Both run the same agent.
+
+#### DevUI port already in use
+
+If startup reports `WinError 10048` or `address already in use` on port 8090, another server
+or a VS Code/devcontainer port forward is using it. Leave that process running if needed.
+In the same PowerShell terminal, from `src/` with your Windows venv already selected, paste:
+
+```powershell
+$env:DEVUI_PORT = '8091'
+uv run --no-sync python main.py
+```
+
+Open <http://127.0.0.1:8091> once the terminal reports the server is running. If 8091 is
+also occupied, choose another unused port and open the matching URL. `DEVUI_PORT` remains
+set for later runs in this terminal; set it again in a new terminal if needed. Keep this
+terminal running and use a second terminal for other commands.
+
+#### Find your local DevUI token
+
+On the first DevUI launch, `src/lab_agent.py` generates an access token and writes it to
+**`src/.devui_token`**, next to `main.py`, not inside your venv. Later launches reuse that
+file. The setup script does not create it. The launch banner prints the token to paste into
+the browser's **Authentication Required** prompt.
+
+To retrieve the saved token, open a second PowerShell terminal in `src/` and paste:
+
+```powershell
+Get-Content -LiteralPath .\.devui_token -Raw
+```
+
+Or copy it directly to your clipboard from that terminal:
+
+```powershell
+Get-Content -LiteralPath .\.devui_token -Raw | Set-Clipboard
+```
+
+If the file is missing, launch DevUI first and check its terminal for startup errors.
+If `DEVUI_AUTH_TOKEN` is set, DevUI uses that value instead of creating or reading the file;
+use the token printed by the running server. The browser remembers authentication for its
+address, but a different port or browser may ask again. Treat the token as a local access
+credential: do not commit it, share it, or include it in screenshots.
 
 Each run builds a **code-first** agent named `lab-<alias>-supportbuddy`: the agent loop, its tools and
 its memory run in your Python process on your laptop, and only the model runs in Foundry. Nothing is
@@ -1348,11 +1495,14 @@ Now play the advisor, on the **Operator desk**:
 3. Ask the **advisor assist** agent for help: **Summarise**, **Suggest a reply** (then **Use as reply**,
    edit, and send), or **Check again**. Only you see this panel.
 4. Ask the assist agent to **Restart modem**. An approval card appears on *your* desk: you are the person
-   who decides. When you approve, the customer is told which action was taken on their service, and by
-   whom; the restart appears under **Approved actions**.
-5. **Hand back to SupportBuddy**, and as the customer, ask a follow-up question: SupportBuddy answers again,
-   knowing what the advisor said and did (it does not restart the modem a second time). Or **Close**: the handover record is marked resolved with your
-   last message, which is what `get_handover_status` returns if the customer asks about `HO-...` later.
+  who decides. Approval lets the tool run; only a confirmed successful result tells the customer that
+  the restart command was sent and by whom. The confirmed action is saved in the handover record,
+  and the restart appears under **Approved actions**. A rejected or failed restart must not claim success.
+5. Wait for advisor assist to finish; **Hand back to SupportBuddy** is disabled while it is working.
+  Then hand back and, as the customer, ask `What did Lea do?`: SupportBuddy can retrieve the confirmed
+  action from the handover record without restarting the modem a second time. The case stays
+  **in progress** until **Close** marks it resolved, retaining the action note and your last message
+  for later `get_handover_status` lookups. A restart command does not prove that connectivity is fixed.
 
 #### Scenario C: approve an action (customer chat)
 
@@ -4423,12 +4573,12 @@ All data is in `src/lab_backend/data/scenarios.json` (fictional).
 | `429 Too Many Requests` | The shared model hit its rate limit. Wait a minute and retry. |
 | `reasoning` ... `not supported with this model` | Your chat model has no reasoning support: set `SUPPORTBUDDY_REASONING_EFFORT=off` in `.env`. |
 | `AzureCliCredential.get_token failed: Timed out waiting for Azure CLI` | The Azure CLI took too long to answer (slow or busy laptop). Run `az account get-access-token -o none` once, then try again. `Please run 'az login'` means your sign-in expired: `az login --tenant <tenant>`. |
-| DevUI shows **Authentication Required** | Paste the token from the banner at the top of the terminal output (also in `src/.devui_token`). |
+| DevUI shows **Authentication Required** | Paste the running server's banner token. See [Find your local DevUI token](#find-your-local-devui-token) for file location and copy-paste PowerShell commands. |
 | Codespaces: DevUI returns `invalid_host` / `host_not_allowed` | Restart the agent with `CODESPACES=true` and no `DEVUI_HOST` override (or `DEVUI_HOST=0.0.0.0`). Open port 8090 from the **Ports** tab and paste the token. Keep the port **Private**. |
 | Codespaces: device-code sign-in is blocked | Check the tenant in `az login --use-device-code --tenant <tenant>`. Ask the customer's administrator whether Conditional Access allows device-code sign-in and non-managed devices. |
 | Codespaces: servers stopped after the idle timeout | Restart the codespace and rerun the server commands in your terminals. Files and `.env` survive; server processes do not. |
 | `No module named 'mcp_server'` (or `solutions`, `lab_agent`) | Run the command from the `src` folder: `cd src`. |
-| Port 8090 or 8000 already in use | Stop the previous run (`Ctrl+C`), or set `DEVUI_PORT` / `MCP_PORT`. |
+| Port 8090 or 8000 already in use | Stop your previous run (`Ctrl+C`) if no longer needed. For DevUI, see [DevUI port already in use](#devui-port-already-in-use) for copy-paste commands using another port; for MCP, set `MCP_PORT`. |
 | Stage 6/7: connection refused to `127.0.0.1:8000` | Start the MCP server in a second terminal: `uv run python -m mcp_server.server`. |
 | Stage 7: the contact centre does not start (`address already in use`) | Another program uses port 8070; stop it, or set `CONTACT_CENTRE_PORT`. |
 | Stage 7: the customer chat says the assistant is not reachable | Start the MCP server (`uv run python -m mcp_server.server`) for Stages 6-8, and check the contact centre terminal for errors. |

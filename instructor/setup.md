@@ -46,15 +46,17 @@ is `https://aka.ms/azd/extensions/registry`, redirecting to
 extension downloads use `github.com` and can redirect to `objects.githubusercontent.com` or
 `release-assets.githubusercontent.com`. GitHub download access does not require participant accounts.
 
-If PyPI is blocked, IT must provide an **Azure Artifacts feed with a PyPI upstream** serving the
-lab's pinned dependencies. Set its URL locally before running setup:
+If PyPI is blocked, use the approved internal PyPI feed, or ask IT for an **Azure Artifacts feed
+with a PyPI upstream** serving the lab's pinned dependencies. Pass the feed URL to the Windows
+setup script in the terminal; it remains set in that PowerShell session. Replace the placeholder
+with the URL supplied by IT and keep that URL in local, uncommitted notes:
 
 ```powershell
-$env:UV_INDEX_URL = '<customer Python simple-index URL>'
-.\setup-windows.ps1
+.\setup-windows.ps1 -PackageIndexUrl '<approved-package-index-url>'
 ```
 
-Use the customer's approved feed authentication. Do not commit feed URLs or credentials.
+For another approved feed, replace the URL. Use the feed's approved authentication. Do not commit
+feed URLs or credentials. On other platforms, configure `UV_INDEX_URL` for the setup command.
 
 ## Reusable scenario time
 
@@ -102,11 +104,62 @@ date claims from earlier dry runs.
   `text-embedding-3-small`, **Global Standard** by default. The router can also use **Data Zone Standard**
   where supported; check the quota for that SKU before switching.
   Check it in the Foundry portal (Quota) or with `az cognitiveservices usage list -l <region>`.
-- On your machine: [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
-  (`azd`), [uv](https://docs.astral.sh/uv/) and the Azure CLI. Docker is **not** needed: the MCP server image
-  is built in Azure Container Registry.
+- Local tools: [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+  (`azd`), [uv](https://docs.astral.sh/uv/) and the Azure CLI. **The Windows bootstrap below installs
+  missing tools**, including PowerShell 7 (`pwsh`) for the provisioning hook. On macOS/Linux,
+  install the CLI tools before the manual commands below. Docker is **not** needed: the MCP server
+  image is built in Azure Container Registry.
 
 ### Run it
+
+**First, bootstrap the instructor's laptop.** On Windows, open PowerShell in the repository
+root and paste this command. Windows PowerShell 5.1 or PowerShell 7 can run the bootstrap:
+
+```powershell
+.\setup-windows.ps1 -PrerequisitesOnly -VenvPath '.venv-windows'
+```
+
+The script has two checkpoints, with a Y/N continue choice between them:
+
+1. Check or install **uv, Azure CLI, azd and PowerShell 7** using winget.
+2. Obtain **Python 3.12**, create or reuse **`src/.venv-windows`**, install the lab dependencies,
+   and check or install the **`microsoft.foundry` azd extension**.
+
+It then stops: **no participant `.env`, Azure sign-in, lab preflight or Azure provisioning**.
+The instructor uses the same dependencies as the lab (`src/pyproject.toml`); there is no separate
+instructor requirements file. No existing Foundry project is needed for these local steps.
+
+Replace `.venv-windows` with your existing Windows venv name, such as `.venv2`, to reuse it.
+Never select the devcontainer's Linux `.venv`. No activation is needed. If your network requires
+a feed, append `-PackageIndexUrl '<approved-package-index-url>'`, replacing the placeholder with
+the URL from IT. For a corporate network proxy, append `-Proxy 'http://proxy.example.com:8080'`
+using the URL from IT. Neither option is required merely to select a venv. Keep internal feed
+URLs local and uncommitted. If winget or installers are blocked, ask IT to pre-install the tools;
+do not bypass company policy.
+
+**Windows checkpoint:** both stages show `[PASS]`, followed by `Local prerequisites complete`.
+The script prints commands selecting the instructor folder and the absolute Windows venv path.
+Paste those into **PowerShell 7** before provisioning, especially if you started in Windows
+PowerShell 5.1 or opened a new terminal. The absolute path is inherited by the provisioning hook
+and stays valid when changing folders. The hook requires PowerShell 7, not Windows PowerShell 5.1.
+
+On macOS/Linux or inside the devcontainer, with uv and the Azure CLI tools already installed,
+run from the repository root instead:
+
+```bash
+uv sync --project ./src --python 3.12
+uv run --project ./src --no-sync python --version
+```
+
+This uses `src/.venv` by default, unless `UV_PROJECT_ENVIRONMENT` selects another environment.
+Do not reuse a Windows venv from Linux. Only set an approved package index if your network
+requires one; see [Restricted networks](#customers-on-azure-devops-no-github) above.
+
+**macOS/Linux checkpoint:** `uv sync` completes successfully and the version check prints
+`Python 3.12.x`. Resolve any local installation errors before provisioning Azure resources.
+
+**Then provision Azure.** Continue in the prepared terminal. From the repository root, run
+the commands below; skip `cd instructor` if the bootstrap's printed commands already moved you there:
 
 ```bash
 cd instructor
@@ -131,8 +184,18 @@ azd up
 3. **Deploys** the network MCP server: builds `src/mcp_server` in the registry and runs it.
 
 At the end it prints the values to give the participants: the lines for their `src/.env`, the guardrail
-ID (Stage 13) and the project resource ID (Stage 14). Print them again at any time with
-`uv run --project ../src python setup_lab.py` (it is safe to run again).
+ID (Stage 13) and the project resource ID (Stage 14). To rerun setup and print the handout again,
+run this from `instructor/`, with the Windows venv selected as above if applicable:
+
+```bash
+uv run --project ../src python setup_lab.py
+```
+
+This is **not a print-only command**: it rewrites the shared project connections, reapplies the
+knowledge-base, knowledge-source and index definitions, uploads the runbooks again, and creates
+the memory store if missing. It reuses existing resources rather than duplicating them, but can
+overwrite intentional shared configuration changes. Review those changes before rerunning;
+use the previous terminal output if you only need another copy of the handout.
 
 Application Insights is instructor-provisioned once per environment, not created by participants.
 The handout enables prompt-agent client tracing with `SUPPORTBUDDY_TRACING=true` and leaves chat/tool
@@ -230,6 +293,11 @@ Use this when the customer already has a Foundry project to use. You need: Owner
 resource group, **Foundry Project Manager** on the project, **Search Service Contributor** and **Search
 Index Data Contributor** on the search service, the Azure CLI, `azd` with `azd ext install microsoft.foundry`,
 and the lab's `src/.env` filled in.
+
+On Windows, first run the prerequisites-only bootstrap under [Run it](#run-it) from the
+repository root. Use its printed commands to select your Windows venv in PowerShell 7.
+Keep that terminal's absolute `UV_PROJECT_ENVIRONMENT` setting when running the following
+Python commands from `src/`.
 
 ### 1. Model deployments
 
@@ -368,12 +436,13 @@ their Stage 11 identity/memory and Stage 9 toolbox; evaluation does not provisio
 
 ### 6. Guardrail (Stage 13)
 
-`guardrail.json` is the default policy plus **Indirect Attack** detection.
+`guardrail.json` is the default policy plus **Indirect Attack** detection. Run from `src/`;
+the policy file is in the sibling `instructor/` folder:
 
 ```bash
 az rest --method put \
   --url "https://management.azure.com<foundry-account-resource-id>/raiPolicies/supportbuddy-guardrail?api-version=2025-06-01" \
-  --body @instructor/guardrail.json
+  --body @../instructor/guardrail.json
 ```
 
 Replace `<foundry-account-resource-id>` with the account ID including its leading `/`.

@@ -47,7 +47,7 @@ APPROVAL_TEXT = {
 
 # What the customer (and SupportBuddy) are told once an advisor's approved action has run.
 DONE_TEXT = {
-    "restart_modem": "restarted your modem remotely. The connection drops for about 3 minutes, then comes back.",
+    "restart_modem": "sent a remote restart command for your modem. Please wait about 3 minutes, then test your connection.",
 }
 
 Runner = Callable[[str, dict[str, Any]], AsyncIterator[dict[str, Any]]]
@@ -213,6 +213,8 @@ class ContactCentre:
     def hand_back(self, conversation: Conversation, advisor: str) -> None:
         if conversation.mode != "advisor":
             raise ValueError("Only a conversation you have taken can be handed back.")
+        if conversation.assist_busy:
+            raise ValueError("Wait for the assist agent to finish before handing the conversation back.")
         self.store.set_mode(conversation, "agent")
         self._record_human_event(conversation, "handed_back")
         self.store.add(conversation, "system", f"{advisor} handed the conversation back to SupportBuddy.")
@@ -229,11 +231,12 @@ class ContactCentre:
         self.store.add(conversation, "system", f"{advisor} closed the conversation. Thank you for contacting us.")
         if conversation.handover:
             last_reply = next((m["text"] for m in reversed(conversation.transcript) if m["role"] == "advisor"), None)
+            messages = [conversation.handover.get("advisor_message"), last_reply]
             backend.update_handover(
                 conversation.handover["handover_id"],
                 status="resolved",
                 advisor=advisor,
-                advisor_message=last_reply or "Resolved in the live chat.",
+                advisor_message="\n".join(message for message in messages if message) or "Resolved in the live chat.",
             )
 
     def _record_human_event(self, conversation: Conversation, event: str) -> None:
@@ -279,18 +282,44 @@ class ContactCentre:
         resume = self._approval_resume(conversation.assist_transcript, approval)
         if resume is None:
             return
-        for decision in self._approval_batch(conversation.assist_transcript, approval):
-            if decision["status"] != "approved":
-                continue
-            # The customer sees every action taken on their service, and who approved it.
-            done = DONE_TEXT.get(decision["tool"], f"ran {decision['tool']} on your service.")
-            approver = decision["advisor"]
-            self.store.add(conversation, "system", f"{approver} {done}")
-            conversation.agent_history.append({
-                "id": uuid.uuid4().hex, "role": "assistant",
-                "content": f"(Human advisor {approver} {done} This is done; do not run it again.)",
-            })
         await self._run_assist(conversation, resume=resume)
+
+    def _record_advisor_restart(
+        self, conversation: Conversation, approval: dict[str, Any], result: dict[str, Any],
+    ) -> None:
+        customer_id = self.case_customer(conversation)
+        if (
+            result.get("restart_sent") is not True
+            or not customer_id
+            or result.get("customer_id") != customer_id
+            or approval.get("action_recorded")
+        ):
+            return
+        approver = approval["advisor"]
+        message = f"{approver} {DONE_TEXT['restart_modem']}"
+        if result.get("requested_at"):
+            message += f" Command sent at {result['requested_at']}."
+        if conversation.handover:
+            handover_id = conversation.handover["handover_id"]
+            stored = backend.get_handover_status(handover_id, customer_id)
+            if not stored.get("found"):
+                return
+            messages = [stored.get("advisor_message"), message]
+            updated = backend.update_handover(
+                handover_id,
+                status="resolved" if stored["status"] == "resolved" else "in_progress",
+                advisor=approver,
+                advisor_message="\n".join(item for item in messages if item),
+            )
+            if updated is not None:
+                conversation.handover.update(updated)
+        approval["action_recorded"] = True
+        self.store.add(conversation, "system", message)
+        conversation.agent_history.append({
+            "id": uuid.uuid4().hex, "role": "assistant",
+            "content": f"(Human advisor action confirmed: {message} This is done; do not run it again.)",
+        })
+        self.store.publish_state(conversation)
 
     # ----- AG-UI -----------------------------------------------------------------------------
 
@@ -383,6 +412,12 @@ class ContactCentre:
             body["resume"] = resume
         texts: dict[str, dict[str, Any]] = {}
         calls: dict[str, str] = {}
+        approved_actions = {
+            message.get("tool_call_id", message["interrupt_id"]): message for message in conversation.assist_transcript
+            if history_attr == "assist_history" and resume and message["role"] == "approval"
+            and message["status"] == "approved"
+            and any(decision["interruptId"] == message["interrupt_id"] for decision in resume)
+        }
         steps: dict[str, str] = {}
         announced: set[str] = set()
         handover: dict[str, Any] | None = None
@@ -470,6 +505,12 @@ class ContactCentre:
                     if changed or trace_changed:
                         self.store.publish_state(conversation)
                         await asyncio.sleep(0)
+                if kind == "TOOL_CALL_RESULT":
+                    approval = approved_actions.get(event.get("toolCallId"))
+                    if approval and approval["tool"] == "restart_modem":
+                        result = tool_result(event.get("content"))
+                        if result is not None:
+                            self._record_advisor_restart(conversation, approval, result)
                 if kind == "TEXT_MESSAGE_CONTENT":
                     message = texts.get(event["messageId"])
                     if message is None:
@@ -524,6 +565,7 @@ class ContactCentre:
                             "approval",
                             APPROVAL_TEXT.get(name, f"Allow {name}?"),
                             interrupt_id=interrupt["id"],
+                            tool_call_id=call.get("call_id") or interrupt.get("toolCallId") or interrupt["id"],
                             approval_batch=body["runId"],
                             tool=name,
                             arguments=call.get("arguments") or {},

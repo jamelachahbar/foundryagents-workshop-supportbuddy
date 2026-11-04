@@ -144,7 +144,7 @@ function renderControls() {
   }
   const mine = c.mode === "advisor";
   $("#take").disabled = !["waiting", "agent"].includes(c.mode) || c.busy;
-  $("#handback").disabled = !mine;
+  $("#handback").disabled = !mine || c.assist_busy;
   $("#close").disabled = c.mode === "closed" || c.busy;
   $("#text").disabled = $("#send").disabled = !mine;
   $("#text").placeholder = mine ? "Write to the customer" : "Take the conversation to write to the customer";

@@ -353,11 +353,15 @@ def test_assist_works_for_the_advisor_only():
         tool("c1", "escalate_to_human", record) + [{"type": "RUN_FINISHED"}],
         text("m1", "Suggested reply:\nHello") + [{"type": "RUN_FINISHED"}],
         [{"type": "RUN_FINISHED", "outcome": {"type": "interrupt", "interrupts": [interrupt]}}],
-        text("m2", "Done") + [{"type": "RUN_FINISHED"}],
+        tool("a-1", "restart_modem", {
+            "restart_sent": True, "customer_id": "CUST-1005",
+            "requested_at": "2026-11-04T14:39:03+00:00",
+        }) + text("m2", "Done") + [{"type": "RUN_FINISHED"}],
     )
     centre = ContactCentre(agents, signs_in=False, agent_label="test")
     conversation = centre.start(None)
     run(centre.customer_message(conversation, "Nothing loads"))
+    centre.take(conversation, "Lea")
     customer_messages = len(conversation.transcript)
 
     run(centre.assist(conversation, "Lea", "Suggest a reply."))
@@ -374,8 +378,12 @@ def test_assist_works_for_the_advisor_only():
     run(centre.assist_approval(conversation, "Lea", "a-1", True))
     assert agents.calls[3][1]["resume"][0]["payload"] == {"approved": True}
     # The customer is told about an action on their service, and who took it; SupportBuddy learns it is done.
-    assert conversation.transcript[-1]["text"].startswith("Lea restarted your modem remotely.")
+    assert conversation.transcript[-1]["text"].startswith("Lea sent a remote restart command for your modem.")
     assert "do not run it again" in conversation.agent_history[-1]["content"]
+    stored = backend.get_handover_status(record["handover_id"], "CUST-1005")
+    assert stored["status"] == "in_progress"
+    assert stored["advisor_message"] == conversation.transcript[-1]["text"]
+    assert "2026-11-04T14:39:03+00:00" in stored["advisor_message"]
 
 
 def test_assist_identifies_an_unknown_customer_then_works_on_that_customer_only():
@@ -394,6 +402,126 @@ def test_assist_identifies_an_unknown_customer_then_works_on_that_customer_only(
 
     run(centre.assist(conversation, "Lea", "Check again."))
     assert agents.calls[1][0] == ASSIST_PATH.format(who="CUST-1004")
+
+
+@pytest.mark.parametrize("approved,result,result_call", [
+    (False, {"restart_sent": True, "customer_id": "CUST-1005"}, "restart-1"),
+    (True, {"restart_sent": False, "customer_id": "CUST-1005"}, "restart-1"),
+    (True, {"restart_sent": True, "customer_id": "CUST-1002"}, "restart-1"),
+    (True, {"restart_sent": "true", "customer_id": "CUST-1005"}, "restart-1"),
+    (True, {"restart_sent": True, "customer_id": "CUST-1005"}, "unrelated-call"),
+    (True, {"isError": True, "content": [{"type": "text", "text": "restart failed"}]}, "restart-1"),
+    (True, None, "restart-1"),
+])
+def test_advisor_restart_requires_approved_matching_success(approved, result, result_call):
+    record = handover_record()
+    interrupt = {"id": "restart-1", "metadata": {"agent_framework": {"function_call": {
+        "name": "restart_modem", "arguments": {"customer_id": "CUST-1005"},
+    }}}}
+    events = [] if result is None else [{
+        "type": "TOOL_CALL_RESULT", "toolCallId": result_call, "content": json.dumps(result),
+    }]
+    agents = ScriptedAgents(
+        [{"type": "RUN_FINISHED", "outcome": {"interrupts": [interrupt]}}],
+        events + [{"type": "RUN_FINISHED"}],
+    )
+    centre = ContactCentre(agents, signs_in=False, agent_label="test")
+    conversation = centre.start(None)
+    conversation.handover = record
+    centre.take(conversation, "Lea")
+    run(centre.assist(conversation, "Lea", "Restart the modem."))
+    before = len(conversation.transcript)
+    run(centre.assist_approval(conversation, "Lea", "restart-1", approved))
+    assert len(conversation.transcript) == before
+    assert backend.get_handover_status(record["handover_id"], "CUST-1005")["advisor_message"] is None
+    assert not any("do not run it again" in message["content"] for message in conversation.agent_history)
+    assert not conversation.assist_busy
+
+
+def test_advisor_restart_uses_tool_call_identity_and_updates_only_current_case():
+    record = handover_record()
+    other = handover_record()
+    interrupt = {"id": "approval-1", "toolCallId": "restart-1", "metadata": {"agent_framework": {"function_call": {
+        "call_id": "restart-1", "name": "network___restart_modem", "arguments": {"customer_id": "CUST-1005"},
+    }}}}
+    result = {
+        "restart_sent": True, "customer_id": "CUST-1005", "requested_at": "2026-11-04T14:39:03+00:00",
+    }
+    event = {"type": "TOOL_CALL_RESULT", "toolCallId": "restart-1", "content": json.dumps({
+        "content": [{"type": "text", "text": json.dumps(result)}],
+    })}
+    agents = ScriptedAgents(
+        [{"type": "RUN_FINISHED", "outcome": {"interrupts": [interrupt]}}],
+        [event, event, {"type": "RUN_FINISHED"}],
+    )
+    centre = ContactCentre(agents, signs_in=False, agent_label="test")
+    conversation = centre.start(None)
+    conversation.handover = record
+    centre.take(conversation, "Lea")
+    run(centre.assist(conversation, "Lea", "Restart the modem."))
+    before = len(conversation.transcript)
+    run(centre.assist_approval(conversation, "Lea", "approval-1", True))
+    assert len(conversation.transcript) == before + 1
+    stored = backend.get_handover_status(record["handover_id"], "CUST-1005")
+    assert stored["advisor_message"] == conversation.transcript[-1]["text"]
+    assert stored["advisor"] == "Lea" and stored["status"] == "in_progress"
+    assert conversation.handover["advisor_message"] == stored["advisor_message"]
+    assert backend.get_handover_status(other["handover_id"], "CUST-1005")["advisor_message"] is None
+    assert not backend.get_handover_status(record["handover_id"], "CUST-1002")["found"]
+    centre.advisor_message(conversation, "Lea", "The customer will test the connection.")
+    centre.close(conversation, "Lea")
+    closed = backend.get_handover_status(record["handover_id"], "CUST-1005")
+    assert closed["status"] == "resolved"
+    assert stored["advisor_message"] in closed["advisor_message"]
+    assert "The customer will test the connection." in closed["advisor_message"]
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_handback_waits_for_advisor_execution_and_unblocks_after_completion(failed):
+    async def scenario():
+        entered = asyncio.Event()
+        release = asyncio.Event()
+        interrupt = {"id": "restart-1", "metadata": {"agent_framework": {"function_call": {
+            "name": "restart_modem", "arguments": {"customer_id": "CUST-1005"},
+        }}}}
+
+        async def runner(path, body):
+            if not body.get("resume"):
+                yield {"type": "RUN_FINISHED", "outcome": {"interrupts": [interrupt]}}
+                return
+            entered.set()
+            await release.wait()
+            if failed:
+                raise httpx.ReadError("restart stream failed")
+            yield {"type": "TOOL_CALL_RESULT", "toolCallId": "restart-1", "content": json.dumps({
+                "restart_sent": True, "customer_id": "CUST-1005",
+            })}
+            yield {"type": "RUN_FINISHED"}
+
+        record = handover_record()
+        centre = ContactCentre(runner, signs_in=False, agent_label="test")
+        conversation = centre.start(None)
+        conversation.handover = record
+        centre.take(conversation, "Lea")
+        await centre.assist(conversation, "Lea", "Restart the modem.")
+        task = asyncio.create_task(centre.assist_approval(conversation, "Lea", "restart-1", True))
+        try:
+            await asyncio.wait_for(entered.wait(), timeout=2)
+            assert conversation.assist_busy
+            assert backend.get_handover_status(record["handover_id"], "CUST-1005")["advisor_message"] is None
+            with pytest.raises(ValueError, match="Wait for the assist agent"):
+                centre.hand_back(conversation, "Lea")
+            assert conversation.mode == "advisor"
+        finally:
+            release.set()
+            await task
+        assert not conversation.assist_busy
+        centre.hand_back(conversation, "Lea")
+        assert conversation.mode == "agent"
+        stored = backend.get_handover_status(record["handover_id"], "CUST-1005")
+        assert bool(stored["advisor_message"]) is not failed
+
+    run(scenario())
 
 
 def test_signed_in_conversations_use_one_agent_per_customer():

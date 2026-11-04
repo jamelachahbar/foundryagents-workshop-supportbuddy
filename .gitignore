@@ -14,6 +14,7 @@ __pycache__/
 # Organisation-specific package index configuration, and locks resolved against it
 uv.toml
 uv.lock
+package-feed.local.txt
 
 # Stage 14: generated per participant by `azd ai agent init`
 .azure/
