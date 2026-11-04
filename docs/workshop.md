@@ -264,6 +264,10 @@ agents never call each other: there is no multi-agent orchestration in this lab.
 
 ## Prerequisites
 
+No GitHub account? Your instructor gives you the clone URL (for example Azure DevOps).
+Copilot is optional. Use a local laptop or an instructor-provided development machine;
+GitHub Codespaces is an option only for participants with GitHub accounts.
+
 > **🟣 Important**
 >
 > Sort these out **before** the workshop day; environment access is the most common reason a lab day
@@ -294,14 +298,17 @@ agents never call each other: there is no multi-agent orchestration in this lab.
 - [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
 - For Stage 14: the [Azure Developer CLI](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
   (`azd` 1.27.1 or later) with the Foundry extensions: `azd ext install microsoft.foundry`. Docker is **not** needed.
-- Network access to PyPI, GitHub, `*.services.ai.azure.com`, `*.search.windows.net` and `*.azurecontainerapps.io`
+- Network access to PyPI (or the customer's internal Python feed), `*.services.ai.azure.com`,
+  `*.search.windows.net` and `*.azurecontainerapps.io`. Tool installation may also need GitHub;
+  for restricted networks, see [Customers on Azure DevOps](../instructor/setup.md#customers-on-azure-devops-no-github).
 - GitHub Copilot is **not** required.
 
-A dev container is included (`.devcontainer/`) if you prefer Codespaces or Docker.
+A dev container is included (`.devcontainer/`) for local VS Code Dev Containers with Docker,
+or Codespaces if you have a GitHub account.
 
 ### Running in GitHub Codespaces
 
-Open the codespace **before day 1** and wait for container setup to finish. Use it in the browser or
+This option requires a GitHub account. Open the codespace **before day 1** and wait for container setup to finish. Use it in the browser or
 connect with VS Code desktop. The container installs Python, uv, Azure CLI and Azure Developer CLI,
 including the Foundry extension.
 
@@ -345,6 +352,30 @@ The full list is in `src/pyproject.toml`.
 <details>
 <summary><strong>Get ready to build</strong> &middot; Configure, sign in, run, restart and catch up</summary>
 
+### Windows: one-command setup
+
+Clone or extract the repository, open **PowerShell** in its root folder, then run:
+
+```powershell
+.\setup-windows.ps1
+```
+
+The script installs missing **uv, Azure CLI and azd** using winget, installs the Foundry extension,
+and uses uv to obtain **Python 3.12** and create **`src/.venv`** with the lab dependencies.
+Python packages stay in this virtual environment; the CLI tools and uv-managed Python live outside it.
+No Docker, GitHub account or Copilot is needed. You still need VS Code (or your preferred editor).
+
+When prompted, fill in `src/.env` using the instructor's handout, save and close Notepad, then
+enter the Azure tenant ID. The script signs you in and runs preflight. Existing `.env` values
+are preserved when rerunning it. After setup, run the lab's `uv run ...` commands from `src/`;
+no virtual-environment activation is needed.
+
+winget may request installer approval or elevation. If winget, downloads or PowerShell scripts are
+blocked by company policy, ask IT to approve/pre-install the tools; do not change the company policy.
+For a private Python feed, set `$env:UV_INDEX_URL` in the same PowerShell window first.
+
+### Manual setup (all platforms)
+
 ```bash
 git clone <this repository>
 cd <repository>/src
@@ -386,7 +417,9 @@ uv run python preflight.py
 
 > **🟢 Tip**
 >
-> **Checkpoint:** you see four `[OK]` lines and `Ready for the lab.`
+> **Checkpoint:** the four required checks show `[OK]`, followed by `Ready for the lab.`
+> The two Stage 14 tooling checks (azd >= 1.27.1 and `microsoft.foundry`) show `[OK]` or
+> `[WARN]` with an installation hint. Warnings do not block day 1; resolve them before Stage 14.
 
 ### How you will run the agent
 

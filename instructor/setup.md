@@ -18,6 +18,44 @@ Container Apps environment, no identity.
 One shared environment per group is the normal case. A personal environment costs more (an Azure AI
 Search Basic service each) and takes about 15 minutes per person, so do it **before** the workshop day.
 
+## Customers on Azure DevOps (no GitHub)
+
+The lab does not require participant GitHub accounts, Codespaces or Copilot. Azure sign-in and the
+Foundry permissions described below are still required.
+
+1. In the customer's Azure DevOps project, select **Repos > Import repository** and enter
+   `https://github.com/jamelachahbar/foundryagents-workshop-supportbuddy.git`.
+2. Give participants the **Azure DevOps clone URL**, or distribute a ZIP of the repository through
+   the customer's usual file-sharing channel.
+3. On Windows, participants extract or clone the repository and run the
+   [one-command Windows setup](../docs/workshop.md#windows-one-command-setup).
+
+Use local laptops, **Microsoft Dev Box**, or an Azure VM. Codespaces requires GitHub accounts;
+it is not needed here. If Docker is allowed, the included `.devcontainer` also works locally with
+VS Code Dev Containers. **Copilot is optional**; `.github/skills` is only an extra for licence holders.
+
+**Restricted networks:** ask IT to allow the tool downloads or pre-install uv, Python 3.12,
+Azure CLI, azd and `microsoft.foundry`. The Windows script uses winget for missing CLI tools;
+uv downloads Python when needed. Test on a customer machine before the workshop.
+The [azd installer](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd)
+uses `https://aka.ms/install-azd.ps1`, currently redirecting to
+`https://azuresdkartifacts.z5.web.core.windows.net/azd/standalone/installer/install-azd.ps1`.
+The [extension registry](https://learn.microsoft.com/azure/developer/azure-developer-cli/extensions/overview)
+is `https://aka.ms/azd/extensions/registry`, redirecting to
+`https://raw.githubusercontent.com/Azure/azure-dev/refs/heads/main/cli/azd/extensions/registry.json`;
+extension downloads use `github.com` and can redirect to `objects.githubusercontent.com` or
+`release-assets.githubusercontent.com`. GitHub download access does not require participant accounts.
+
+If PyPI is blocked, IT must provide an **Azure Artifacts feed with a PyPI upstream** serving the
+lab's pinned dependencies. Set its URL locally before running setup:
+
+```powershell
+$env:UV_INDEX_URL = '<customer Python simple-index URL>'
+.\setup-windows.ps1
+```
+
+Use the customer's approved feed authentication. Do not commit feed URLs or credentials.
+
 ## Reusable scenario time
 
 Every lab run replays the same synthetic snapshot: **18 November 2026, 10:00 UTC**
