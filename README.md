@@ -21,6 +21,9 @@ Optional Copilot skills and references: [.github/skills/README.md](.github/skill
 
 Visual architecture guide: [AG-UI in SupportBuddy](docs/ag-ui.md) - streaming, approvals and human handover.
 
+Optional security lab after Stages 9 and 14: [secure the network MCP server behind the toolbox](docs/optional-secure-mcp.md)
+(project identity, then per-agent app role).
+
 Optional extension after Stage 9: [live evidence-panel lab and working solution](docs/optional-ag-ui-lab.md)
 (`--evidence-panel`), driven by AG-UI events. Run `uv run python -m contact_centre ag_ui_lab --evidence-panel`
 from `src/`; its dedicated instructions leave your current stage untouched.
@@ -96,6 +99,7 @@ docs/workshop.md                  participant guide (start here)
 docs/walkthrough.md               fast click-through of the whole lab with screenshots (dry run, catch-up)
 instructor/setup.md               lab environment setup: `azd up` in any tenant, or by hand (+ guardrail.json)
 instructor/azure.yaml, infra/     the lab environment as code (Bicep) and its post-provision script (setup_lab.py)
+instructor/secure_mcp.py          optional: Entra ID and app-role access for the shared MCP server (docs/optional-secure-mcp.md)
 src/main.py                       your agent - you extend it at each stage
 src/main.instructions.md          your agent's instructions
 src/lab_agent.py                  shared plumbing: settings, Foundry connection, DevUI / console runner

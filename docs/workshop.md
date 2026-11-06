@@ -2335,6 +2335,9 @@ Do not delete the toolbox or its shared connections.
 See [Toolbox capabilities](https://learn.microsoft.com/azure/foundry/agents/concepts/toolbox-overview)
 and [server-side tool search](https://learn.microsoft.com/azure/foundry/agents/how-to/tools/tool-search).
 
+**Optional (instructor demo):** [secure the network MCP server behind the toolbox](optional-secure-mcp.md),
+Step A. The server then refuses anonymous calls, and your toolbox keeps working through the project identity.
+
 <p align="right"><a href="#stage-8-knowledge-foundry-iq">Previous: Stage 8</a> · <a href="#contents">Contents</a> · <a href="#stage-10-prompt-agent">Next: Stage 10 &rarr;</a></p>
 
 </details>
@@ -4505,6 +4508,10 @@ Keep content capture off unless deliberately debugging **synthetic** messages an
 - Both can reuse the toolbox, knowledge base, platform guardrails and evaluations. The lab contact
   centre can load the Stage 14 implementation locally, as above, but it does not call the deployed
   hosted endpoint. Handovers recorded inside the deployed container do not reach the local advisor desk.
+
+**Optional:** give your hosted agent its own access to the network tools with an app role, then take it
+away again: [secure the network MCP server](optional-secure-mcp.md#step-b-per-agent-access-with-an-app-role-after-stage-14),
+Step B (with your instructor).
 
 <p align="right"><a href="#stage-13-guardrails">Previous: Stage 13</a> · <a href="#contents">Contents</a> · <a href="#scenario-reference">Next: Scenarios &rarr;</a></p>
 

@@ -37,7 +37,8 @@ GUARDRAIL_ID = re.compile(
 )
 
 
-def toolbox_tools(project: AIProjectClient, include_network: bool = True) -> list[MCPToolboxTool]:
+def toolbox_tools(project: AIProjectClient, include_network: bool = True,
+                  network_connection: str = NETWORK_CONNECTION) -> list[MCPToolboxTool]:
     """The tools in the toolbox. server_label becomes the prefix of each tool name."""
     knowledge = project.connections.get(KNOWLEDGE_CONNECTION)
     tools = [
@@ -51,26 +52,27 @@ def toolbox_tools(project: AIProjectClient, include_network: bool = True) -> lis
     ]
     if include_network:
         try:
-            network = project.connections.get(NETWORK_CONNECTION)
+            network = project.connections.get(network_connection)
         except ResourceNotFoundError:
-            sys.exit(f"The project has no '{NETWORK_CONNECTION}' connection. Without a network MCP server on Azure, "
+            sys.exit(f"The project has no '{network_connection}' connection. Without a network MCP server on Azure, "
                      "set NETWORK_TOOLS=local in src/.env and run this again.")
         tools.insert(0, MCPToolboxTool(
             server_label="network",
             server_url=network.target,
-            project_connection_id=NETWORK_CONNECTION,
+            project_connection_id=network_connection,
             require_approval="never",  # read-only diagnostics
         ))
     return tools
 
 
-def create(project: AIProjectClient, name: str, guardrail: str | None, include_network: bool = True) -> None:
+def create(project: AIProjectClient, name: str, guardrail: str | None, include_network: bool = True,
+           network_connection: str = NETWORK_CONNECTION) -> None:
     if guardrail and not GUARDRAIL_ID.match(guardrail):
         sys.exit("--guardrail needs the full resource ID: /subscriptions/.../accounts/<account>/raiPolicies/<name>")
     version = project.toolboxes.create_version(
         name=name,
         description="SupportBuddy lab tools: synthetic network diagnostics and runbooks (training data only).",
-        tools=toolbox_tools(project, include_network),
+        tools=toolbox_tools(project, include_network, network_connection),
         policies=ToolboxPolicies(rai_config=RaiConfig(rai_policy_name=guardrail)) if guardrail else None,
     )
     # A new version is not served until it is the default: promote it explicitly.
@@ -78,6 +80,8 @@ def create(project: AIProjectClient, name: str, guardrail: str | None, include_n
     print(f"Toolbox '{name}' version {version.version} is now the default.")
     if not include_network:
         print("NETWORK_TOOLS=local: the toolbox holds the runbooks; the network tools stay on your laptop.")
+    if network_connection != NETWORK_CONNECTION:
+        print(f"Network tools use the connection '{network_connection}'. Run `toolbox.py create` to go back.")
     if guardrail:
         print("The guardrail now screens tool inputs and outputs through this toolbox.")
 
@@ -96,6 +100,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Manage your SupportBuddy Foundry Toolbox.")
     parser.add_argument("action", choices=["create", "show"])
     parser.add_argument("--guardrail", help="Stage 13: resource ID of a guardrail (RAI policy) to apply to the tools.")
+    parser.add_argument("--network-connection", default=NETWORK_CONNECTION,
+                        help="Optional secure-MCP lab: use another project connection for the network tools.")
     args = parser.parse_args()
 
     settings = load_settings()
@@ -104,7 +110,8 @@ def main() -> int:
         asyncio.run(show(toolbox["TOOLBOX_ENDPOINT"]))
         return 0
     with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=AzureCliCredential()) as project:
-        create(project, toolbox["TOOLBOX_NAME"], args.guardrail, include_network=toolbox["NETWORK_TOOLS"] == "toolbox")
+        create(project, toolbox["TOOLBOX_NAME"], args.guardrail, include_network=toolbox["NETWORK_TOOLS"] == "toolbox",
+               network_connection=args.network_connection)
     return 0
 
 

@@ -11,7 +11,10 @@ From Stage 9 the instructor also runs one shared copy on Azure Container Apps
 so Foundry (Toolbox, prompt agents, hosted agents) can reach it; that copy only
 serves the same fictional, read-only data. Securing and governing real MCP
 endpoints (Entra ID, API Management / MCP gateway, rate limits) is covered in
-the workshop discussion.
+the workshop discussion and in the optional lab docs/optional-secure-mcp.md:
+``instructor/secure_mcp.py`` turns on Entra authentication for the shared copy,
+and ``NETWORK_MCP_REQUIRED_ROLE`` (see ``mcp_server/access.py``) adds an app-role
+check per caller. Both are off by default.
 
 Run it from the ``src`` folder:
 
@@ -83,4 +86,13 @@ def get_known_incidents(
 
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    import logging
+
+    import uvicorn
+
+    from mcp_server.access import protect
+
+    logging.basicConfig(level=logging.INFO, format="%(name)s %(levelname)s %(message)s")
+    # Same as mcp.run(transport="streamable-http"), plus the optional caller check (off unless configured).
+    uvicorn.run(protect(mcp.streamable_http_app()), host=mcp.settings.host, port=mcp.settings.port,
+                log_level=mcp.settings.log_level.lower())

@@ -287,6 +287,9 @@ This deletes the resource group with everything participants created in it (tool
 hosted agents, memories, evaluation runs) and purges the Foundry resource so its name and quota are free
 again.
 
+If you ran the optional secure MCP lab, also delete the app registration `supportbuddy-network-mcp` in Entra ID:
+`azd down` does not remove it.
+
 ## Option B: by hand, in an existing Foundry project
 
 Use this when the customer already has a Foundry project to use. You need: Owner (or equivalent) on the
@@ -379,6 +382,13 @@ az containerapp create -g <rg> -n supportbuddy-network-mcp --environment <contai
 
 In a policy-restricted subscription, add the tags your policies require. For a production MCP server,
 put it behind Azure API Management with Microsoft Entra ID authentication instead.
+
+To show how to secure it in the lab, see the optional [secure MCP lab](../docs/optional-secure-mcp.md):
+`secure_mcp.py enable` requires an Entra token (project identity), and `enable --roles` adds a per-agent
+app role. You need the right to create app registrations in Entra ID. Re-running `azd provision` or
+`setup_lab.py` resets the toolbox connection to no authentication, so run `secure_mcp.py enable` again
+afterwards. Do not secure a server that other tenants use through `EXTERNAL_NETWORK_MCP_URL`: the toolbox
+cannot get tokens across tenants, so their network tools would stop working.
 
 ### 4. Project connections used by the toolbox (Stage 9)
 
