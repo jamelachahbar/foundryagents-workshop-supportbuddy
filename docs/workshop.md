@@ -4378,6 +4378,34 @@ function now executes inside the hosted process; no separate function-executing 
 **After later edits:** restart the local server to update local behavior; run `azd deploy` again to
 update the hosted agent. Neither action updates the Stage 10 prompt-agent definition.
 
+### 6. See your agent's identity (about 10 minutes, no changes)
+
+When your hosted agent calls the toolbox, Foundry, or any Azure resource, it uses an **agent identity**:
+a service principal in Microsoft Entra ID that the platform creates for you. That is what
+`DefaultAzureCredential` picks up inside the container. Find it:
+
+```bash
+azd ai agent show lab-<alias>-supportbuddy-hosted
+```
+
+Look for the **instance identity principal ID** in the output. That is the identity's object ID.
+Then, in the Microsoft Entra admin center, search for that ID under **Enterprise applications**
+(or **Agent ID**, if your tenant shows it), and in the Azure portal open the Foundry project's
+**Access control (IAM) > Role assignments** and look for the same name.
+
+Discuss in pairs:
+
+- What can this identity reach today? (`azd deploy` gives it the **Foundry User** role on the project,
+  so it can call models and the toolbox.)
+- Unpublished agents in a project share one identity; a published agent gets its own. What does that
+  change for audit and for least privilege?
+- If this agent should read the network tools but not another team's tools, where would you give it
+  that right? The optional [secure MCP lab](optional-secure-mcp.md#step-b-per-agent-access-with-an-app-role-after-stage-14)
+  does exactly that, with your instructor.
+
+Only the instructor gives roles to agent identities (see
+[how an instructor gives an agent identity a role](optional-secure-mcp.md#how-an-instructor-gives-an-agent-identity-a-role)).
+
 ### Optional: explore the Stage 14 code in DevUI and the contact centre
 
 These are **local experiences using the hosted-agent implementation**, not clients of your deployed
@@ -4489,6 +4517,7 @@ Keep content capture off unless deliberately debugging **synthetic** messages an
 - [ ] The hosted agent answers the modem case with `[RB-02 Modem restart procedure]`.
 - [ ] It records the line-fault handover with a `HO-...` reference by executing Python inside the hosted
       process; the default Stage 10 definition omitted this capability.
+- [ ] You found your hosted agent's identity and can say which role it has on the project.
 
 > **🔵 Note**
 >
@@ -4508,10 +4537,6 @@ Keep content capture off unless deliberately debugging **synthetic** messages an
 - Both can reuse the toolbox, knowledge base, platform guardrails and evaluations. The lab contact
   centre can load the Stage 14 implementation locally, as above, but it does not call the deployed
   hosted endpoint. Handovers recorded inside the deployed container do not reach the local advisor desk.
-
-**Optional:** give your hosted agent its own access to the network tools with an app role, then take it
-away again: [secure the network MCP server](optional-secure-mcp.md#step-b-per-agent-access-with-an-app-role-after-stage-14),
-Step B (with your instructor).
 
 <p align="right"><a href="#stage-13-guardrails">Previous: Stage 13</a> · <a href="#contents">Contents</a> · <a href="#scenario-reference">Next: Scenarios &rarr;</a></p>
 

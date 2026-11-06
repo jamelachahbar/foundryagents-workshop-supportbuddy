@@ -273,6 +273,12 @@ add people to the group later; nothing has to be redeployed).
 | Monitoring Reader | Application Insights | View the shared monitoring resource and traces |
 | Log Analytics Reader | Log Analytics workspace | Query the shared lab's logs |
 
+**Agent identities also need roles.** The Stage 10 prompt agent and the Stage 14 hosted agent call the
+toolbox with their **agent identity**, not the participant's account. That identity needs **Foundry User**
+on the project. `azd deploy` gives it to the hosted agent; check it for the prompt agent, and give it
+again after anyone **publishes** an agent (publishing creates a new identity). Steps and commands:
+[how an instructor gives an agent identity a role](../docs/optional-secure-mcp.md#how-an-instructor-gives-an-agent-identity-a-role).
+
 Guests from another tenant need to be invited into the tenant first, and sign in with
 `az login --tenant <tenant-id>`. The person who ran `azd up` gets all the roles above.
 

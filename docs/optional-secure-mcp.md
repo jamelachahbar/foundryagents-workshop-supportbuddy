@@ -125,8 +125,11 @@ Compared with Step A, this:
 
 ### B2. Give one agent the role (instructor, with a participant)
 
-Find the object ID of the participant's hosted agent's identity: in the Foundry portal, open the agent and
-look for its identity; or in Entra ID, search the agent's name under **Agent ID** (enterprise applications).
+Ask the participant for their hosted agent's identity object ID (Stage 14, step 6), or find it yourself:
+
+```bash
+azd ai agent show lab-<alias>-supportbuddy-hosted     # look for the instance identity principal ID
+```
 
 ```bash
 uv run --project ../src python secure_mcp.py grant-agent --principal-id <agent identity object ID>
@@ -165,6 +168,70 @@ Your laptop agents need that one, because only a hosted or published agent has a
 - [ ] The hosted agent works after `grant-agent`, and gets `403` after `revoke-agent`.
 - [ ] The log has IDs only, never a token.
 
+## How an instructor gives an agent identity a role
+
+An agent identity is a service principal in Entra ID. You give it rights the same way as any app, but
+there are **two different kinds of role**, and they are given in different places:
+
+| Kind | What it controls | Where you give it | In this lab |
+| --- | --- | --- | --- |
+| **Azure role** (Azure RBAC) | Access to an Azure resource: the Foundry project, Search, Storage... | On the resource: **Access control (IAM)**, or `az role assignment create` | **Foundry User** on the project, so the agent can call models and the toolbox (Stages 10 and 14) |
+| **App role** (Entra ID) | Access to *your own* API, which checks the role in the token | On the API's service principal in Entra ID, with Microsoft Graph | **Network.Read** on the MCP server (Step B) |
+
+### 1. Find the identity's object ID
+
+| Agent | How |
+| --- | --- |
+| Hosted agent (Stage 14) | `azd ai agent show <agent name>`: the instance identity principal ID |
+| Published agent (prompt or hosted) | The agent application's `defaultInstanceIdentity`, or the identity shown on the published agent in the portal |
+| Unpublished agents (laptop clients, Stage 10 before publishing) | They share the project's agent identity: one ID for all of them |
+
+Important: publishing creates a **new** identity, and *"permissions don't transfer automatically"*
+([publish an agent](https://learn.microsoft.com/azure/foundry/agents/how-to/publish-agent)). Give the
+roles again after you publish, or tool calls that worked in development fail with 401/403.
+
+### 2. Give an Azure role (for example Foundry User on the project)
+
+In the portal: open the Foundry project > **Access control (IAM)** > **Add role assignment** >
+**Foundry User** > **Assign access to: User, group, or service principal** > **Select members** >
+paste the object ID. Or with the CLI:
+
+```bash
+az role assignment create   --assignee-object-id <agent identity object ID>   --assignee-principal-type ServicePrincipal   --role "Foundry User"   --scope <FOUNDRY_PROJECT_ID>
+```
+
+`--assignee-principal-type ServicePrincipal` avoids a lookup in Entra ID that can fail for new identities.
+For the hosted agent, `azd deploy` should already have done this: check **Role assignments** first.
+
+### 3. Give an app role (for example Network.Read on the MCP server)
+
+The Entra admin center can only assign app roles to users and groups, not to service principals, so you
+use Microsoft Graph. The script does it for you:
+
+```bash
+cd instructor
+uv run --project ../src python secure_mcp.py grant-agent --principal-id <agent identity object ID> --no-connection
+```
+
+What it runs, if you want to do it by hand:
+
+```bash
+MCP_SP=$(az ad sp list --display-name supportbuddy-network-mcp --query "[0].id" -o tsv)
+ROLE_ID=$(az ad sp show --id $MCP_SP --query "appRoles[?value=='Network.Read'].id | [0]" -o tsv)
+az rest --method POST   --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MCP_SP/appRoleAssignedTo"   --body "{\"principalId\": \"<agent identity object ID>\", \"resourceId\": \"$MCP_SP\", \"appRoleId\": \"$ROLE_ID\"}"
+```
+
+Check it: `az rest --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MCP_SP/appRoleAssignedTo"`,
+or `secure_mcp.py status` (it lists who has `Network.Read`). You need the **Application Administrator**
+or **Cloud Application Administrator** role in Entra ID (or ownership of the app), or an admin who does
+it with you.
+
+### 4. Wait, then test
+
+New roles reach the agent only with a **new token**. A managed identity can keep its token for up to
+24 hours, so give roles before the session when you can, and test with the server's log
+(`allowed: ... role=Network.Read`) rather than by guessing.
+
 ## Pattern C: on behalf of the user (discussion)
 
 Use it when the tool must apply **the user's own permissions**. In SupportBuddy, that is the advisor desk:
@@ -199,7 +266,10 @@ rely on them in front of a customer:
   tokens put roles under another claim name, the check returns `403`: look at the log line.
 - **Which identity the toolbox presents** for an `agentic-identity` connection when the hosted agent
   calls the toolbox. If the log shows the project identity, the per-agent step does not apply in your setup.
-- **Where to find the agent identity's object ID** in the portal can change between releases.
+- **Where to find the agent identity's object ID** in the portal can change between releases. The
+  `azd ai agent show` field name comes from community write-ups: check the output in your tenant.
+- **Agent identities in Microsoft Graph.** Agent identities are a newer kind of service principal. Check
+  that `appRoleAssignedTo` accepts them in your tenant before the session (run `grant-agent` once).
 - **`azd ai connection create` flags.** If that command fails, create the connection in the portal
   (project → **Connected resources**), with agent identity authentication and audience `api://<app ID>`.
 - **Refresh delay.** The toolbox may keep a token for a while after you change a connection or a role.
@@ -226,6 +296,7 @@ stay: delete them in Entra ID (**App registrations**) when the lab is over. Dele
 Sources: [Foundry toolbox](https://learn.microsoft.com/azure/foundry/agents/concepts/toolbox-overview),
 [MCP authentication in Foundry](https://learn.microsoft.com/azure/foundry/agents/how-to/mcp-authentication),
 [agent identity](https://learn.microsoft.com/azure/foundry/agents/concepts/agent-identity),
+[publish an agent](https://learn.microsoft.com/azure/foundry/agents/how-to/publish-agent),
 [Container Apps with Entra ID](https://learn.microsoft.com/azure/container-apps/authentication-entra),
 [app roles](https://learn.microsoft.com/entra/identity-platform/howto-add-app-roles-in-apps),
 [MCP security best practices](https://modelcontextprotocol.io/specification/2025-06-18/basic/security_best_practices).
