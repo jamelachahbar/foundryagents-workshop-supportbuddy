@@ -184,7 +184,8 @@ there are **two different kinds of role**, and they are given in different place
 | --- | --- |
 | Hosted agent (Stage 14) | `azd ai agent show <agent name>`: the instance identity principal ID |
 | Published agent (prompt or hosted) | The agent application's `defaultInstanceIdentity`, or the identity shown on the published agent in the portal |
-| Unpublished agents (laptop clients, Stage 10 before publishing) | They share the project's agent identity: one ID for all of them |
+| Unpublished prompt agent (Stage 10) | Unpublished agents share the project's agent identity: one ID for all of them |
+| Code-first agents on the laptop (Stages 1-13) | No agent identity: they use the participant's own `az login` |
 
 Important: publishing creates a **new** identity, and *"permissions don't transfer automatically"*
 ([publish an agent](https://learn.microsoft.com/azure/foundry/agents/how-to/publish-agent)). Give the
@@ -197,7 +198,11 @@ In the portal: open the Foundry project > **Access control (IAM)** > **Add role 
 paste the object ID. Or with the CLI:
 
 ```bash
-az role assignment create   --assignee-object-id <agent identity object ID>   --assignee-principal-type ServicePrincipal   --role "Foundry User"   --scope <FOUNDRY_PROJECT_ID>
+az role assignment create \
+  --assignee-object-id <agent identity object ID> \
+  --assignee-principal-type ServicePrincipal \
+  --role "Foundry User" \
+  --scope <FOUNDRY_PROJECT_ID>
 ```
 
 `--assignee-principal-type ServicePrincipal` avoids a lookup in Entra ID that can fail for new identities.
@@ -218,7 +223,9 @@ What it runs, if you want to do it by hand:
 ```bash
 MCP_SP=$(az ad sp list --display-name supportbuddy-network-mcp --query "[0].id" -o tsv)
 ROLE_ID=$(az ad sp show --id $MCP_SP --query "appRoles[?value=='Network.Read'].id | [0]" -o tsv)
-az rest --method POST   --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MCP_SP/appRoleAssignedTo"   --body "{\"principalId\": \"<agent identity object ID>\", \"resourceId\": \"$MCP_SP\", \"appRoleId\": \"$ROLE_ID\"}"
+az rest --method POST \
+  --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MCP_SP/appRoleAssignedTo" \
+  --body "{\"principalId\": \"<agent identity object ID>\", \"resourceId\": \"$MCP_SP\", \"appRoleId\": \"$ROLE_ID\"}"
 ```
 
 Check it: `az rest --url "https://graph.microsoft.com/v1.0/servicePrincipals/$MCP_SP/appRoleAssignedTo"`,

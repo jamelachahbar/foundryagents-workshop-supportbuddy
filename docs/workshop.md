@@ -4395,8 +4395,8 @@ Then, in the Microsoft Entra admin center, search for that ID under **Enterprise
 
 Discuss in pairs:
 
-- What can this identity reach today? (`azd deploy` gives it the **Foundry User** role on the project,
-  so it can call models and the toolbox.)
+- What can this identity reach today? (It should have **Foundry User** on the project, so it can call
+  models and the toolbox. Your laptop agents never had an agent identity: they used your `az login`.)
 - Unpublished agents in a project share one identity; a published agent gets its own. What does that
   change for audit and for least privilege?
 - If this agent should read the network tools but not another team's tools, where would you give it
