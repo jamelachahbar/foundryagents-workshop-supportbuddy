@@ -4,6 +4,10 @@ Everything the participants use that they do not build themselves: the Foundry p
 runbook knowledge base, the network MCP server, the toolbox connections, Application Insights, the memory store and the
 guardrail. Everything here is synthetic training data.
 
+**Instructor documents:** use this page for provisioning, permissions and model deployments.
+Use the [facilitation guide](facilitation.md) for stage-by-stage demo preparation and scripts.
+Participants follow [the workshop](../docs/workshop.md) and its linked exercises instead.
+
 ## Who sets it up?
 
 The same setup works in **any tenant and subscription**. Nothing has to exist beforehand: no registry, no
@@ -210,7 +214,8 @@ capture only for a controlled debugging exercise, and restart clients after chan
 
 ### Optional settings
 
-Set these with `azd env set <NAME> <value>` before `azd up`.
+Set the environment-variable rows with `azd env set <NAME> <value>` before `azd up`.
+The model-pool row is a portal/deployment-template option, not an environment variable.
 
 | Setting | Default | Use it when |
 | --- | --- | --- |
@@ -222,7 +227,13 @@ Set these with `azd env set <NAME> <value>` before `azd up`.
 | `CHAT_MODEL_DEPLOYMENT_NAME` | `model-router` | Name exported as `AZURE_AI_MODEL_DEPLOYMENT_NAME` in the participant handout. |
 | `CHAT_MODEL_SKU` | `GlobalStandard` | `DataZoneStandard` for routing within the deployment's data zone (EU for an EU region), where supported and quota is available. |
 | `CHAT_MODEL_ROUTING_MODE` | `balanced` | `quality` or `cost`. This is a shared deployment setting, not a participant prompt/reasoning setting; ignored for non-router models. |
+| Model Router eligible pool (portal / deployment template) | Unrestricted; `routing.models` omitted | Optionally restrict underlying models for a controlled comparison. See [Model Router choices from the lab](#model-router-choices-from-the-lab). This is not currently an `azd env` setting. |
 | `CHAT_MODEL_CAPACITY` | `100` | Thousands of tokens per minute, shared by everyone. Count about 10 per participant. |
+| `DEPLOY_EVALUATION_MODEL` | `true` | Provision the fixed judge and print its deployment name in the handout. Disable only for sessions without Foundry scoring, or when a separately managed fixed judge is provided. |
+| `EVALUATION_MODEL_NAME`, `EVALUATION_MODEL_VERSION` | `gpt-5-mini`, `2025-08-07` | Fixed judge model/version; verify evaluator support, current availability and quota before provisioning. Do not select `model-router`. |
+| `EVALUATION_MODEL_DEPLOYMENT_NAME` | `supportbuddy-judge` | A distinct deployment name; never reuse the chat or embedding deployment name. |
+| `EVALUATION_MODEL_SKU` | `GlobalStandard` | `DataZoneStandard` or `Standard` where the chosen model, region and evaluator support it. |
+| `EVALUATION_MODEL_CAPACITY` | `10` | Judge capacity in thousands of tokens per minute, shared by participants; allocated only when enabled. |
 
 With a model that does not support reasoning, participants set `SUPPORTBUDDY_REASONING_EFFORT=off` in `.env`.
 
@@ -244,6 +255,194 @@ For example, set `CHAT_MODEL_ROUTING_MODE` to `quality` or `cost` with `azd env 
 `azd provision`. Allow up to five minutes for routing changes to take effect. Check saved model/version,
 deployment-name and SKU overrides before reprovisioning an older environment. See
 [Model router deployment settings](https://learn.microsoft.com/azure/foundry/openai/how-to/model-router#optional-customize-deployment-settings).
+
+### Model Router choices from the lab
+
+Keep the current **`model-router` / `balanced` / unrestricted pool** as the workshop default.
+The following are alternatives to evaluate, not automatic changes to the deployment:
+
+| Choice | Setup control | Evidence or reason to try it |
+| --- | --- | --- |
+| Balanced router, full pool | `CHAT_MODEL_NAME=model-router`, `CHAT_MODEL_ROUTING_MODE=balanced` | In the observed Stage 10 run, switching from the earlier deployment to the router restored the expected diagnostic sequence for Anna's outage, with citations and no unnecessary restart or handover. This is one observed scenario, not a full reliability result. |
+| Quality router | `CHAT_MODEL_ROUTING_MODE=quality` | An optional quality-focused comparison; no claim that our lab demonstrated better results for this mode. Keep dataset and judge fixed and compare cost/latency as well as correctness. |
+| Cost router | `CHAT_MODEL_ROUTING_MODE=cost` | An optional cost-focused comparison; no claim that our lab validated its action decisions. Retest diagnostics, handover and approval/rejection behavior. |
+| Router with a restricted pool | Portal **Route to a subset of models**, or `routing.models` in the deployment definition | Constrain eligible models for a controlled experiment or governance requirement; keep the routing mode fixed when testing the pool change. |
+| A direct, supported chat-model deployment | `CHAT_MODEL_NAME`, `CHAT_MODEL_VERSION`, `CHAT_MODEL_DEPLOYMENT_NAME` | Compare an explicitly selected model with the router. The earlier `supportbuddy-chat` name is a deployment alias, not proof of its underlying model/version; don't copy that alias into `CHAT_MODEL_NAME`. |
+
+**What we actually observed:** the earlier `supportbuddy-chat` deployment requested local support
+functions before completing diagnostics. After switching to Model Router, republishing and restarting
+the clients, the outage scenario followed the expected checks. The recorded model-call labels were:
+
+| Observed point in the lab | Reported response/model-call identifier |
+| --- | --- |
+| Earlier diagnostic call | `gpt-5.6-terra-2026-07-09` |
+| Restart-related call | `gpt-6-sol-2026-09-22` |
+| Follow-up answer after submitting restart output | `gpt-5.4-mini-2026-03-17` |
+
+These are historical session observations, **not validated deployment parameters**. The restricted
+pool example below uses these observed model/version labels as candidates; confirm each exact entry
+in Foundry's selector before applying it to the current router version, region and SKU. The final
+answer's label also does not establish which model requested the action: Python executes the approved
+function, and another model request can write the response. See the [lab evidence and caveats](../docs/workshop.md#what-improved-in-the-observed-run).
+
+#### Restrict the eligible model pool
+
+This is an **instructor-controlled deployment setting**. It affects everyone using that deployment;
+prefer a separate experimental router rather than modifying the group's baseline mid-session.
+
+1. In Foundry, open the Model Router deployment's **Custom settings** and choose
+  **Route to a subset of models**. Select at least one currently supported model from that
+  deployment's selector. An empty selection uses the default pool; it does not disable routing.
+2. Record the router version, routing mode, SKU and exact selected model names/versions. Models
+  added to the service later are excluded from an explicit subset until deliberately included.
+  Changes can take up to five minutes to take effect.
+3. If managing the restriction in infrastructure, add `models` under the router's existing
+  `properties.routing` block in the [chat deployment resource](infra/resources.bicep#L77), alongside
+  `mode`. Each entry has `format`, `name` and `version`.
+  The documented schema looks like this; verify current support before using these example entries:
+
+  ```json
+  {
+    "routing": {
+     "mode": "balanced",
+    "models": [
+     {"format": "OpenAI", "name": "gpt-5.6-terra", "version": "2026-07-09"},
+     {"format": "OpenAI", "name": "gpt-6-sol", "version": "2026-09-22"},
+     {"format": "OpenAI", "name": "gpt-5.4-mini", "version": "2026-03-17"}
+    ]
+    }
+  }
+  ```
+
+  This is a properties fragment, not a complete deployment template. The current lab Bicep
+  intentionally emits only `routing.mode`; no `CHAT_MODEL_ROUTING_MODELS` variable is wired up.
+  Persist an agreed subset in the deployment definition if you choose to manage it as IaC;
+  do not assume a portal-only change will survive a later template reprovisioning.
+4. Most routed models need no separate deployment. **Claude is the exception:** selected Claude
+  models must already have matching deployments in the same Foundry account and SKU. Verify
+  provider terms, policy permissions and regional support; this lab does not provision them.
+5. Test fresh conversations and inspect individual model-call metadata. Repeat the outage, modem,
+  Wi-Fi, handover and approval/rejection checks, then compare Stage 12 results using a fixed judge.
+  Record missing metadata as unknown rather than assuming a selected model was used. A restricted
+  pool does not enforce customer ownership, tool eligibility or human approval.
+
+No model pool is changed merely by reading this example. Refer to the current
+[supported model table](https://learn.microsoft.com/azure/foundry/openai/how-to/model-router#supported-models)
+and [subset configuration procedure](https://learn.microsoft.com/azure/foundry/openai/how-to/model-router#optional-route-to-a-model-subset)
+before applying changes.
+
+### Optional: additional model deployments
+
+The normal setup provisions **three deployments**, with separate jobs: the agent's chat router,
+the memory embedding model, and a fixed-model evaluation judge. IQ-planner and comparison models
+remain optional portal-managed additions, not prerequisites for the normal workshop:
+
+| Role | Example deployment name | Used for |
+| --- | --- | --- |
+| Agent chat model (baseline) | `model-router` | SupportBuddy's reasoning and tool decisions. It is not the evaluation judge. |
+| Embedding model (baseline) | `supportbuddy-embedding` (`text-embedding-3-small`) | Foundry Memory in Stage 11. It does not automatically vectorize Stage 8's runbooks. |
+| IQ planning/synthesis model (optional) | `supportbuddy-iq-planner` | A portal-supported chat model for the separate model-backed knowledge-base experiment. |
+| Evaluation judge (provisioned by default) | `supportbuddy-judge` (`gpt-5-mini`, `2025-08-07`) | A fixed model/version, independent of the model under test. |
+| Comparison candidate (optional) | `supportbuddy-candidate` | Controlled model or agent comparisons, keeping the judge fixed. |
+
+#### Provision the judge with instructor setup
+
+The judge is part of the normal `azd up` by default. For an existing environment, inspect saved
+overrides and explicitly set the agreed configuration before deliberate reprovisioning:
+
+```powershell
+azd env set DEPLOY_EVALUATION_MODEL true
+azd env set EVALUATION_MODEL_NAME gpt-5-mini
+azd env set EVALUATION_MODEL_VERSION 2025-08-07
+azd env set EVALUATION_MODEL_DEPLOYMENT_NAME supportbuddy-judge
+azd env set EVALUATION_MODEL_CAPACITY 10
+```
+
+These are configurable defaults, not a guarantee of current model/evaluator support in every region.
+As checked on 5 November 2026, Microsoft's [retirement schedule](https://learn.microsoft.com/azure/foundry/openai/concepts/model-retirement-schedule)
+lists `gpt-5-mini` version `2025-08-07` as GA, with retirement scheduled for 13 July 2027.
+It is also used in the current [cloud evaluation prerequisites](https://learn.microsoft.com/azure/foundry/observability/how-to/cloud-evaluation#prerequisites).
+Check availability and quota first; override model, version, deployment name or SKU when needed.
+Saved `azd` environment values take precedence over source defaults. If an existing environment
+still selects an older judge model/version, update both values using the commands above;
+editing the Bicep defaults alone does not replace those saved settings or a live deployment.
+The judge is created after the existing chat and embedding deployments, in the same Foundry account.
+Existing account-level model permissions apply; no new API keys are distributed.
+Its deployment sets `versionUpgradeOption=NoAutoUpgrade` to avoid silently taking a new default
+model version during comparisons. This is not a permanent lifecycle guarantee: track retirement
+dates, deliberately migrate when required, and record the actual judge model/version for each run.
+Do not modify the judge deployment while participants are comparing baseline/candidate results.
+
+For an **existing environment**, select its existing azd environment, set the same values and
+deliberately run `azd provision` rather than creating another environment. This reapplies the shared
+infrastructure and runs the setup hook, including knowledge-base/connection updates described above;
+coordinate with participants before reprovisioning. No deployment happens merely by setting a variable.
+
+When enabled, setup exports `AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME` and prints this handout line:
+
+```text
+AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME=supportbuddy-judge
+```
+
+Participants use the emitted deployment name in `src/.env`; in portal evaluations, select that
+deployment as the judge instead. `evaluate.py` defaults to this fixed deployment name if the local
+setting is blank or absent; it never falls back to the agent's router. Before any cloud-scored
+agent cases run, it performs a read-only deployment check, prints the actual judge model/version,
+and rejects a missing deployment or a router. This check is not a guarantee of evaluator compatibility.
+
+If the instructor disables provisioning, the handout omits the line: local rule-based scoring
+still works, but Foundry scoring requires an existing separately managed fixed judge. Changing the
+flag to `false` is not a deletion request; an already-created deployment can remain. Review explicit
+cleanup only after confirming nobody uses that deployment.
+
+Redeploying does not overwrite participants' existing `src/.env` files or terminal variables.
+Distribute the regenerated handout and have participants update
+`AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME`; a previously exported terminal value can override
+the file. Do not replace `AZURE_AI_MODEL_DEPLOYMENT_NAME`, which still selects the agent model.
+
+#### Other optional models or manual deployment
+
+For an IQ planner, comparison candidate, or a judge managed outside the template:
+
+1. Agree the extra quota, token budget, region and data-residency requirements before deploying.
+  Creating models requires appropriate resource permissions, such as **Cognitive Services Contributor**
+  or equivalent. Do not grant the whole participant group deployment rights for this exercise.
+2. In [Microsoft Foundry](https://ai.azure.com), use **Discover > Models** to select a supported model,
+  then **Deploy > Custom settings**. Check the actual model/version, deployment type, region and
+  allocated capacity. Give each optional role a distinct deployment name in the workshop's Foundry
+  resource/project. Do not rename or replace the working baseline deployments.
+3. Use **Build > Models** to verify **Succeeded** and test each deployment. For an IQ planner, verify
+  that the knowledge-base portal supports the chosen model and the Search managed identity can
+  invoke it. For a judge, verify compatibility with the actual evaluator/API; a model that answers
+  playground questions is not automatically a supported judge. Record model and deployment versions.
+4. Give participants deployment **names**, not model catalog IDs or keys. Extra deployments consume
+  quota and add usage cost. Apart from the standard judge above, these portal-created extras are not
+  automatically provisioned by this template; record their configuration and clean up only the
+  experimental assets when agreed. Never create a manual deployment with a name already managed
+  by the instructor template.
+
+For code-first Foundry scoring, participants use this line from the instructor's handout in `src/.env`:
+
+```text
+AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME=supportbuddy-judge
+```
+
+This changes the judge selected by `evaluate.py` for its Foundry scoring paths, including completeness
+and groundedness. It does **not** change `AZURE_AI_MODEL_DEPLOYMENT_NAME`, the published agent, the
+memory embedding model or the IQ planning model. Unset or blank selects `supportbuddy-judge`, never
+the agent deployment. The portal wizard has its own judge selector; it does not read local `.env`.
+Fixed-response `safety_calibrate.py` is a separate utility and retains its own existing configuration.
+
+For a candidate-model comparison, change only the model under test and record the actual selected
+model where available; keep dataset, prompt, tools, evaluator versions and judge deployment fixed.
+Assess all candidates with the same judge, rather than letting each candidate judge itself. This
+reduces one source of bias but does not make LLM judging objective or deterministic. A base-model
+evaluation has no SupportBuddy tools/instructions unless supplied explicitly, so label it separately
+from an agent evaluation. Do not use the tool-grounded lab references to claim a fair bare-model
+comparison without supplying the same necessary evidence to every candidate.
+
+See [model deployment in the portal](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/deploy-foundry-models)
+and the [evaluation prerequisites](https://learn.microsoft.com/azure/foundry/how-to/evaluate-generative-ai-app#prerequisites).
 
 ### If Container Apps is not possible
 
@@ -330,7 +529,7 @@ the toolbox).
 
 #### Optional: model-backed knowledge-base experiments
 
-The [Stage 8 optional portal exercise](../docs/workshop.md#optional-portal-experiment-retrieval-effort-and-output-mode)
+The [Stage 8 instructor demonstration](facilitation.md#stage-8-retrieval-effort-and-output-mode)
 compares retrieval effort and output modes without changing the shared baseline.
 The Bicep setup enables a **system-assigned managed identity on Search** and grants that identity
 **Cognitive Services User** on the Foundry account. This prepares model access only: it does not attach
@@ -422,8 +621,22 @@ Without it, memory searches and updates fail with `401` and the agent silently r
 
 ### Evaluation preparation (Stage 12)
 
-Reserve Azure usage for live agent runs and additional Foundry quality judges. Participants keep
-their Stage 11 identity/memory and Stage 9 toolbox; evaluation does not provision new agent capabilities.
+Choose the route before the session and announce it to participants:
+
+- **Route A, instructor-led portal:** follow the [guided evaluation route](../docs/portal-evaluation.md).
+  Upload `src/evals/portal_quality.jsonl` once as a shared project dataset, verify evaluation
+  permissions and a supported judge deployment/connection, and prepare a Stage 10 toolbox-only
+  sandbox agent without local function declarations. Fix the dataset version, agent/model,
+  judge and criteria for the whole exercise. Allocate sandbox agents per participant if they
+  will edit independently; only you edit a shared demo agent. Everyone creates alias-named
+  evaluation runs and compares baseline/candidate results. Do not overwrite participants'
+  function-enabled agents or claim that three portal cases replace the full local regression.
+- **Route B, existing lab:** retain the code/CLI task list and preparation below. Participants
+  preserve their Stage 11 identity/memory and Stage 9 toolbox.
+
+Reserve Azure usage for live agent runs and additional Foundry quality judges. In Route B,
+participants keep their Stage 11 identity/memory and Stage 9 toolbox; evaluation does not provision
+new agent capabilities. Route A uses the prepared sandbox prompt agent instead.
 
 - Use the [Stage 12 task list](../docs/workshop.md#stage-12-evaluation): baseline, one new quality case
   with `ground_truth`, published-definition comparison, then a measured prompt improvement.
@@ -436,6 +649,20 @@ their Stage 11 identity/memory and Stage 9 toolbox; evaluation does not provisio
 
 ### 6. Guardrail (Stage 13)
 
+For **Route A, instructor-led portal**, prepare the
+[sandbox guardrail demonstration](facilitation.md#stage-13-portal-guardrail-demonstration)
+with account-level policy permissions, a non-production toolbox-only agent and a separate demo
+policy. You perform writes; participants inspect and run the same playground cases. Do not
+assign the demo policy to the shared model deployment or modify the standard workshop policy
+for the presentation. Test the portal's available controls and intervention points beforehand,
+record the intended sandbox assignment and restore it afterward. If access is missing, provide
+a report/demo review labelled observed rather than claiming participants ran it independently.
+This route does not demonstrate Python authorization middleware or attach the toolbox policy.
+
+For **Route B, existing lab**, the policy below is the one participants attach to their toolbox;
+they then complete the middleware and regression tasks. Keep that infrastructure available even
+when the session uses Route A, without requiring participants to complete both routes.
+
 `guardrail.json` is the default policy plus **Indirect Attack** detection. Run from `src/`;
 the policy file is in the sibling `instructor/` folder:
 
@@ -447,9 +674,9 @@ az rest --method put \
 
 Replace `<foundry-account-resource-id>` with the account ID including its leading `/`.
 Give participants the policy's full resource ID: `<foundry-account-resource-id>/raiPolicies/supportbuddy-guardrail`.
-Participants attach this existing policy to their toolbox and merge middleware into their own agent;
+Route B participants attach this existing policy to their toolbox and merge middleware into their own agent;
 they should not overwrite the prompt improvements they measured in Stage 12.
-The [Stage 13 checkpoint](../docs/workshop.md#stage-13-guardrails) requires an offline proof of their
+The [Route B checkpoint](../docs/workshop.md#route-b-existing-guardrails-lab) requires an offline proof of their
 actual middleware wiring, the live safety cases and a full regression. A safe model reply alone
 does not identify the layer that prevented unsafe behavior.
 

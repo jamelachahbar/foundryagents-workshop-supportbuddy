@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from agent_framework import AgentResponse, Content, Message
+from agent_framework import AgentResponse, Content, EvalItem, Message
 from agent_framework_openai import OpenAIContentFilterException
 from openai import BadRequestError
 
@@ -577,7 +577,8 @@ def test_stage_12_extra_case_is_ready_to_append():
     (case,) = evaluate.load_cases(reference)
     assert case["id"] not in {existing["id"] for existing in evaluate.load_cases()}
     assert case["category"] == "quality" and case["ground_truth"].strip()
-    assert case["query"] and len(evaluate.checks_for(case)) == 3
+    assert case["query"] and len(evaluate.checks_for(case)) == 4
+    assert case["expected_language"] == "fr"
     assert backend.identify_customer(customer_id=case["customer"])["found"]
     assert set(case["expected_runbooks"]) <= {runbook["id"] for runbook in load_runbooks()}
 
@@ -588,9 +589,87 @@ def test_every_kind_of_expectation_adds_a_check():
         "expected_decision": "handover",
         "expected_runbooks": ["RB-07"],
         "must_not_contain": ["+12025550101"],
+        "expected_language": "fr",
     }
-    assert len(evaluate.checks_for(case)) == 4
+    assert len(evaluate.checks_for(case)) == 5
     assert evaluate.checks_for({}) == []
+
+
+def test_expected_response_language_adds_a_local_check():
+    assert len(evaluate.checks_for({"expected_language": "fr"})) == 1
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("reply,passed,detected", [
+    (
+        "Votre ligne fibre fonctionne normalement. Le signal Wi-Fi est faible dans les chambres. "
+        "Placez le modem dans un endroit central, puis testez votre connexion. "
+        "[RB-03 Wi-Fi interference] [RB-11 Mesh / extender placement]",
+        True, "fr",
+    ),
+    (
+        "Your fibre line is healthy. Move your modem into an open central position "
+        "and test the wireless connection upstairs. [RB-03 Wi-Fi interference]",
+        False, "en",
+    ),
+    (
+        "Su conexion funciona correctamente, pero la cobertura inalambrica es debil. "
+        "Coloque el equipo en una zona central y pruebe la conexion de nuevo.",
+        False, "es",
+    ),
+    ("", False, "undetermined"),
+    ("OK", False, "undetermined"),
+    ("[RB-03 Wi-Fi interference] [RB-11 Mesh / extender placement]", False, "undetermined"),
+    (
+        "Bonjour. Your fibre line is healthy. You should move the modem into an open central position "
+        "and test the wireless connection upstairs again before contacting support.",
+        False, "en",
+    ),
+    (
+        "Bonjour, votre connexion fonctionne bien. Please move the modem upstairs and test again. "
+        "Le signal reste faible dans les chambres.",
+        False, "fr",
+    ),
+    (
+        "Bonjour, votre Wi-Fi est lent. Please move the modem upstairs and test again.",
+        False, "en",
+    ),
+])
+async def test_french_response_check_uses_actual_reply_not_query_or_citations(reply, passed, detected):
+    (check,) = evaluate.checks_for({"expected_language": "fr"})
+    item = EvalItem(conversation=[
+        Message("user", ["Bonjour, mon Wi-Fi est lent dans les chambres."]),
+        Message("assistant", [reply]),
+    ])
+    result = await check(item)
+    assert result.passed is passed
+    assert result.check_name == "response_language"
+    assert f"majority language {detected}" in result.reason
+
+
+@pytest.mark.parametrize("language", [None, "", "FR", "french", "zz"])
+def test_invalid_expected_language_cannot_silently_disable_the_check(language):
+    with pytest.raises(ValueError, match="expected_language"):
+        evaluate.checks_for({"expected_language": language})
+
+
+@pytest.mark.anyio
+async def test_both_french_cases_reject_english_answers_with_other_checks_satisfied():
+    reference = evaluate.DATASET.parent.parent / "solutions" / "stage_12_extra_case.jsonl"
+    (extra,) = evaluate.load_cases(reference)
+    original = next(case for case in evaluate.load_cases() if case["id"] == "D-line-fault-fr")
+    for case in [original, extra]:
+        calls = list(case["expected_tools"])
+        if case["expected_decision"] == "handover":
+            calls.append("escalate_to_human")
+        reply = "Your line and modem have been checked. Contact support for further assistance. " + " ".join(case.get("expected_runbooks", []))
+        item = EvalItem(conversation=[
+            Message("user", [case["query"]]),
+            *_conversation(*calls),
+            Message("assistant", [reply]),
+        ])
+        results = [await check(item) for check in evaluate.checks_for(case)]
+        assert [result.check_name for result in results if not result.passed] == ["response_language"]
 
 
 @pytest.fixture
@@ -622,7 +701,11 @@ def evaluation_harness(monkeypatch):
         contents = [
             Content.from_function_call(call_id=str(i), name=name, arguments="{}") for i, name in enumerate(names)
         ]
-        text = overrides.get(case["id"], "Safe answer " + " ".join(case.get("expected_runbooks", [])))
+        default = (
+            "Votre ligne est instable. Je transmets votre dossier au support pour une analyse technique."
+            if case.get("expected_language") == "fr" else "Safe answer"
+        )
+        text = overrides.get(case["id"], default + " " + " ".join(case.get("expected_runbooks", [])))
         return AgentResponse(messages=[Message("assistant", [*contents, Content.from_text(text)])])
 
     class Judge:
@@ -651,6 +734,7 @@ def evaluation_harness(monkeypatch):
         "AZURE_AI_MODEL_DEPLOYMENT_NAME": "lab-model",
         "WORKSHOP_RESOURCE_PREFIX": "lab-test",
     })
+    monkeypatch.setattr(evaluate, "verify_judge_deployment", AsyncMock())
     monkeypatch.setattr(evaluate, "agent_factory", lambda *_: lambda case: agents[case["id"]])
     monkeypatch.setattr(evaluate, "open_agent", open_agent)
     monkeypatch.setattr(evaluate, "_run_rejecting_approvals", run)
@@ -897,8 +981,29 @@ async def test_safety_all_blocked_does_not_create_a_judge(evaluation_harness, ca
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize("judge_deployment", [None, "", "  independent-judge  "])
+async def test_optional_judge_deployment_does_not_change_agent_model(evaluation_harness, monkeypatch, judge_deployment):
+    if judge_deployment is None:
+        monkeypatch.delenv("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", raising=False)
+    else:
+        monkeypatch.setenv("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", judge_deployment)
+    clients = []
+    monkeypatch.setattr(evaluate, "FoundryChatClient", lambda **kwargs: clients.append(kwargs) or object())
+    assert await evaluate.main_async("main", 1, True, use_foundry_safety=True) == 0
+    assert len(clients) == 2
+    expected = "independent-judge" if judge_deployment and judge_deployment.strip() else "supportbuddy-judge"
+    assert all(client["model"] == expected for client in clients)
+    assert evaluate.load_settings()["AZURE_AI_MODEL_DEPLOYMENT_NAME"] == "lab-model"
+
+
+@pytest.mark.anyio
 @pytest.mark.parametrize("metric,field", [("groundedness", "context"), ("response_completeness", "ground_truth")])
-async def test_evidence_dataset_maps_required_fields_and_preserves_rows(metric, field, capsys):
+@pytest.mark.parametrize("judge_deployment", [None, "evidence-judge"])
+async def test_evidence_dataset_maps_required_fields_and_preserves_rows(metric, field, capsys, monkeypatch, judge_deployment):
+    if judge_deployment is None:
+        monkeypatch.delenv("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", raising=False)
+    else:
+        monkeypatch.setenv("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", judge_deployment)
     client = SimpleNamespace(
         post=AsyncMock(return_value=SimpleNamespace(id="eval-1")),
         evals=SimpleNamespace(runs=SimpleNamespace(
@@ -913,10 +1018,72 @@ async def test_evidence_dataset_maps_required_fields_and_preserves_rows(metric, 
              "context": "Tool evidence", "ground_truth": "Reference answer"}]
     await evaluate.score_dataset(client, {"AZURE_AI_MODEL_DEPLOYMENT_NAME": "judge"}, rows, metric, field, "lab")
     criterion = client.post.call_args.kwargs["body"]["testing_criteria"][0]
+    assert criterion["initialization_parameters"]["deployment_name"] == (judge_deployment or "supportbuddy-judge")
     assert criterion["data_mapping"][field] == "{{item." + field + "}}"
     assert criterion["evaluator_name"] == f"builtin.{metric}"
     assert client.evals.runs.create.call_args.kwargs["data_source"]["source"]["content"] == [{"item": rows[0]}]
     assert "1/1 items passed" in capsys.readouterr().out
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("metadata,error", [
+    ({"modelName": "gpt-5-mini", "modelVersion": "2025-08-07"}, None),
+    ({"modelName": "model-router", "modelVersion": "2025-11-18"}, "is Model Router"),
+    ({"modelName": "gpt-5-mini"}, "Cannot verify a fixed model/version"),
+])
+async def test_judge_preflight_checks_actual_deployment_model(monkeypatch, metadata, error):
+    monkeypatch.setenv("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", "custom-judge")
+    credential = MagicMock()
+    credential.__aenter__.return_value = credential
+    project = MagicMock()
+    project.__aenter__.return_value = project
+    project.deployments.get = AsyncMock(return_value=SimpleNamespace(as_dict=lambda: metadata))
+    monkeypatch.setattr(evaluate, "AsyncAzureCliCredential", lambda: credential)
+    monkeypatch.setattr(evaluate, "AIProjectClient", lambda **kwargs: project)
+    if error:
+        with pytest.raises(RuntimeError, match=error):
+            await evaluate.verify_judge_deployment({"AZURE_AI_PROJECT_ENDPOINT": "https://example.test"})
+    else:
+        await evaluate.verify_judge_deployment({"AZURE_AI_PROJECT_ENDPOINT": "https://example.test"})
+    project.deployments.get.assert_awaited_once_with("custom-judge")
+
+
+@pytest.mark.anyio
+async def test_missing_fixed_judge_requests_instructor_setup(monkeypatch):
+    from azure.core.exceptions import ResourceNotFoundError
+
+    monkeypatch.delenv("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", raising=False)
+    credential = MagicMock()
+    credential.__aenter__.return_value = credential
+    project = MagicMock()
+    project.__aenter__.return_value = project
+    project.deployments.get = AsyncMock(side_effect=ResourceNotFoundError("missing"))
+    monkeypatch.setattr(evaluate, "AsyncAzureCliCredential", lambda: credential)
+    monkeypatch.setattr(evaluate, "AIProjectClient", lambda **kwargs: project)
+    with pytest.raises(RuntimeError, match="DEPLOY_EVALUATION_MODEL=true"):
+        await evaluate.verify_judge_deployment({"AZURE_AI_PROJECT_ENDPOINT": "https://example.test"})
+    project.deployments.get.assert_awaited_once_with("supportbuddy-judge")
+
+
+@pytest.mark.anyio
+async def test_judge_preflight_failure_prevents_all_agent_runs(evaluation_harness, monkeypatch):
+    verify = AsyncMock(side_effect=RuntimeError("fixed judge missing"))
+    factory = MagicMock()
+    monkeypatch.setattr(evaluate, "verify_judge_deployment", verify)
+    monkeypatch.setattr(evaluate, "agent_factory", factory)
+    with pytest.raises(RuntimeError, match="fixed judge missing"):
+        await evaluate.main_async("main", 1, True)
+    verify.assert_awaited_once()
+    factory.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("foundry,only", [(False, None), (True, ["S1-other-customer"])])
+async def test_local_scoring_does_not_require_a_judge_preflight(evaluation_harness, monkeypatch, foundry, only):
+    verify = AsyncMock()
+    monkeypatch.setattr(evaluate, "verify_judge_deployment", verify)
+    assert await evaluate.main_async("main", 1, foundry, only=only) == 0
+    verify.assert_not_awaited()
 
 
 @pytest.mark.anyio

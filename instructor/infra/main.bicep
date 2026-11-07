@@ -41,6 +41,17 @@ param embeddingModelVersion string = '1'
 param embeddingModelSku string = 'GlobalStandard'
 param embeddingModelCapacity int = 50
 
+@description('Provision the fixed evaluation judge by default. Disable only for sessions without Foundry scoring; requires model availability and quota.')
+param deployEvaluationModel bool = true
+param evaluationModelName string = 'gpt-5-mini'
+param evaluationModelVersion string = '2025-08-07'
+@description('Use a name distinct from the chat and embedding deployments.')
+param evaluationModelDeploymentName string = 'supportbuddy-judge'
+@allowed(['GlobalStandard', 'DataZoneStandard', 'Standard'])
+param evaluationModelSku string = 'GlobalStandard'
+@description('Judge capacity in thousands of tokens per minute, shared by participants.')
+param evaluationModelCapacity string = '10'
+
 @description('Extra tags as key=value pairs separated by semicolons, for example "SecurityControl=Ignore;owner=me", when policies require them.')
 param resourceTags string = ''
 
@@ -78,6 +89,14 @@ module lab 'resources.bicep' = {
       routingMode: chatModelRoutingMode
     }
     embeddingModel: { name: embeddingModelName, version: embeddingModelVersion, sku: embeddingModelSku, capacity: embeddingModelCapacity }
+    deployEvaluationModel: deployEvaluationModel
+    evaluationModel: {
+      name: evaluationModelName
+      version: evaluationModelVersion
+      deploymentName: evaluationModelDeploymentName
+      sku: evaluationModelSku
+      capacity: int(evaluationModelCapacity)
+    }
     externalNetworkMcpUrl: externalNetworkMcpUrl
     networkMcpExists: networkMcpExists
   }
@@ -87,6 +106,7 @@ output AZURE_RESOURCE_GROUP string = rg.name
 output AZURE_AI_PROJECT_ENDPOINT string = lab.outputs.projectEndpoint
 output AZURE_AI_MODEL_DEPLOYMENT_NAME string = lab.outputs.chatDeployment
 output AZURE_AI_EMBEDDING_DEPLOYMENT_NAME string = lab.outputs.embeddingDeployment
+output AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME string = lab.outputs.evaluationDeployment
 output AZURE_AI_SEARCH_ENDPOINT string = lab.outputs.searchEndpoint
 output FOUNDRY_ACCOUNT_ID string = lab.outputs.accountId
 output FOUNDRY_PROJECT_ID string = lab.outputs.projectId

@@ -26,6 +26,8 @@ Handover/action timestamps and real waiting periods are not frozen.
 See [The scenario clock](workshop.md#the-scenario-clock) and the
 [instructor preparation checklist](../instructor/setup.md#reusable-scenario-time).
 
+## Contents
+
 | Part | Stages | Runs where |
 | --- | --- | --- |
 | [0. Lab environment](#0-lab-environment) | | Instructor handoff; participants do not provision Azure |
@@ -195,10 +197,18 @@ Copy-Item solutions/stage_5_correlation.instructions.md main.instructions.md
 The agent runs in your Python process; only the model runs in Foundry. Each stage: copy the reference
 over `main.py` and `main.instructions.md`, run it, and check the result.
 
+---
+
 ### Stage 1: Agent only
 
+<p align="right"><a href="#1-your-laptop">Previous: Your laptop</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-2-customer-identification">Next: Stage 2 &rarr;</a></p>
+
+> **Concept:** the agent understands the request but cannot inspect any system \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_1_agent_only.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 1 lab</strong> &middot; Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-1-agent-only)
 
@@ -218,10 +228,18 @@ ID, e-mail or phone number. Stop DevUI with `Ctrl+C` before the next stage.
 
 </details>
 
+---
+
 ### Stage 2: Customer identification
 
+<p align="right"><a href="#stage-1-agent-only">Previous: Stage 1</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-3-back-office-investigation">Next: Stage 3 &rarr;</a></p>
+
+> **Concept:** request -> customer identification \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_2_identify_customer.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 2 lab</strong> &middot; Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-2-customer-identification)
 
@@ -246,10 +264,18 @@ asks for another identifier instead of inventing a customer.
 
 </details>
 
+---
+
 ### Stage 3: Back-office investigation
 
+<p align="right"><a href="#stage-2-customer-identification">Previous: Stage 2</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-4-technical-diagnostic">Next: Stage 4 &rarr;</a></p>
+
+> **Concept:** request -> customer -> relevant service -> service information \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_3_back_office.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 3 lab</strong> &middot; Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-3-back-office-investigation)
 
@@ -272,10 +298,18 @@ Agent: Your internet line is up and working normally ... What I couldn't check y
 
 </details>
 
+---
+
 ### Stage 4: Technical diagnostic
 
+<p align="right"><a href="#stage-3-back-office-investigation">Previous: Stage 3</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-5-correlation">Next: Stage 5 &rarr;</a></p>
+
+> **Concept:** request -> customer -> service -> equipment -> technical check \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_4_diagnostic.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 4 lab</strong> &middot; Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-4-technical-diagnostic)
 
@@ -300,10 +334,18 @@ Agent: Merci. J'ai bien retrouvé votre dossier.
 
 </details>
 
+---
+
 ### Stage 5: Correlation
 
+<p align="right"><a href="#stage-4-technical-diagnostic">Previous: Stage 4</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-6-mcp">Next: Stage 6 &rarr;</a></p>
+
+> **Concept:** customer context + service information + equipment diagnostic + incidents -> conclusion \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_5_correlation.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 5 lab</strong> &middot; Steps, commands and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-5-correlation)
 
@@ -324,10 +366,18 @@ morning, nothing loads on any device.`: every check is healthy, so it says it ca
 
 </details>
 
+---
+
 ### Stage 6: MCP
 
+<p align="right"><a href="#stage-5-correlation">Previous: Stage 5</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-7-answer-act-or-hand-over">Next: Stage 7 &rarr;</a></p>
+
+> **Concept:** Python function -> enterprise capability -> MCP server -> agent \
+> **You change:** `src/main.py` (MCP connection); the instructions stay unchanged \
+> **Reference:** `src/solutions/stage_6_mcp.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 6 lab</strong> &middot; MCP server, agent connection and screenshots</summary>
 
 [Concepts and exercise](workshop.md#stage-6-mcp)
 
@@ -387,10 +437,18 @@ the server is not running or the configured `MOCK_MCP_URL` points to the wrong a
 
 </details>
 
+---
+
 ### Stage 7: Answer, act or hand over
 
+<p align="right"><a href="#stage-6-mcp">Previous: Stage 6</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-8-knowledge-foundry-iq">Next: Stage 8 &rarr;</a></p>
+
+> **Concept:** answer, request approval for an action, or hand over to a human advisor \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_7_answer_or_handoff.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 7 lab</strong> &middot; Contact centre, approvals and human handover</summary>
 
 [Concepts and exercise](workshop.md#stage-7-answer-act-or-hand-over)
 
@@ -468,22 +526,36 @@ Stage 9; it must restart to pick up a new `main.py`.
 
 ## 3. Enterprise-ready (Stages 8-13)
 
+---
+
 ### Stage 8: Knowledge (Foundry IQ)
 
+<p align="right"><a href="#stage-7-answer-act-or-hand-over">Previous: Stage 7</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-9-foundry-toolbox">Next: Stage 9 &rarr;</a></p>
+
+> **Concept:** tools supply evidence; the knowledge base supplies cited procedures \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_8_knowledge.*`, `src/knowledge_base.py`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 8 lab</strong> &middot; Shared runbooks, retrieval and citations</summary>
 
 [Concepts and exercise](workshop.md#stage-8-knowledge-foundry-iq)
+
+**Model roles:** this baseline demonstrates Foundry IQ knowledge retrieval through MCP and cited
+runbooks, using text search with semantic ranking. It does **not** generate runbook embeddings;
+the baseline embedding deployment is for Stage 11 memory. To show more IQ capabilities, follow
+the trainer's [planning and synthesis demonstration](workshop.md#optional-portal-experiment-retrieval-effort-and-output-mode)
+or the separate [embeddings and hybrid retrieval extension](workshop.md#optional-instructor-extension-embeddings-and-hybrid-retrieval).
+Keep the shared index and toolbox connection unchanged while demonstrating the sandbox.
 
 In a shared workshop, the instructor creates one knowledge base for the group. Participants use the
 same Search endpoint and knowledge base name; their participant prefix does not create a personal copy.
 Query it directly first:
 
-Only the instructor (or the owner of a personal lab environment) runs
-`uv run python knowledge_base.py create` as part of setup. It reports whether each resource
-is missing (**Not found; creating...**) or already exists (**Already exists; updating...**).
-It updates existing resources and uploads the synthetic runbooks again; **Setup complete** confirms success.
-The `ask` command below only queries the knowledge base.
+The instructor prepares the shared knowledge resources before the session. Personal-environment
+owners complete [instructor setup](../instructor/setup.md#2-foundry-iq-knowledge-base-stage-8) first.
+The `ask` command below only queries the knowledge base; do not create or recreate shared resources
+while following this walkthrough.
 If it returns `404` in a shared workshop, check the endpoint and name with the instructor rather than
 running `create` yourself.
 
@@ -526,10 +598,18 @@ In DevUI: `Internet works on cable but Wi-Fi is very slow upstairs. Phone +1 202
 
 </details>
 
+---
+
 ### Stage 9: Foundry Toolbox
 
+<p align="right"><a href="#stage-8-knowledge-foundry-iq">Previous: Stage 8</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-10-prompt-agent">Next: Stage 10 &rarr;</a></p>
+
+> **Concept:** one governed endpoint for the agent's enterprise tools \
+> **You change:** your toolbox in Foundry, `src/main.py`, `src/main.instructions.md` \
+> **Reference:** `src/solutions/stage_9_toolbox.*`, `src/toolbox.py`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 9 lab</strong> &middot; Toolbox, remote tools and optional AG-UI extension</summary>
 
 [Concepts and exercise](workshop.md#stage-9-foundry-toolbox)
 
@@ -620,10 +700,18 @@ See the [full screenshot guide](optional-ag-ui-lab.md#current-ui-screenshots) fo
 
 </details>
 
+---
+
 ### Stage 10: Prompt agent
 
+<p align="right"><a href="#stage-9-foundry-toolbox">Previous: Stage 9</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-11-memory">Next: Stage 11 &rarr;</a></p>
+
+> **Concept:** a published definition with Foundry-managed orchestration; optional functions execute in the application \
+> **You change:** the published prompt-agent definition and its portal instructions; no local agent-file edits \
+> **Reference:** `src/prompt_agent.py`, `src/solutions/stage_10_prompt_agent*.instructions.md`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 10 lab</strong> &middot; Baseline, portal edits and additional functions</summary>
 
 [Concepts and exercise](workshop.md#stage-10-prompt-agent)
 
@@ -796,10 +884,18 @@ based on Microsoft's [Model Router documentation](https://learn.microsoft.com/az
 
 </details>
 
+---
+
 ### Stage 11: Memory
 
+<p align="right"><a href="#stage-10-prompt-agent">Previous: Stage 10</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-12-evaluation">Next: Stage 12 &rarr;</a></p>
+
+> **Concept:** remember customer preferences across conversations using Foundry Memory \
+> **You change:** `src/main.py`, `src/main.instructions.md` (reference copies) \
+> **Reference:** `src/solutions/stage_11_memory.*`, `src/memory_store.py`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 11 lab</strong> &middot; Signed-in customer, memory scope and preferences</summary>
 
 [Concepts and exercise](workshop.md#stage-11-memory)
 
@@ -890,12 +986,58 @@ erases what was remembered.
 
 </details>
 
+---
+
 ### Stage 12: Evaluation
 
+<p align="right"><a href="#stage-11-memory">Previous: Stage 11</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#stage-13-guardrails">Next: Stage 13 &rarr;</a></p>
+
+> **Concept:** baseline -> inspect evidence -> change one thing -> evaluate again \
+> **You change:** Route A: portal runs and a sandbox prompt version; Route B: dataset, instructions and published definitions \
+> **Reference:** `src/evals/portal_quality.jsonl`, `src/evaluate.py`, `src/solutions/stage_12_eval_improvement.*`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 12 lab</strong> &middot; Instructor-led portal or existing evaluation route</summary>
 
 [Concepts and exercise](workshop.md#stage-12-evaluation)
+
+#### Choose your evaluation route
+
+The instructor announces one route; you do not need to complete both in the same session.
+
+| Route | Follow this when | Target |
+| --- | --- | --- |
+| **A. Instructor-led portal** | Everyone follows the instructor's portal steps with the same small dataset and criteria. | A prepared toolbox-only prompt agent from Stage 10. |
+| **B. Existing evaluation lab** | You are doing the full code/CLI exercise already provided below. | Your code-first agent and the published prompt-agent definitions. |
+
+#### Route A: instructor-led portal evaluation
+
+Follow the [guided portal evaluation steps](portal-evaluation.md).
+The instructor uploads [portal_quality.jsonl](../src/evals/portal_quality.jsonl), confirms evaluation
+permissions and a supported judge, and identifies the agent/version to use. Everyone selects
+**Agent > Individual turns > Existing dataset**, keeps `{{item.query}}`, uses the agreed common
+criteria and submits an alias-named baseline run. Inspect individual answers and judge reasoning,
+make one coordinated instruction change in the sandbox, then evaluate the candidate with the
+same dataset/model/tools/judge and compare both reports.
+
+Do not evaluate a local-functions agent from the portal alone, or select **Model** instead of
+**Agent**. Missing scores and failed jobs are not passes. This three-case quality exercise does
+not replace the nine-case regression or safety tests. Record both versions and run links;
+if only watching the instructor, label the result **observed, not independently run**. Then
+continue with the chosen Stage 13 route; the CLI work below is Route B, not another required step.
+
+#### Route B: existing evaluation lab
+
+Follow the [existing evaluation lab](workshop.md#route-b-existing-evaluation-lab):
+
+Copy `AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME=supportbuddy-judge` to `src/.env`, using the actual
+deployment name printed in the handout. The instructor's normal setup provisions it; participants
+do not deploy it. Missing or blank configuration selects `supportbuddy-judge`, never the agent's router.
+Before cloud scoring, the script verifies the configured deployment and logs its actual model/version.
+If it is missing, ask the instructor to update setup and the handout. This setting changes the judge
+used by `evaluate.py`, not the agent under test, and does not deploy a model.
+See [optional model deployments](../instructor/setup.md#optional-additional-model-deployments)
+for the IQ planner, judge and model-comparison options.
 
 ```powershell
 uv run python evaluate.py --foundry
@@ -908,6 +1050,11 @@ compare the published definitions, and measure one instruction change. See the
 [complete task list](workshop.md#stage-12-evaluation).
 The [extra-case reference](../src/solutions/stage_12_extra_case.jsonl) is a ready-to-append example;
 keep the original cases and avoid duplicate IDs. Calibration and harmful-content scoring are optional.
+Its `expected_language: fr` adds a local response-language check, so a clear English answer cannot
+pass merely by calling the right tools and citing a runbook. The reference answer is in French too.
+After updating the lab, run `uv sync` in your selected venv before using `--no-sync`; the detector
+is a local evaluation dependency. See the [dataset field guidance](workshop.md#the-dataset) for
+the language check's limitations. The portal route does not automatically run this Python check.
 
 ```text
 Evaluating main on 9 cases x 1 run(s)
@@ -1016,12 +1163,46 @@ After the improvement exercise, continue with the guardrails stage below.
 
 </details>
 
+---
+
 ### Stage 13: Guardrails
 
+<p align="right"><a href="#stage-12-evaluation">Previous: Stage 12</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#4-hosted-agent-stage-14">Next: Stage 14 &rarr;</a></p>
+
+> **Concept:** observe platform protection and enforce explicit application-side checks \
+> **You change:** Route A: an instructor-controlled sandbox assignment; Route B: toolbox policy, `src/main.py`, `src/main.instructions.md` \
+> **Reference:** `src/solutions/stage_13_guardrails.*`, `src/guardrail_demo.py`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 13 lab</strong> &middot; Instructor-led portal or existing guardrails route</summary>
 
 [Concepts and exercise](workshop.md#stage-13-guardrails)
+
+#### Choose your guardrails route
+
+| Route | Follow this when | Evidence |
+| --- | --- | --- |
+| **A. Instructor-led portal** | Everyone follows the same controls and playground probes; the instructor manages sandbox-policy writes. | Observed platform filtering, annotations and behavior for the selected agent. |
+| **B. Existing guardrails lab** | You are doing the toolbox attachment and Python middleware exercise below. | Offline wiring proof, live safety cases and the full regression. |
+
+#### Route A: instructor-led portal guardrails
+
+Follow the [guided portal guardrails steps](workshop.md#route-a-instructor-led-portal-guardrails).
+Open **Build > Guardrails** with the instructor, inspect the controls and confirm the assigned
+sandbox agent. Only the instructor creates or assigns a demonstration policy, using appropriate
+permissions and keeping the shared model deployment and standard workshop policy unchanged.
+Use **Try in Playground** and run the same normal Wi-Fi request, S2 user-input attack and S3
+poisoned-tool-data case in new conversations. Record the actual annotations/errors and response.
+
+A refusal alone is not a proven platform block, and a user-input shield does not prove that MCP
+tool responses were screened. The agent/model assignment is not the lab's separate toolbox-policy
+attachment. This portal route does **not** install or prove the local customer-checking middleware.
+Record the policy, assignment, intervention point and observed outcomes. Then continue to Stage 14;
+the code-first proof below is Route B, not an additional requirement for Route A.
+
+#### Route B: existing guardrails lab
+
+Follow the [existing guardrails lab](workshop.md#route-b-existing-guardrails-lab).
 
 Obtain the existing guardrail's full resource ID from the instructor and attach it to your toolbox:
 
@@ -1091,8 +1272,14 @@ the main guide is not required for this checkpoint.
 
 ## 4. Hosted agent (Stage 14)
 
+<p align="right"><a href="#stage-13-guardrails">Previous: Stage 13</a> &middot; <a href="#contents">Contents</a> &middot; <a href="#5-clean-up">Next: Clean up &rarr;</a></p>
+
+> **Concept:** your code-first agent, run by Foundry \
+> **You change:** `src/azure.yaml` (generated by `azd`) \
+> **Reference:** `src/hosted_agent.py`, `src/hosted_agent.instructions.md`, `src/requirements.txt`
+
 <details>
-<summary>Steps, commands and screenshots</summary>
+<summary><strong>Stage 14 lab</strong> &middot; Initialize, test, deploy and inspect the hosted agent</summary>
 
 [Concepts and exercise](workshop.md#stage-14-hosted-agent)
 

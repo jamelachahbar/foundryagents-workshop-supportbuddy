@@ -92,3 +92,40 @@ def test_monitoring_is_unconditional_and_exports_only_a_resource_id(compiled, la
     assert "WorkspaceResourceId" in insights["properties"]
     assert "APPLICATIONINSIGHTS_RESOURCE_ID" in compiled["outputs"]
     assert "APPLICATIONINSIGHTS_CONNECTION_STRING" not in compiled["outputs"]
+
+
+def test_fixed_judge_is_enabled_by_default_and_serialized_after_embeddings(compiled, lab):
+    assert compiled["parameters"]["deployEvaluationModel"]["defaultValue"] is True
+    assert compiled["parameters"]["evaluationModelName"]["defaultValue"] == "gpt-5-mini"
+    assert compiled["parameters"]["evaluationModelVersion"]["defaultValue"] == "2025-08-07"
+    assert compiled["parameters"]["evaluationModelDeploymentName"]["defaultValue"] == "supportbuddy-judge"
+    assert lab["parameters"]["deployEvaluationModel"]["value"] == "[parameters('deployEvaluationModel')]"
+    judge = next(
+        resource for resource in lab["template"]["resources"]
+        if resource["type"] == "Microsoft.CognitiveServices/accounts/deployments"
+        and "evaluationModel" in resource["name"]
+    )
+    assert judge["condition"] == "[parameters('deployEvaluationModel')]"
+    assert any("supportbuddy-embedding" in dependency for dependency in judge["dependsOn"])
+    assert judge["properties"]["model"] == {
+        "format": "OpenAI", "name": "[parameters('evaluationModel').name]",
+        "version": "[parameters('evaluationModel').version]",
+    }
+    assert judge["properties"]["versionUpgradeOption"] == "NoAutoUpgrade"
+    assert "if(parameters('deployEvaluationModel')" in lab["template"]["outputs"]["evaluationDeployment"]["value"]
+    assert "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME" in compiled["outputs"]
+
+
+def test_optional_judge_parameters_are_bound_to_azd_configuration(compiled, lab):
+    parameters = json.loads((ROOT / "instructor" / "infra" / "main.parameters.json").read_text())["parameters"]
+    assert parameters["deployEvaluationModel"]["value"] == "${DEPLOY_EVALUATION_MODEL=true}"
+    for name, environment in {
+        "evaluationModelName": "EVALUATION_MODEL_NAME",
+        "evaluationModelVersion": "EVALUATION_MODEL_VERSION",
+        "evaluationModelDeploymentName": "EVALUATION_MODEL_DEPLOYMENT_NAME",
+        "evaluationModelSku": "EVALUATION_MODEL_SKU",
+        "evaluationModelCapacity": "EVALUATION_MODEL_CAPACITY",
+    }.items():
+        default = compiled["parameters"][name]["defaultValue"]
+        assert parameters[name]["value"] == f"${{{environment}={default}}}"
+    assert lab["parameters"]["evaluationModel"]["value"]["deploymentName"] == "[parameters('evaluationModelDeploymentName')]"

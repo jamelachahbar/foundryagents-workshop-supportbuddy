@@ -36,7 +36,10 @@ REQUIRED = [
 
 def azd_values() -> dict[str, str]:
     """Values from the environment (azd hooks) or, when run by hand, from `azd env get-values`."""
-    values = {name: os.environ[name] for name in [*REQUIRED, "NETWORK_MCP_URL"] if os.getenv(name)}
+    values = {
+        name: os.environ[name] for name in [*REQUIRED, "NETWORK_MCP_URL", "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"]
+        if os.getenv(name)
+    }
     if any(name not in values for name in REQUIRED):
         output = subprocess.run(["azd", "env", "get-values", "--output", "json"], capture_output=True, text=True,
                                 check=True, shell=sys.platform == "win32").stdout
@@ -123,10 +126,13 @@ def main() -> int:
     run_lab_script(["knowledge_base.py", "create"], env, "knowledge base supportbuddy-runbooks")
     run_lab_script(["memory_store.py", "create"], env, "memory store supportbuddy-memory")
 
+    evaluation_model = values.get("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME")
+    judge_setting = f"AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME={evaluation_model}\n" if evaluation_model else ""
     print(
         "\nGive the participants these lines for src/.env (each adds their own WORKSHOP_RESOURCE_PREFIX):\n\n"
         f"AZURE_AI_PROJECT_ENDPOINT={values['AZURE_AI_PROJECT_ENDPOINT']}\n"
         f"AZURE_AI_MODEL_DEPLOYMENT_NAME={values['AZURE_AI_MODEL_DEPLOYMENT_NAME']}\n"
+        f"{judge_setting}"
         "MOCK_MCP_URL=http://127.0.0.1:8000/mcp\n"
         f"AZURE_AI_SEARCH_ENDPOINT={values['AZURE_AI_SEARCH_ENDPOINT']}\n"
         "FOUNDRY_KNOWLEDGE_BASE_NAME=supportbuddy-runbooks\n"

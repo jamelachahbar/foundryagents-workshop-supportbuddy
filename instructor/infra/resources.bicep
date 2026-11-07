@@ -7,6 +7,8 @@ param principalType string
 param participantsGroupId string
 param chatModel object
 param embeddingModel object
+param deployEvaluationModel bool
+param evaluationModel object
 param externalNetworkMcpUrl string
 param networkMcpExists bool
 
@@ -72,7 +74,18 @@ resource chatDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-1
   sku: { name: chatModel.sku, capacity: chatModel.capacity }
   properties: union({
     model: { format: 'OpenAI', name: chatModel.name, version: chatModel.version }
-  }, chatModel.name == 'model-router' ? { routing: { mode: chatModel.routingMode } } : {})
+  }, chatModel.name == 'model-router' ? {
+    routing: {
+      mode: chatModel.routingMode
+      // Optional allow-list: verify these observed model/version pairs in Foundry first.
+      // Uncomment to restrict the router; leaving this commented keeps the full pool eligible.
+      // models: [
+      //   { format: 'OpenAI', name: 'gpt-5.6-terra', version: '2026-07-09' },
+      //   { format: 'OpenAI', name: 'gpt-6-sol', version: '2026-09-22' },
+      //   { format: 'OpenAI', name: 'gpt-5.4-mini', version: '2026-03-17' }
+      // ]
+    }
+  } : {})
   dependsOn: [guardrail]
 }
 
@@ -84,6 +97,17 @@ resource embeddingDeployment 'Microsoft.CognitiveServices/accounts/deployments@2
     model: { format: 'OpenAI', name: embeddingModel.name, version: embeddingModel.version }
   }
   dependsOn: [chatDeployment]
+}
+
+resource evaluationDeployment 'Microsoft.CognitiveServices/accounts/deployments@2025-06-01' = if (deployEvaluationModel) {
+  parent: account
+  name: evaluationModel.deploymentName
+  sku: { name: evaluationModel.sku, capacity: evaluationModel.capacity }
+  properties: {
+    model: { format: 'OpenAI', name: evaluationModel.name, version: evaluationModel.version }
+    versionUpgradeOption: 'NoAutoUpgrade'
+  }
+  dependsOn: [embeddingDeployment]
 }
 
 // ----- Azure AI Search: the Foundry IQ knowledge base (runbooks) -----------------------------
@@ -335,6 +359,7 @@ resource participantsReadLogs 'Microsoft.Authorization/roleAssignments@2022-04-0
 output projectEndpoint string = 'https://${account.properties.customSubDomainName}.services.ai.azure.com/api/projects/${project.name}'
 output chatDeployment string = chatDeployment.name
 output embeddingDeployment string = embeddingDeployment.name
+output evaluationDeployment string = deployEvaluationModel ? evaluationModel.deploymentName : ''
 output searchEndpoint string = 'https://${search.name}.search.windows.net'
 output accountId string = account.id
 output projectId string = project.id

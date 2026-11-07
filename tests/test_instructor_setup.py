@@ -21,6 +21,7 @@ def values():
     return {
         "AZURE_AI_PROJECT_ENDPOINT": "https://lab.services.ai.azure.com/api/projects/supportbuddy",
         "AZURE_AI_MODEL_DEPLOYMENT_NAME": "model-router",
+        "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME": "supportbuddy-judge",
         "AZURE_AI_EMBEDDING_DEPLOYMENT_NAME": "supportbuddy-embedding",
         "AZURE_AI_SEARCH_ENDPOINT": "https://lab.search.windows.net/",
         "FOUNDRY_PROJECT_ID": "/subscriptions/test/resourceGroups/lab/providers/Microsoft.CognitiveServices/accounts/lab/projects/supportbuddy",
@@ -107,7 +108,7 @@ def test_project_connection_failure_is_not_reported_as_success(values, arm, caps
 
 
 def test_azd_values_includes_monitoring_from_fresh_hook_environment(monkeypatch, values):
-    for key in [*setup.REQUIRED, "NETWORK_MCP_URL"]:
+    for key in [*setup.REQUIRED, "NETWORK_MCP_URL", "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"]:
         monkeypatch.delenv(key, raising=False)
     for key, value in values.items():
         monkeypatch.setenv(key, value)
@@ -118,7 +119,7 @@ def test_azd_values_includes_monitoring_from_fresh_hook_environment(monkeypatch,
 
 
 def test_missing_monitoring_output_requests_reprovision(monkeypatch, values):
-    for key in [*setup.REQUIRED, "NETWORK_MCP_URL"]:
+    for key in [*setup.REQUIRED, "NETWORK_MCP_URL", "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"]:
         monkeypatch.delenv(key, raising=False)
     values.pop("APPLICATIONINSIGHTS_RESOURCE_ID")
     monkeypatch.setattr(setup.subprocess, "run", Mock(return_value=SimpleNamespace(stdout=json.dumps(values))))
@@ -136,8 +137,44 @@ def test_handout_enables_tracing_without_payload_capture_or_credentials(monkeypa
     assert scripts.call_count == 2
     output = capsys.readouterr().out
     assert "AZURE_AI_MODEL_DEPLOYMENT_NAME=model-router\n" in output
+    assert "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME=supportbuddy-judge\n" in output
     assert "SUPPORTBUDDY_TRACING=true\n" in output
     assert "SUPPORTBUDDY_TRACE_CONTENT=false\n" in output
     assert values["APPLICATIONINSIGHTS_RESOURCE_ID"] in output
     assert "APPLICATIONINSIGHTS_CONNECTION_STRING" not in output
     assert "InstrumentationKey=" not in output
+
+
+def test_optional_judge_output_is_loaded_from_hook_environment(monkeypatch, values):
+    for key in [*setup.REQUIRED, "NETWORK_MCP_URL", "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"]:
+        monkeypatch.delenv(key, raising=False)
+    values["AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"] = "supportbuddy-judge"
+    for key, value in values.items():
+        monkeypatch.setenv(key, value)
+    run = Mock()
+    monkeypatch.setattr(setup.subprocess, "run", run)
+    assert setup.azd_values() == values
+    run.assert_not_called()
+
+
+def test_optional_judge_output_is_loaded_from_saved_azd_values(monkeypatch, values):
+    for key in [*setup.REQUIRED, "NETWORK_MCP_URL", "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"]:
+        monkeypatch.delenv(key, raising=False)
+    values["AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"] = "supportbuddy-judge"
+    monkeypatch.setattr(setup.subprocess, "run", Mock(return_value=SimpleNamespace(stdout=json.dumps(values))))
+    assert setup.azd_values() == values
+
+
+@pytest.mark.parametrize("judge", ["", "supportbuddy-judge"])
+def test_handout_includes_judge_only_when_configured(monkeypatch, values, capsys, judge):
+    values["AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME"] = judge
+    monkeypatch.setattr(setup, "azd_values", lambda: values)
+    monkeypatch.setattr(setup, "create_connections", Mock())
+    monkeypatch.setattr(setup, "run_lab_script", Mock())
+    assert setup.main() == 0
+    output = capsys.readouterr().out
+    assert "AZURE_AI_MODEL_DEPLOYMENT_NAME=model-router\n" in output
+    if judge:
+        assert "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME=supportbuddy-judge\n" in output
+    else:
+        assert "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME=" not in output

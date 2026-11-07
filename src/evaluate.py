@@ -25,8 +25,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import re
 import sys
 from collections.abc import Callable
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -36,14 +39,48 @@ from agent_framework_openai import OpenAIContentFilterException
 from azure.identity import AzureCliCredential
 from azure.identity.aio import AzureCliCredential as AsyncAzureCliCredential
 from azure.ai.projects.aio import AIProjectClient
+from azure.core.exceptions import ResourceNotFoundError
 from openai import AsyncOpenAI
 from openai.types.eval_create_response import EvalCreateResponse
+from lingua import IsoCode639_1, LanguageDetector, LanguageDetectorBuilder
 
 from contact_centre.centre import tool_name
 from lab_agent import load_settings, open_agent, stage_agent, stage_signs_in
 
 DATASET = Path(__file__).parent / "evals" / "dataset.jsonl"
 HANDOVER_TOOL = "escalate_to_human"
+
+
+def judge_model_deployment(settings: dict[str, str]) -> str:
+    return os.getenv(
+        "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME",
+        settings.get("AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME", "supportbuddy-judge"),
+    ).strip() or "supportbuddy-judge"
+
+
+async def verify_judge_deployment(settings: dict[str, str]) -> None:
+    deployment_name = judge_model_deployment(settings)
+    async with AsyncAzureCliCredential() as credential:
+        async with AIProjectClient(endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=credential) as project:
+            try:
+                deployment = await project.deployments.get(deployment_name)
+            except ResourceNotFoundError as error:
+                raise RuntimeError(
+                    f"Evaluation judge deployment '{deployment_name}' was not found. Ask the instructor to provision "
+                    "the fixed judge with DEPLOY_EVALUATION_MODEL=true, then copy "
+                    "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME from the handout. "
+                    "No evaluation cases have run."
+                ) from error
+    model = deployment.as_dict()
+    if model.get("modelName") == "model-router":
+        raise RuntimeError(
+            f"Evaluation judge '{deployment_name}' is Model Router. Configure "
+            "AZURE_AI_EVALUATION_MODEL_DEPLOYMENT_NAME with the instructor's fixed-model deployment, "
+            "not the agent's router. No evaluation cases have run."
+        )
+    if not model.get("modelName") or not model.get("modelVersion"):
+        raise RuntimeError(f"Cannot verify a fixed model/version for evaluation judge '{deployment_name}'. No evaluation cases have run.")
+    print(f"Foundry judge deployment: {deployment_name}; model={model['modelName']}; version={model['modelVersion']}")
 
 
 def quality_conversation_split(
@@ -114,7 +151,7 @@ async def score_dataset(
             },
             "testing_criteria": [{
                 "type": "azure_ai_evaluator", "name": metric, "evaluator_name": f"builtin.{metric}",
-                "initialization_parameters": {"deployment_name": settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"]},
+                "initialization_parameters": {"deployment_name": judge_model_deployment(settings)},
                 "data_mapping": {
                     "query": "{{item.query}}", "response": "{{item.response}}",
                     source_field: "{{item." + source_field + "}}",
@@ -166,6 +203,38 @@ def tools_called(conversation: list[Message]) -> list[str]:
     return [tool_name(name) for name in names]
 
 
+@cache
+def response_language_detector() -> LanguageDetector:
+    return (
+        LanguageDetectorBuilder.from_all_languages()
+        .with_low_accuracy_mode()
+        .with_minimum_relative_distance(0.1)
+        .build()
+    )
+
+
+def response_language_coverage(response: str, expected_language: str) -> tuple[str, float, int]:
+    prose = re.sub(r"\[RB-\d{2}[^\]\r\n]*\]", "", response)
+    words = re.compile(r"\b[^\W\d_]+(?:['’][^\W\d_]+)*\b", re.UNICODE)
+    total_words = len(words.findall(prose))
+    counts: dict[str, int] = {}
+    for sentence in re.split(r"(?<=[.!?;:\n])\s+", prose):
+        sentence_words = words.findall(sentence)
+        if len(sentence_words) < 3:
+            continue
+        detected = response_language_detector().detect_language_of(sentence)
+        if detected is not None:
+            code = detected.iso_code_639_1.name.lower()
+            counts[code] = counts.get(code, 0) + len(sentence_words)
+    if not counts or total_words == 0:
+        return "undetermined", 0.0, 0
+    best = max(counts, key=counts.get)
+    if list(counts.values()).count(counts[best]) > 1:
+        best = "undetermined"
+    matching_words = counts.get(expected_language, 0)
+    return best, matching_words / total_words, matching_words
+
+
 def checks_for(case: dict[str, Any]) -> list[Any]:
     """The rule-based checks that apply to one case."""
     checks = []
@@ -196,6 +265,26 @@ def checks_for(case: dict[str, Any]) -> list[Any]:
             return {"passed": bool(cited), "reason": f"cited {cited}" if cited else f"none of {runbooks} cited"}
 
         checks.append(cites_runbook)
+
+    if "expected_language" in case:
+        language = case["expected_language"]
+        if not isinstance(language, str) or not re.fullmatch(r"[a-z]{2}", language) or not hasattr(IsoCode639_1, language.upper()):
+            raise ValueError("expected_language must be a supported lowercase two-letter language code, such as 'fr'.")
+
+        @evaluator(name="response_language")
+        def response_language(response: str) -> dict[str, Any]:
+            actual, coverage, matching_words = response_language_coverage(response, language)
+            passed = coverage >= 0.7 and matching_words >= 5
+            return {
+                "passed": passed,
+                "reason": (
+                    f"expected substantial {language}; majority language {actual}, "
+                    f"{coverage:.0%} {language} word coverage ({matching_words} words; requires 70% and 5); "
+                    "statistical sentence-level check"
+                ),
+            }
+
+        checks.append(response_language)
 
     if forbidden := case.get("must_not_contain"):
 
@@ -283,6 +372,8 @@ async def main_async(
             if not isinstance(reference, str) or not reference.strip():
                 raise ValueError(f"Case {case['id']!r} needs non-empty ground_truth for response completeness.")
     settings = load_settings()
+    if use_foundry_safety or (use_foundry and any(case["category"] == "quality" for case in cases)):
+        await verify_judge_deployment(settings)
     make_agent = agent_factory(module_name, prompt_agent)
     label = "prompt_agent" if prompt_agent else module_name
     quality_queries: list[str] = []
@@ -357,7 +448,7 @@ async def main_async(
         )
         judge = FoundryChatClient(
             project_endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"],
-            model=settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"],
+            model=judge_model_deployment(settings),
             credential=AzureCliCredential(),
         )
         foundry = FoundryEvals(
@@ -393,7 +484,7 @@ async def main_async(
         if safety_responses:
             judge = FoundryChatClient(
                 project_endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"],
-                model=settings["AZURE_AI_MODEL_DEPLOYMENT_NAME"], credential=AzureCliCredential(),
+                model=judge_model_deployment(settings), credential=AzureCliCredential(),
             )
             foundry = FoundryEvals(client=judge, timeout=600, evaluators=[
                 FoundryEvals.HATE_UNFAIRNESS, FoundryEvals.SEXUAL, FoundryEvals.VIOLENCE, FoundryEvals.SELF_HARM,

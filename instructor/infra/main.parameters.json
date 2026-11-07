@@ -14,6 +14,12 @@
     "chatModelSku": { "value": "${CHAT_MODEL_SKU=GlobalStandard}" },
     "chatModelRoutingMode": { "value": "${CHAT_MODEL_ROUTING_MODE=balanced}" },
     "chatModelCapacity": { "value": "${CHAT_MODEL_CAPACITY=100}" },
+    "deployEvaluationModel": { "value": "${DEPLOY_EVALUATION_MODEL=true}" },
+    "evaluationModelName": { "value": "${EVALUATION_MODEL_NAME=gpt-5-mini}" },
+    "evaluationModelVersion": { "value": "${EVALUATION_MODEL_VERSION=2025-08-07}" },
+    "evaluationModelDeploymentName": { "value": "${EVALUATION_MODEL_DEPLOYMENT_NAME=supportbuddy-judge}" },
+    "evaluationModelSku": { "value": "${EVALUATION_MODEL_SKU=GlobalStandard}" },
+    "evaluationModelCapacity": { "value": "${EVALUATION_MODEL_CAPACITY=10}" },
     "resourceTags": { "value": "${AZURE_RESOURCE_TAGS=}" },
     "externalNetworkMcpUrl": { "value": "${EXTERNAL_NETWORK_MCP_URL=}" },
     "networkMcpExists": { "value": "${SERVICE_NETWORK_MCP_RESOURCE_EXISTS=false}" }
