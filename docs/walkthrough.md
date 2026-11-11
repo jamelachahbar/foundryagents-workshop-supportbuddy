@@ -26,6 +26,8 @@ Handover/action timestamps and real waiting periods are not frozen.
 See [The scenario clock](workshop.md#the-scenario-clock) and the
 [instructor preparation checklist](../instructor/setup.md#reusable-scenario-time).
 
+> **Quick reference:** [Participant terminal cheatsheet](participant-terminal-cheatsheet.md) covers reopening terminals and restarting local servers.
+
 ## Contents
 
 | Part | Stages | Runs where |
@@ -92,8 +94,9 @@ Replace `.venv-windows` with your chosen Windows venv name if different. For opt
 parameters or an environment already installed, see
 [Windows setup](workshop.md#windows-one-command-setup). Keep Windows and devcontainer venvs separate.
 
-After setup, paste its printed commands to select `src/` and your Windows venv. Repeat the
-environment selection in each new terminal. No activation is needed. If all five checkpoints
+After setup, open PowerShell in the repository root and paste its printed commands. The agent
+runs from `src/` without changing the terminal's folder. Repeat the environment selection in each
+new terminal. No activation is needed. If all five checkpoints
 passed, skip the manual configuration and preflight below and continue at the terminal table.
 
 **macOS/Linux or devcontainer participants:** with uv and Azure CLI installed, start from
@@ -112,7 +115,7 @@ configuration rather than overwriting it. Set your own prefix:
 WORKSHOP_RESOURCE_PREFIX=lab-<alias>      # 2-8 lowercase letters or digits, for example lab-jdoe
 ```
 
-Sign in and check everything:
+Sign in and run [src/preflight.py](../src/preflight.py) from `src/` to check everything:
 
 ```powershell
 az login --tenant <tenant-id>
@@ -138,17 +141,19 @@ template just to resume the lab.
 **In every new PowerShell terminal**, open the repository root and paste:
 
 ```powershell
-Set-Location .\src
-$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv-windows'
+if (-not (Test-Path '.\setup-windows.ps1')) {
+  throw 'Open PowerShell in the repository root first. If the prompt shows src, open a new terminal at the repository root.'
+}
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD 'src\.venv-windows'
 if (-not (Test-Path (Join-Path $env:UV_PROJECT_ENVIRONMENT 'Scripts\python.exe'))) {
   throw 'Windows venv not found. Check the name you used during setup before continuing.'
 }
-uv run --no-sync python -c "import sys; print(sys.executable)"
+uv run --directory src --no-sync python -c "import sys; print(sys.executable)"
 ```
 
 Replace `.venv-windows` with your actual Windows venv name, such as `.venv2`. If the terminal
-already starts in `src/`, skip `Set-Location .\src`. Never run the lab from the venv's
-`Scripts` folder or point Windows at the devcontainer's Linux `.venv`.
+is not in the repository root, open a new PowerShell terminal there. Never run the lab from the
+venv's `Scripts` folder or point Windows at the devcontainer's Linux `.venv`.
 
 **Checkpoint:** the last command prints the Python executable inside your chosen Windows
 venv, for example `...\src\.venv-windows\Scripts\python.exe`. Selecting

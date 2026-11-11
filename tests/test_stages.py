@@ -1,6 +1,7 @@
 """Each stage adds capabilities in the intended order, without needing Azure."""
 
 import importlib
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -284,6 +285,145 @@ def test_hosted_agent_uses_the_toolbox_and_the_local_handover_function(monkeypat
     assert [t.name for t in hosted_agent.tools()] == [TOOLBOX, *HUMAN_IN_THE_LOOP]
     assert hosted_agent.tools()[0].tool_result_content == "both"
     assert hosted_agent.create_agent().name == "lab-test-supportbuddy"
+
+
+@pytest.mark.parametrize("connection", ["supportbuddy-network-mcp", "supportbuddy-network-mcp-agent"])
+def test_toolbox_publishes_selected_network_connection(connection):
+    import toolbox
+
+    project = MagicMock()
+    project.connections.get.side_effect = lambda name: SimpleNamespace(target=f"https://example.test/{name}")
+    project.toolboxes.create_version.return_value.version = "4"
+    toolbox.create(project, TOOLBOX, None, network_connection=connection)
+    network, knowledge = project.toolboxes.create_version.call_args.kwargs["tools"]
+    assert network.project_connection_id == connection
+    assert network.server_url == f"https://example.test/{connection}"
+    assert knowledge.project_connection_id == toolbox.KNOWLEDGE_CONNECTION
+    project.toolboxes.update.assert_called_once_with(TOOLBOX, default_version="4")
+
+
+def test_toolbox_defaults_to_shared_network_connection():
+    import toolbox
+
+    project = MagicMock()
+    project.connections.get.return_value = SimpleNamespace(target="https://example.test/mcp")
+    network, _ = toolbox.toolbox_tools(project)
+    assert network.project_connection_id == "supportbuddy-network-mcp"
+
+
+def test_toolbox_show_explains_mcp_routes_and_authentication(monkeypatch, capsys):
+    import asyncio
+    import toolbox
+
+    route = {
+        "server_label": "network",
+        "server_url": "https://example.test/mcp",
+        "project_connection_id": "supportbuddy-network-mcp-agent",
+    }
+    project = MagicMock()
+    project.__enter__.return_value = project
+    project.toolboxes.get.return_value.as_dict.return_value = {"default_version": "4"}
+    project.toolboxes.get_version.return_value.as_dict.return_value = {"tools": [route]}
+    project.connections.get.return_value.as_dict.return_value = {
+        "credentials": {"type": "AgenticIdentityToken"}
+    }
+    monkeypatch.setattr(toolbox, "AIProjectClient", lambda **kwargs: project)
+
+    class AsyncContext:
+        def __init__(self, value=None):
+            self.value = value
+
+        async def __aenter__(self):
+            return self.value or self
+
+        async def __aexit__(self, *args):
+            return None
+
+    import agent_framework.foundry
+    import azure.identity.aio
+
+    monkeypatch.setattr(azure.identity.aio, "AzureCliCredential", lambda: AsyncContext(object()))
+    monkeypatch.setattr(
+        agent_framework.foundry,
+        "FoundryToolbox",
+        lambda credential, url: AsyncContext(SimpleNamespace(functions=[SimpleNamespace(name="network___identify_customer")])),
+    )
+
+    asyncio.run(toolbox.show("https://example.test/project", TOOLBOX, "https://example.test/toolboxes/mcp"))
+
+    output = capsys.readouterr().out
+    assert "Active version: 4" in output
+    assert "Server endpoint: https://example.test/mcp" in output
+    assert "Foundry connection: supportbuddy-network-mcp-agent" in output
+    assert "hosted agent identity (AgenticIdentityToken)" in output
+    assert "identify_customer  [network___identify_customer]" in output
+    assert "does not prove a tool call succeeded" in output
+
+
+def test_toolbox_show_reports_agent_identity_needs_hosted_context(monkeypatch, capsys):
+    import asyncio
+    import toolbox
+    from agent_framework.exceptions import ToolExecutionException
+
+    route = {
+        "server_label": "network",
+        "server_url": "https://example.test/mcp",
+        "project_connection_id": "supportbuddy-network-mcp-agent",
+    }
+    project = MagicMock()
+    project.__enter__.return_value = project
+    project.toolboxes.get.return_value.as_dict.return_value = {"default_version": "6"}
+    project.toolboxes.get_version.return_value.as_dict.return_value = {"tools": [route]}
+    project.connections.get.return_value.as_dict.return_value = {
+        "credentials": {"type": "AgenticIdentityToken"}
+    }
+    monkeypatch.setattr(toolbox, "AIProjectClient", lambda **kwargs: project)
+
+    class AsyncContext:
+        async def __aenter__(self):
+            return object()
+
+        async def __aexit__(self, *args):
+            return None
+
+    class AgentContext:
+        async def __aenter__(self):
+            raise ToolExecutionException(
+                "AgenticIdentityToken auth type requires AgentInstanceClientId and AgentBlueprintClientId"
+            )
+
+        async def __aexit__(self, *args):
+            return None
+
+    import agent_framework.foundry
+    import azure.identity.aio
+
+    monkeypatch.setattr(azure.identity.aio, "AzureCliCredential", AsyncContext)
+    monkeypatch.setattr(agent_framework.foundry, "FoundryToolbox", lambda credential, url: AgentContext())
+
+    asyncio.run(toolbox.show("https://example.test/project", TOOLBOX, "https://example.test/toolboxes/mcp"))
+
+    output = capsys.readouterr().out
+    assert "Active version: 6" in output
+    assert "AgenticIdentityToken" in output
+    assert "Tool listing requires the hosted-agent identity" in output
+    assert "use a hosted conversation to verify these tools" in output
+
+
+def test_toolbox_cli_forwards_selected_network_connection(monkeypatch):
+    import toolbox
+
+    project = MagicMock()
+    project.__enter__.return_value = project
+    publish = MagicMock()
+    monkeypatch.setattr(sys, "argv", ["toolbox.py", "create", "--network-connection", "supportbuddy-network-mcp-agent"])
+    monkeypatch.setattr(toolbox, "AIProjectClient", lambda **kwargs: project)
+    monkeypatch.setattr(toolbox, "load_settings", lambda: {"AZURE_AI_PROJECT_ENDPOINT": "https://example.test"})
+    monkeypatch.setattr(toolbox, "toolbox_settings", lambda: {"TOOLBOX_NAME": TOOLBOX, "NETWORK_TOOLS": "toolbox"})
+    monkeypatch.setattr(toolbox, "create", publish)
+    assert toolbox.main() == 0
+    publish.assert_called_once_with(project, TOOLBOX, None, include_network=True,
+                                    network_connection="supportbuddy-network-mcp-agent")
 
 
 def test_hosted_agent_requirements_match_the_pinned_agent_framework():

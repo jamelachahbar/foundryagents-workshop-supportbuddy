@@ -7,6 +7,8 @@ guardrail. Everything here is synthetic training data.
 **Instructor documents:** use this page for provisioning, permissions and model deployments.
 Use the [facilitation guide](facilitation.md) for stage-by-stage demo preparation and scripts.
 Participants follow [the workshop](../docs/workshop.md) and its linked exercises instead.
+For the optional MCP identity demonstration, see the [secure MCP instructor guide](secure-mcp-demo.md).
+Its role-enforcement path is experimental and not yet verified end to end on Azure.
 
 ## Who sets it up?
 
@@ -113,6 +115,49 @@ date claims from earlier dry runs.
   missing tools**, including PowerShell 7 (`pwsh`) for the provisioning hook. On macOS/Linux,
   install the CLI tools before the manual commands below. Docker is **not** needed: the MCP server
   image is built in Azure Container Registry.
+
+### If WinGet is blocked
+
+Install the prerequisites with their official installers, then run the bootstrap below. It checks
+`PATH` first and skips any tool that is already available. Install Python and the command-line tools
+under the customer-approved software policy; a managed desktop may require IT to approve the MSI.
+
+1. Install [Python 3.12 for Windows](https://www.python.org/downloads/release/python-31210/) using
+  the **Windows installer (64-bit)**. Keep the Python launcher (`py`) enabled. Verify with
+  `py -3.12 --version`.
+2. Install the [Azure CLI 64-bit MSI](https://aka.ms/installazurecliwindowsx64). Close and reopen
+  PowerShell after installation, then verify with `az version`.
+3. Install `azd` using the [official Azure Developer CLI installer](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd):
+
+  ```powershell
+  powershell -ex AllSigned -c "Invoke-RestMethod 'https://aka.ms/install-azd.ps1' | Invoke-Expression"
+  ```
+
+  Verify with `azd version`.
+4. Install [PowerShell 7 for Windows](https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows)
+  using the stable **x64 MSI** (currently
+  [PowerShell 7.6.6](https://github.com/PowerShell/PowerShell/releases/download/v7.6.6/PowerShell-7.6.6-win-x64.msi)).
+  Verify `pwsh --version` in a new terminal.
+5. Install `uv` from PyPI into a separate tools venv. This customer does not use a Python-feed proxy,
+  so pip can use its normal configured index; do not set `-Proxy` for this scenario:
+
+  ```powershell
+  $uvTools = Join-Path $env:LOCALAPPDATA 'supportbuddy-uv-tools'
+  py -3.12 -m venv $uvTools
+  $uvPython = Join-Path $uvTools 'Scripts\python.exe'
+  & $uvPython -m pip install --upgrade pip
+  & $uvPython -m pip install uv
+  $env:PATH = (Join-Path $uvTools 'Scripts') + ';' + $env:PATH
+  uv --version
+  ```
+
+  If their security policy requires an approved Python package index, use that index with pip;
+  otherwise, leave pip/uv on the default PyPI configuration.
+
+With `uv`, `az`, `azd`, and `pwsh` visible in the same PowerShell session, continue with
+`-PrerequisitesOnly`. The bootstrap will create `src/.venv-windows`, run `uv sync --python 3.12`,
+and install the `microsoft.foundry` azd extension. If any command is still missing, ask IT to install
+it rather than retrying the blocked WinGet package.
 
 ### Run it
 

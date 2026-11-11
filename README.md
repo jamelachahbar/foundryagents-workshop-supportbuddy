@@ -17,6 +17,8 @@ and hands the case to a human when it cannot resolve it.
 
 **Start here: [docs/workshop.md](docs/workshop.md)**
 
+Quick reference for resuming after closing terminals: [participant terminal cheatsheet](docs/participant-terminal-cheatsheet.md).
+
 Optional Copilot skills and references: [.github/skills/README.md](.github/skills/README.md).
 
 Visual architecture guide: [AG-UI in SupportBuddy](docs/ag-ui.md) - streaming, approvals and human handover.

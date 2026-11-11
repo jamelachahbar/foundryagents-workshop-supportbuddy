@@ -3,7 +3,7 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-RUN pip install --no-cache-dir "mcp>=1.24.0,<2"
+RUN pip install --no-cache-dir "mcp>=1.24.0,<2" "uvicorn>=0.30"
 
 COPY lab_backend ./lab_backend
 COPY mcp_server ./mcp_server

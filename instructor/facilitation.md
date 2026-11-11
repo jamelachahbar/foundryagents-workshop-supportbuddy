@@ -10,6 +10,9 @@ or change the group's model/router configuration while following a demo. Announc
 route and budget, prepare a separate sandbox, and distinguish observing a demo from completing
 an independent exercise. All data must remain synthetic.
 
+For the optional network MCP identity demonstration, see the [secure MCP instructor guide](secure-mcp-demo.md).
+Its role-enforcement path is experimental and requires additional live verification before a workshop.
+
 ## Stage 8: retrieval effort and output mode
 
 This extension is optional and is not required for the participant Stage 8 checkpoint. Complete

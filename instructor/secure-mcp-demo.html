@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Secure MCP | Instructor Lab</title>
+  <script>
+    (() => {
+      const param = new URLSearchParams(window.location.search).get("clawpilotTheme");
+      const theme =
+        param || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+      document.documentElement.setAttribute("data-theme", theme);
+    })();
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --cp-bg: #f7f4ef;
+      --cp-bg-elevated: #fcfbf8;
+      --cp-surface: #ffffff;
+      --cp-surface-soft: #f5f5f5;
+      --cp-border: #dedede;
+      --cp-border-strong: #919191;
+      --cp-text: #242424;
+      --cp-text-muted: #5c5c5c;
+      --cp-text-soft: #6f6f6f;
+      --cp-accent: #b11f4b;
+      --cp-accent-hover: #9a1a41;
+      --cp-accent-soft: rgba(177, 31, 75, 0.08);
+      --cp-accent-fg: #ffffff;
+      --cp-success: #16a34a;
+      --cp-danger: #dc2626;
+      --cp-warning: #f59e0b;
+      --cp-link: #0078d4;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.12);
+      --cp-overlay: rgba(255, 255, 255, 0.8);
+      --cp-panel: rgba(255, 255, 255, 0.86);
+      --cp-panel-strong: rgba(255, 255, 255, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.55);
+      --cp-highlight: rgba(177, 31, 75, 0.12);
+    }
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --cp-bg: #3d3b3a;
+      --cp-bg-elevated: #343231;
+      --cp-surface: #292929;
+      --cp-surface-soft: #2e2e2e;
+      --cp-border: #474747;
+      --cp-border-strong: #5f5f5f;
+      --cp-text: #dedede;
+      --cp-text-muted: #919191;
+      --cp-text-soft: #b0b0b0;
+      --cp-accent: #fd8ea1;
+      --cp-accent-hover: #fb7b91;
+      --cp-accent-soft: rgba(253, 142, 161, 0.14);
+      --cp-accent-fg: #1a1a1a;
+      --cp-success: #4ade80;
+      --cp-danger: #f87171;
+      --cp-warning: #fbbf24;
+      --cp-link: #4da6ff;
+      --cp-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+      --cp-overlay: rgba(41, 41, 41, 0.88);
+      --cp-panel: rgba(41, 41, 41, 0.72);
+      --cp-panel-strong: rgba(41, 41, 41, 0.96);
+      --cp-sheen: rgba(255, 255, 255, 0.04);
+      --cp-highlight: rgba(253, 142, 161, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--cp-bg); color: var(--cp-text); font-family: "Segoe UI", Aptos, Calibri, -apple-system, BlinkMacSystemFont, sans-serif; line-height: 1.5; }
+    button, a { font: inherit; }
+    button { color: inherit; }
+    a { color: var(--cp-link); }
+    button:focus-visible, a:focus-visible { outline: 3px solid var(--cp-link); outline-offset: 3px; }
+    code, pre, .mono { font-family: Consolas, "Courier New", Courier, monospace; }
+    code { overflow-wrap: anywhere; }
+    .topbar { background: var(--cp-text); color: var(--cp-bg-elevated); }
+    .topbar-inner { max-width: 1440px; margin: auto; padding: 14px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 15px; font-weight: 700; }
+    .brand-mark { width: 30px; height: 30px; display: grid; place-items: center; background: var(--cp-accent); color: var(--cp-accent-fg); font-weight: 800; border-radius: 4px; }
+    .top-label { font-size: 12px; opacity: .8; }
+    main { max-width: 1440px; margin: auto; padding: 0 32px 64px; }
+    .intro { padding: 38px 0 25px; display: flex; justify-content: space-between; align-items: end; gap: 24px; }
+    .eyebrow, .section-kicker { color: var(--cp-accent); font-size: 11px; text-transform: uppercase; font-weight: 800; }
+    h1 { margin: 7px 0 8px; font-size: 38px; line-height: 1.12; }
+    .intro p { margin: 0; color: var(--cp-text-muted); max-width: 660px; font-size: 15px; }
+    .guide-link { white-space: nowrap; font-size: 13px; font-weight: 600; }
+    .warning { border-left: 4px solid var(--cp-warning); background: var(--cp-surface); padding: 13px 18px; font-size: 14px; display: flex; flex-wrap: wrap; gap: 5px 8px; }
+    .warning strong { color: var(--cp-text); }
+    .warning span { color: var(--cp-text-muted); }
+    .workspace { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1fr) 320px; border: 1px solid var(--cp-border); background: var(--cp-surface); }
+    .canvas { min-width: 0; padding: 25px; background: repeating-linear-gradient(0deg, var(--cp-surface), var(--cp-surface) 31px, var(--cp-surface-soft) 32px); }
+    .workspace-head { display: flex; align-items: start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+    h2 { font-size: 21px; line-height: 1.2; margin: 5px 0; }
+    .subtitle { margin: 0; font-size: 13px; color: var(--cp-text-muted); }
+    .segmented { display: flex; background: var(--cp-surface-soft); border: 1px solid var(--cp-border); border-radius: 6px; padding: 3px; gap: 2px; }
+    .segmented button { cursor: pointer; border: 0; border-radius: 4px; background: transparent; padding: 7px 12px; font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .segmented button[aria-pressed="true"] { background: var(--cp-text); color: var(--cp-bg-elevated); }
+    .route-label { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--cp-text-muted); }
+    .route-label strong { color: var(--cp-text); }
+    .route-label .tag { background: var(--cp-accent-soft); color: var(--cp-accent); font-weight: 700; padding: 3px 8px; border-radius: 3px; }
+    .flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin: 18px 0 0; }
+    .node { position: relative; min-width: 0; min-height: 150px; text-align: left; background: var(--cp-surface); border: 1px solid var(--cp-border-strong); border-radius: 6px; padding: 15px 12px; cursor: pointer; display: flex; flex-direction: column; justify-content: space-between; }
+    .node:not(:last-child)::after { content: "\2192"; position: absolute; z-index: 1; right: -14px; top: 57px; background: var(--cp-surface); color: var(--cp-text-soft); font-size: 16px; }
+    .node[aria-pressed="true"] { border: 2px solid var(--cp-accent); padding: 14px 11px; background: var(--cp-accent-soft); }
+    .node-top { display: flex; justify-content: space-between; align-items: center; gap: 4px; }
+    .number { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 4px; background: var(--cp-surface-soft); color: var(--cp-text-muted); font: 700 11px Consolas, monospace; }
+    .node-title { font-weight: 750; font-size: 14px; line-height: 1.25; overflow-wrap: anywhere; }
+    .node-detail { color: var(--cp-text-muted); font-size: 12px; line-height: 1.35; }
+    .hop-band { display: grid; grid-template-columns: 2fr 3fr; gap: 12px; margin-top: 13px; font-size: 11px; font-weight: 700; color: var(--cp-text-muted); }
+    .hop-band div { border-top: 2px solid var(--cp-border); padding-top: 8px; }
+    .hop-band div:last-child { border-color: var(--cp-accent); }
+    .result-rail { margin-top: 28px; border-top: 1px solid var(--cp-border); padding-top: 18px; display: flex; flex-wrap: wrap; gap: 18px; }
+    .result-rail div { flex: 1 1 145px; }
+    .result-rail strong { display: block; font-size: 21px; line-height: 1.2; }
+    .result-rail span { display: block; font-size: 12px; color: var(--cp-text-muted); margin-top: 4px; }
+    .detail { border-left: 1px solid var(--cp-border); padding: 25px; background: var(--cp-surface); min-width: 0; }
+    .detail h3 { margin: 9px 0 8px; font-size: 20px; line-height: 1.2; }
+    .detail p { color: var(--cp-text-muted); font-size: 14px; margin: 0 0 18px; }
+    .detail-rule { border-top: 1px solid var(--cp-border); padding-top: 16px; margin-top: 16px; }
+    .detail-label { color: var(--cp-text-soft); text-transform: uppercase; font-size: 10px; font-weight: 800; }
+    .detail-value { margin-top: 5px; font-size: 13px; overflow-wrap: anywhere; }
+    .evidence { padding-top: 42px; }
+    .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+    .section-heading p { max-width: 440px; font-size: 13px; color: var(--cp-text-muted); margin: 0; }
+    .evidence-grid { display: grid; grid-template-columns: minmax(220px, .75fr) minmax(0, 1.25fr); gap: 0; border-top: 1px solid var(--cp-border-strong); border-bottom: 1px solid var(--cp-border); background: var(--cp-surface); }
+    .evidence-list { border-right: 1px solid var(--cp-border); padding: 8px; }
+    .evidence-button { width: 100%; text-align: left; border: 0; background: transparent; padding: 12px; cursor: pointer; display: grid; grid-template-columns: 27px 1fr auto; gap: 10px; align-items: center; }
+    .evidence-button[aria-pressed="true"] { background: var(--cp-accent-soft); }
+    .evidence-button strong { font-size: 13px; }
+    .badge { display: inline-block; font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--cp-text-muted); border: 1px solid var(--cp-border-strong); border-radius: 3px; padding: 2px 6px; white-space: nowrap; }
+    .badge.observed { color: var(--cp-success); border-color: var(--cp-success); }
+    .badge.failed { color: var(--cp-danger); border-color: var(--cp-danger); }
+    .badge.pending { color: var(--cp-text); border-color: var(--cp-warning); }
+    .evidence-content { padding: 24px 28px; min-height: 238px; }
+    .evidence-content h3 { margin: 6px 0 10px; font-size: 20px; }
+    .evidence-content p { margin: 0 0 16px; color: var(--cp-text-muted); font-size: 14px; max-width: 70ch; }
+    .output { background: var(--cp-surface-soft); border-left: 3px solid var(--cp-accent); padding: 12px 15px; font: 12px/1.65 Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .footnote { font-size: 12px; color: var(--cp-text-muted); margin: 14px 0 0; }
+    .test-matrix { padding-top: 42px; }
+    .matrix-status { display: flex; align-items: center; gap: 10px; margin: 18px 0 0; padding: 12px 0; border-top: 2px solid var(--cp-accent); }
+    .matrix-status strong { font-size: 15px; }
+    .matrix-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--cp-border); border-bottom: 1px solid var(--cp-border); background: var(--cp-surface); }
+    .matrix-cell { min-width: 0; padding: 18px; border-right: 1px solid var(--cp-border); }
+    .matrix-cell:last-child { border-right: 0; }
+    .matrix-cell h3 { margin: 0 0 8px; font-size: 13px; }
+    .matrix-cell p { margin: 0; color: var(--cp-text-muted); font-size: 13px; overflow-wrap: anywhere; }
+    .matrix-cell pre { margin: 10px 0 0; padding: 10px; background: var(--cp-surface-soft); color: var(--cp-text); white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.55 Consolas, monospace; }
+    .next { padding: 38px 0 0; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
+    .next section { border-top: 3px solid var(--cp-border-strong); padding-top: 12px; }
+    .next h3 { font-size: 14px; margin: 0 0 6px; }
+    .next p { color: var(--cp-text-muted); font-size: 13px; margin: 0; }
+    .footer { margin-top: 46px; padding-top: 14px; border-top: 1px solid var(--cp-border); display: flex; justify-content: space-between; gap: 16px; color: var(--cp-text-muted); font-size: 12px; flex-wrap: wrap; }
+    @media (max-width: 1050px) { .matrix-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .matrix-cell:nth-child(2) { border-right: 0; } .matrix-cell:nth-child(-n+2) { border-bottom: 1px solid var(--cp-border); } }
+    @media (max-width: 1050px) { .workspace { grid-template-columns: 1fr; } .detail { border-left: 0; border-top: 1px solid var(--cp-border); } .flow { grid-template-columns: repeat(5, minmax(110px, 1fr)); } }
+    @media (max-width: 700px) { main { padding: 0 16px 40px; } .topbar-inner { padding: 12px 16px; } .top-label { display: none; } .intro { align-items: start; flex-direction: column; padding-top: 28px; } h1 { font-size: 30px; } .canvas, .detail { padding: 18px; } .segmented { width: 100%; } .segmented button { flex: 1; padding-inline: 5px; } .flow { grid-template-columns: 1fr; gap: 8px; } .node { min-height: 90px; flex-direction: row; align-items: center; gap: 14px; } .node-top { align-self: stretch; } .node-title, .node-detail { flex: 1; } .node:not(:last-child)::after { content: "\2193"; top: auto; right: 20px; bottom: -14px; } .hop-band { grid-template-columns: 1fr 1fr; } .evidence-grid { grid-template-columns: 1fr; } .evidence-list { border-right: 0; border-bottom: 1px solid var(--cp-border); } .evidence-content { padding: 20px; } .matrix-grid { grid-template-columns: 1fr; } .matrix-cell { border-right: 0; border-bottom: 1px solid var(--cp-border); } .matrix-cell:last-child { border-bottom: 0; } .next { grid-template-columns: 1fr; gap: 18px; } }
+    @media (prefers-reduced-motion: no-preference) { .workspace, .evidence { animation: enter .4s ease-out both; } .evidence { animation-delay: .08s; } @keyframes enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } } }
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="topbar-inner"><div class="brand"><span class="brand-mark">S</span> SupportBuddy <span class="top-label">/ Instructor Lab</span></div><div class="top-label">SYNTHETIC DATA &nbsp; / &nbsp; SECURITY DEMO</div></div></header>
+  <main>
+    <div class="intro"><div><div class="eyebrow">Instructor field guide / optional extension</div><h1>Secure the network MCP</h1><p>Follow the identities, see where a request can be refused, and distinguish observed results from the checks still outstanding.</p></div><a class="guide-link" href="secure-mcp-demo.md">Open instructor runbook &rarr;</a></div>
+    <div class="warning"><strong>Experimental, not a production security boundary.</strong><span>Pattern B's server-side role enforcement has not yet been verified end to end on Azure.</span></div>
+
+    <section class="workspace" aria-labelledby="flow-title">
+      <div class="canvas">
+        <div class="workspace-head"><div><div class="section-kicker">Identity flow</div><h2 id="flow-title">Two hops. Two identities.</h2><p class="subtitle">Select a pattern, then select a component.</p></div><div class="segmented" aria-label="Authentication pattern"><button type="button" data-pattern="A" aria-pressed="true">A &nbsp; Project</button><button type="button" data-pattern="B" aria-pressed="false">B &nbsp; Agent</button><button type="button" data-pattern="C" aria-pressed="false">C &nbsp; User</button></div></div>
+        <div class="route-label"><span class="tag" id="pattern-tag">PATTERN A</span><strong id="pattern-name">Project managed identity</strong><span id="pattern-note">Shared identity for the project's toolbox connection.</span></div>
+        <div class="flow" aria-label="Identity flow components">
+          <button type="button" class="node" data-node="caller" aria-pressed="true"><span class="node-top"><span class="number">01</span></span><span class="node-title">Agent / participant</span><span class="node-detail">Makes a request</span></button>
+          <button type="button" class="node" data-node="toolbox" aria-pressed="false"><span class="node-top"><span class="number">02</span></span><span class="node-title">Foundry toolbox</span><span class="node-detail">One MCP endpoint</span></button>
+          <button type="button" class="node" data-node="connection" aria-pressed="false"><span class="node-top"><span class="number">03</span></span><span class="node-title">Project connection</span><span class="node-detail" id="connection-label">Project identity</span></button>
+          <button type="button" class="node" data-node="platform" aria-pressed="false"><span class="node-top"><span class="number">04</span></span><span class="node-title">Container Apps auth</span><span class="node-detail">Token + client gate</span></button>
+          <button type="button" class="node" data-node="server" aria-pressed="false"><span class="node-top"><span class="number">05</span></span><span class="node-title">Network MCP</span><span class="node-detail">Optional role gate</span></button>
+        </div>
+        <div class="hop-band"><div>HOP 1 &nbsp; Caller &rarr; Foundry</div><div>HOP 2 &nbsp; Connection identity &rarr; MCP server</div></div>
+        <div class="result-rail"><div><strong>401</strong><span>Missing or invalid token</span></div><div><strong>403</strong><span>Platform or server denied access</span></div><div><strong>200</strong><span>Observed open baseline, not a security pass</span></div></div>
+      </div>
+      <aside class="detail" aria-live="polite"><div class="section-kicker">Selected component</div><h3 id="detail-title"></h3><p id="detail-description"></p><div class="detail-rule"><div class="detail-label">Identity or control</div><div class="detail-value mono" id="detail-control"></div></div><div class="detail-rule"><div class="detail-label">What to establish</div><div class="detail-value" id="detail-proof"></div></div></aside>
+    </section>
+
+    <section class="test-matrix" aria-labelledby="test-title">
+      <div class="section-heading"><div><div class="section-kicker">Participant walkthrough</div><h2 id="test-title">Test the selected pattern</h2></div><p>Use one synthetic prompt, then compare portal setup, conversation, and request-correlated logs.</p></div>
+      <div class="matrix-status"><strong id="matrix-pattern">Pattern A / Project managed identity</strong><span class="badge observed" id="matrix-state">Previously observed; rerun on updated image</span></div>
+      <div class="matrix-grid">
+        <section class="matrix-cell"><h3>1 / In the portal</h3><p id="matrix-portal"></p></section>
+        <section class="matrix-cell"><h3>2 / In the conversation</h3><p id="matrix-conversation"></p><pre id="matrix-prompt"></pre></section>
+        <section class="matrix-cell"><h3>3 / In Log Analytics</h3><p id="matrix-logs"></p><pre>mcp_access request_id=... app=... object=... outcome=allowed
+mcp_tool request_id=... app=... object=... tool=... outcome=success</pre></section>
+        <section class="matrix-cell"><h3>4 / Pass condition</h3><p id="matrix-pass"></p></section>
+      </div>
+    </section>
+
+    <section class="evidence" aria-labelledby="evidence-title"><div class="section-heading"><div><div class="section-kicker">Observed in our environment</div><h2 id="evidence-title">Evidence, not assumptions</h2></div><p>One synthetic test environment. Select a result to see what it proves and what it does not.</p></div>
+      <div class="evidence-grid"><div class="evidence-list" aria-label="Test results"><button type="button" class="evidence-button" data-evidence="baseline" aria-pressed="true"><span class="number">01</span><strong>Open baseline</strong><span class="badge observed">Observed</span></button><button type="button" class="evidence-button" data-evidence="patternA" aria-pressed="false"><span class="number">02</span><strong>Project identity</strong><span class="badge observed">Observed</span></button><button type="button" class="evidence-button" data-evidence="blocked" aria-pressed="false"><span class="number">03</span><strong>Hosted agent denied</strong><span class="badge failed">403</span></button><button type="button" class="evidence-button" data-evidence="allowed" aria-pressed="false"><span class="number">04</span><strong>Allow-list corrected</strong><span class="badge observed">Observed</span></button><button type="button" class="evidence-button" data-evidence="local" aria-pressed="false"><span class="number">05</span><strong>Pattern B live success</strong><span class="badge observed">Live</span></button><button type="button" class="evidence-button" data-evidence="restore" aria-pressed="false"><span class="number">06</span><strong>Role-gate deny control</strong><span class="badge observed">403</span></button></div>
+      <div class="evidence-content" aria-live="polite"><div class="section-kicker" id="evidence-kicker"></div><h3 id="evidence-heading"></h3><p id="evidence-description"></p><div class="output" id="evidence-output"></div><p class="footnote" id="evidence-limitation"></p></div></div>
+    </section>
+    <div class="next"><section><h3>01 / Before the demonstration</h3><p>Use an approved sandbox. Record the original image, authentication, connection and toolbox default before changing anything.</p></section><section><h3>02 / Separate the gates</h3><p>A platform allow-list denial is not proof that the MCP server checked an app role. Inspect the appropriate logs.</p></section><section><h3>03 / Restore and verify</h3><p>Before continuing the workshop, follow <a href="secure-mcp-demo.md">walkthrough step 4</a>: disable demo authentication, republish the toolbox with <code>supportbuddy-network-mcp</code>, preserve any original guardrail, and verify tool discovery. Restart local chat and test a fresh conversation. Disable alone leaves the agent toolbox route unchanged; identity artifacts can remain.</p></section></div>
+    <footer class="footer"><span>SUPPORTBUDDY &nbsp; / &nbsp; INSTRUCTOR REFERENCE</span><span>Offline reference. No Azure operations are performed by this page.</span></footer>
+  </main>
+  <script>
+    const patterns = {
+      A: {
+        name: "Project managed identity",
+        note: "The toolbox uses the Foundry project identity to call the network MCP.",
+        connection: "Project identity",
+        state: "Live conversation passed / superseded by Pattern B",
+        stateClass: "observed",
+        portal: "Foundry Project > Connections: supportbuddy-network-mcp uses ProjectManagedIdentity. Toolbox: active version routes the network entry to that connection. Container App: authentication is on, MCP audience is configured, and the project identity is allowed.",
+        conversation: "Run the hosted agent conversation. The caller is the hosted agent, but MCP should see the shared project identity on this hop.",
+        logs: "Observed on 8 November at 17:33 UTC: project object b4cdabf7-3100-4869-b5cc-80b22e0522e4 in token metadata, with four nearby MCP tool-request events. See the runbook's Pattern A participant query. New mcp_access/mcp_tool correlation requires deploying the updated image.",
+        pass: "The synthetic diagnosis succeeded, anonymous access returned 401, and the configured toolbox route and token metadata identify the project identity. Per-call correlation is still pending; this is not hosted-agent identity or server-role enforcement proof.",
+        prompt: "I'm CUST-1003. My Wi-Fi drops often. Diagnose the issue using the network tools and summarize the findings."
+      },
+      B: {
+        name: "Hosted agent identity + app role",
+        note: "The hosted agent identity is presented to the MCP server through the toolbox connection.",
+        connection: "Agent identity",
+        state: "Live success and deny control verified / left enabled",
+        stateClass: "observed",
+        portal: "Container App > Authentication: Enabled, unauthenticated requests return 401, and only the project/agent client apps are allowed. 'Allow any identity' is not anonymous access; MCP still enforces Network.Read. Entra app > App roles defines Network.Read for Applications. Agent Identity > Permissions shows Network.Read directly granted; Entra roles 0 means no directory role, not no app permission. Toolbox v6 routes network through supportbuddy-network-mcp-agent (AgenticIdentityToken).",
+        conversation: "The hosted agent completed the CUST-1003 Wi-Fi diagnosis on 8 November at 23:08 UTC. Conversation conv_03393aaf52d1a9b300TFVM6FDMBNT18EwnFnHkTGR9p3vcIzqg; trace 54bcfba7657f17dac46ea1d802ea4d21.",
+        logs: "mcp_access and mcp_tool share request IDs for identify_customer, get_known_incidents, get_line_status and check_equipment. The caller object/client is 46bc0229-3804-423f-b334-c657e6990e51; Network.Read was allowed.",
+        pass: "The hosted conversation succeeded, request-correlated logs show the agent identity and successful tools, and anonymous initialize returns 401. The temporary Network.Write mismatch produced server-side 403 rows with no tool rows; Network.Read was restored.",
+        prompt: "I'm CUST-1003. My Wi-Fi drops often. Diagnose the issue using the network tools and summarize the findings."
+      },
+      C: {
+        name: "User on-behalf-of identity",
+        note: "Preview concept only; this project has no runnable OBO connection or conversation flow.",
+        connection: "User context",
+        state: "Not implemented",
+        stateClass: "failed",
+        portal: "There is no configured AgentOnBehalfOfUser connection for this lab. Do not create or select one as a test; the required consent, token exchange, and API authorization flow are not implemented.",
+        conversation: "No supported user-context conversation exists in this project. A participant login or laptop token would not prove toolbox OBO.",
+        logs: "No OBO request is expected. Do not interpret project or hosted-agent IDs as a user's identity.",
+        pass: "Not testable in this implementation. A future OBO exercise needs a user sign-in flow, delegated scopes, token exchange, and correlated user-identity logs.",
+        prompt: "Do not run: this pattern is not implemented."
+      }
+    };
+    const nodes = {
+      caller: {title: "Agent / participant", description: "The caller authenticates to Foundry. A hosted agent and a participant using a laptop are different callers.", control: "Entra identity + Foundry access", proof: "A successful caller-to-toolbox connection does not identify which credential the toolbox used downstream."},
+      toolbox: {title: "Foundry toolbox", description: "The toolbox presents one MCP endpoint and uses a project connection for each underlying service.", control: "network___* / runbooks___*", proof: "Tool discovery shows which tools are visible; call a tool to prove execution."},
+      connection: {title: "Project connection", description: "The toolbox network entry selects the project connection that authenticates its downstream MCP request.", control: "ProjectManagedIdentity", proof: "Select the agent connection when publishing the toolbox; inspect its auth type and audience. This creates a new default toolbox version."},
+      platform: {title: "Container Apps auth", description: "The platform validates the token and checks the allowed-client policy before forwarding a request to the server.", control: "Audience + allowed applications", proof: "A 403 here happens before the application role check. Inspect middleware warnings and caller identity."},
+      server: {title: "Network MCP server", description: "The deployed middleware checks the trusted Container Apps principal for the configured app role before any tool handler runs.", control: "NETWORK_MCP_REQUIRED_ROLE", proof: "Live logs show Network.Read allowed with correlated tool success, and a temporary Network.Write mismatch denied with 403 and no tool execution."}
+    };
+    const evidence = {
+      baseline: {kicker: "Before authentication", title: "The original lab baseline", description: "The synthetic MCP endpoint was reachable anonymously. This is the workshop's open baseline, not a production configuration.", output: "Container Apps authentication: off\nToolbox connection auth: None\nEndpoint without a token: 200", limitation: "Observed in the lab environment; no customer or production data was involved."},
+      patternA: {kicker: "Pattern A / live run 8 November, 17:33 UTC", title: "Conversation passed using the project route", description: "The hosted agent returned the synthetic Wi-Fi diagnosis while the default toolbox routed network calls through ProjectManagedIdentity. MCP token metadata identifies the project, not the hosted agent.", output: "Authentication: on / anonymous initialize: 401\nToolbox default: version 3\nConnection: supportbuddy-network-mcp / ProjectManagedIdentity\nProject object: b4cdabf7-3100-4869-b5cc-80b22e0522e4\nProject client: ca136f8a-d50b-4234-92c2-b10c5e82c4d5\n17:33:38-17:33:41 UTC: four MCP tool requests\nConversation: healthy line, no open incident, congested Wi-Fi\nTrace: 39727eea933ab090f1d142ca43686d7a\nPattern A remains enabled", limitation: "Old image: token and tool events are separate records without a shared request ID. No per-call correlation or Network.Read enforcement is claimed. No image was deployed."},
+      blocked: {kicker: "Pattern B / initial attempt", title: "The platform refused the agent", description: "The request used the hosted-agent identity and the expected audience, but Container Apps authentication denied it before the server could inspect Network.Read.", output: "MiddlewareWarning: principal does not match allowed applications\nRequestCompleted: 403 / substatus 76", limitation: "This 403 proves a platform allow-list denial, not an application role denial."},
+      allowed: {kicker: "Pattern B / source-to-endpoint evidence", title: "Match agent identity to the MCP route", description: "Three records show the chain: Foundry's hosted-agent record names the instance identity; Container Apps logs the same oid/appid; toolbox version 4 routes its network entry to the MCP /mcp URL using the AgenticIdentityToken connection.", output: "FOUNDRY AGENT\nlab-jml-supportbuddy-hosted\ninstance_identity.principal_id = client_id\n46bc0229-3804-423f-b334-c657e6990e51\n\nTOOLBOX VERSION 4 / network\nserver_url: https://supportbuddy-network-mcp.jollystone-c8960a3d.swedencentral.azurecontainerapps.io/mcp\nproject_connection_id: supportbuddy-network-mcp-agent\ncredentials.type: AgenticIdentityToken\n\nMCP SERVER LOGS\noid = appid = 46bc0229-3804-423f-b334-c657e6990e51\nCallToolRequest: 11:04:36-11:04:39 UTC (4 events)\n\nCURRENT TOOLBOX DEFAULT: version 3 (project identity)", limitation: "This matches identity, route configuration and nearby tool requests. Logs have no shared request ID, and historical records do not prove which toolbox version served each call. The old image also did not enforce Network.Read."},
+      local: {kicker: "Pattern B / live success / 8 November 2026", title: "Hosted agent passed with correlated tool logs", description: "The hosted agent used toolbox version 6 and the AgenticIdentityToken connection. The server authorized the hosted-agent identity for Network.Read and logged successful tool calls.", output: "Toolbox default: version 6\nConnection: supportbuddy-network-mcp-agent / AgenticIdentityToken\nServer revision: supportbuddy-network-mcp--role-463bc7fe83\nCaller object/client: 46bc0229-3804-423f-b334-c657e6990e51\n\n23:08:54Z  eb1e7b965a1d4746bc88c16f4a7ab150  identify_customer  allowed / success\n23:08:57Z  48b3db416c1442689e84db68edf9cc28  identify_customer  allowed / success\n23:08:57Z  3ca3162ea32e44a69f032475a9fb98b5  check_equipment   allowed / success\n23:08:57Z  0acf1a5027444b408548740a33782e49  get_known_incidents allowed / success\n23:09:00Z  c99f2c0cdeac41f3a21315f92730fc9a  get_known_incidents allowed / success\n23:09:00Z  ba3b9d0530b0407a84d5845ae1394314  get_line_status    allowed / success\n\nConversation: conv_03393aaf52d1a9b300TFVM6FDMBNT18EwnFnHkTGR9p3vcIzqg\nTrace: 54bcfba7657f17dac46ea1d802ea4d21", limitation: "Local toolbox show reports the active connection but cannot enumerate network tools outside hosted-agent context. The hosted conversation and these matching request IDs prove execution."},
+      restore: {kicker: "Pattern B / live role-gate denial / 8 November 2026", title: "Server denied the missing required role", description: "The hosted agent remained platform-allowed and held Network.Read, while the server temporarily required Network.Write. This isolated the server role gate from the Container Apps allow-list.", output: "23:06:50Z  8f8b863cf25c43859fe580e4b65d4d12  app=46bc0229-3804-423f-b334-c657e6990e51  object=46bc0229-3804-423f-b334-c657e6990e51  required_role=Network.Write  outcome=denied  status=403\n23:06:50Z  05e1faea27ff47c882e896399bb74211  app=46bc0229-3804-423f-b334-c657e6990e51  object=46bc0229-3804-423f-b334-c657e6990e51  required_role=Network.Write  outcome=denied  status=403\n\nNo mcp_tool rows for either request ID\nRestored required role: Network.Read\nActive toolbox: version 6", limitation: "Removing the app-role assignment did not immediately deny a fresh conversation because the managed-identity token was cached. The tested control is a server-side required-role mismatch, not immediate role revocation."}
+    };
+    let activePattern = "A";
+    let activeNode = "caller";
+    function renderNode() {
+      const node = nodes[activeNode];
+      document.getElementById("detail-title").textContent = node.title;
+      document.getElementById("detail-description").textContent = node.description;
+      document.getElementById("detail-control").textContent = activeNode === "connection" ? ({A: "ProjectManagedIdentity", B: "AgenticIdentityToken", C: "AgentOnBehalfOfUser (preview)"})[activePattern] : node.control;
+      document.getElementById("detail-proof").textContent = node.proof;
+    }
+    function renderEvidence(key) {
+      const item = evidence[key];
+      document.getElementById("evidence-kicker").textContent = item.kicker;
+      document.getElementById("evidence-heading").textContent = item.title;
+      document.getElementById("evidence-description").textContent = item.description;
+      document.getElementById("evidence-output").textContent = item.output;
+      document.getElementById("evidence-limitation").textContent = item.limitation;
+    }
+    function renderPatternTest() {
+      const pattern = patterns[activePattern];
+      document.getElementById("matrix-pattern").textContent = `Pattern ${activePattern} / ${pattern.name}`;
+      const state = document.getElementById("matrix-state");
+      state.textContent = pattern.state;
+      state.className = `badge ${pattern.stateClass}`;
+      document.getElementById("matrix-portal").textContent = pattern.portal;
+      document.getElementById("matrix-conversation").textContent = pattern.conversation;
+      document.getElementById("matrix-prompt").textContent = pattern.prompt;
+      document.getElementById("matrix-logs").textContent = pattern.logs;
+      document.getElementById("matrix-pass").textContent = pattern.pass;
+    }
+    document.querySelectorAll("[data-pattern]").forEach(button => button.addEventListener("click", () => {
+      activePattern = button.dataset.pattern;
+      document.querySelectorAll("[data-pattern]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      const pattern = patterns[activePattern];
+      document.getElementById("pattern-tag").textContent = `PATTERN ${activePattern}`;
+      document.getElementById("pattern-name").textContent = pattern.name;
+      document.getElementById("pattern-note").textContent = pattern.note;
+      document.getElementById("connection-label").textContent = pattern.connection;
+      renderNode();
+      renderPatternTest();
+    }));
+    document.querySelectorAll("[data-node]").forEach(button => button.addEventListener("click", () => {
+      activeNode = button.dataset.node;
+      document.querySelectorAll("[data-node]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      renderNode();
+    }));
+    document.querySelectorAll("[data-evidence]").forEach(button => button.addEventListener("click", () => {
+      document.querySelectorAll("[data-evidence]").forEach(item => item.setAttribute("aria-pressed", String(item === button)));
+      renderEvidence(button.dataset.evidence);
+    }));
+    renderNode();
+    renderEvidence("baseline");
+    renderPatternTest();
+  </script>
+</body>
+</html>

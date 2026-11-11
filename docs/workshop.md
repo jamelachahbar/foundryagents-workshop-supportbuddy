@@ -17,9 +17,11 @@ understands a request, identifies the customer, collects evidence from independe
 technical check, correlates what it found, and either gives an evidence-grounded answer or hands the
 case to a human.
 
+> **Quick reference:** [Participant terminal cheatsheet](participant-terminal-cheatsheet.md) covers reopening terminals and restarting local servers.
+
 ## Contents
 
-[Codespaces](#running-in-github-codespaces) · [Run the agent](#how-you-will-run-the-agent) ·
+[Terminal cheatsheet](participant-terminal-cheatsheet.md) · [Codespaces](#running-in-github-codespaces) · [Run the agent](#how-you-will-run-the-agent) ·
 [Restart after edits](#after-changing-code-or-instructions) · [Catch up](#if-you-fall-behind) ·
 [Troubleshooting](#troubleshooting)
 
@@ -383,20 +385,18 @@ No reinstall or index setting is needed if setup already installed the lab depen
 From the repository root, use your existing Windows venv:
 
 ```powershell
-Set-Location .\src
-$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv2'
-uv run --no-sync python main.py
+if (-not (Test-Path '.\setup-windows.ps1')) { throw 'Open PowerShell in the repository root first.' }
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD 'src\.venv2'
+uv run --directory src --no-sync python main.py
 ```
 
 Replace `.venv2` with the name you chose during setup (`.venv-windows` by default).
-If your terminal is already in `src/`, skip `Set-Location .\src`. If it is inside
-`src/.venv2/Scripts`, run `Set-Location ..\..` first to return to `src/`, then run the
-last two commands above. Repeat the environment setting in each new terminal.
+Keep PowerShell in the repository root and repeat the environment setting in each new terminal.
 
 `--no-sync` runs with the packages already installed in the selected venv without syncing
 dependencies. It leaves the devcontainer's `.venv` untouched. Windows and Linux must use
 separate venvs. If your Windows venv is already activated, you can instead run
-`uv run --active --no-sync python main.py` from `src/`.
+`uv run --directory src --active --no-sync python main.py` from the repository root.
 
 The script installs missing **uv, Azure CLI and azd** using winget, installs the Foundry extension,
 and uses uv to obtain **Python 3.12** and create **`src/.venv-windows`** with the lab dependencies.
@@ -406,9 +406,10 @@ No Docker, GitHub account or Copilot is needed. You still need VS Code (or your 
 When prompted, fill in `src/.env` using the instructor's handout, save and close Notepad, then
 enter the Azure tenant ID. The script signs you in and runs preflight. Existing `.env` values
 are preserved when rerunning it. Each successful checkpoint asks whether to continue (Y) or stop (N).
-After setup, copy the printed commands into PowerShell. They select `src/` and set
-`UV_PROJECT_ENVIRONMENT` to your chosen venv before running the lab. Repeat them in each new
-terminal; no virtual-environment activation is needed. Never run from a venv's `Scripts` folder.
+After setup, open PowerShell in the repository root and copy the printed commands. They set
+`UV_PROJECT_ENVIRONMENT` to your chosen venv and run the agent from `src/` without changing the
+terminal's folder. Repeat them in each new terminal; no virtual-environment activation is needed.
+Never run from a venv's `Scripts` folder.
 
 Windows and the Linux devcontainer must use separate venvs. The Windows default leaves the
 devcontainer's `.venv` untouched. To choose another name, run this from the repository root:
@@ -421,28 +422,29 @@ This creates or reuses `src/.venv2`. To use it in a new PowerShell terminal, sta
 repository root and paste:
 
 ```powershell
-Set-Location .\src
-$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv2'
-uv run python main.py
+if (-not (Test-Path '.\setup-windows.ps1')) { throw 'Open PowerShell in the repository root first.' }
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD 'src\.venv2'
+uv run --directory src python main.py
 ```
 
-If you already activated a Windows venv, you can instead run `uv run --active python main.py`
-from `src/`. `--active` is a uv option and must appear before `python`, not after `main.py`.
+If you already activated a Windows venv, you can instead run
+`uv run --directory src --active python main.py` from the repository root. `--active` is a uv
+option and must appear before `python`, not after `main.py`.
 
 If uv warns that `VIRTUAL_ENV` does not match the project environment, it is ignoring the
 activated venv. If Windows then reports `lib64: Access is denied`, it may be trying to
-replace the devcontainer's Linux `.venv`. Do not delete that shared environment. From `src/`,
-select your Windows venv explicitly:
+replace the devcontainer's Linux `.venv`. Do not delete that shared environment. From the
+repository root, select your Windows venv explicitly:
 
 ```powershell
-$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD '.venv2'
-uv run python main.py
+if (-not (Test-Path '.\setup-windows.ps1')) { throw 'Open PowerShell in the repository root first.' }
+$env:UV_PROJECT_ENVIRONMENT = Join-Path $PWD 'src\.venv2'
+uv run --directory src python main.py
 ```
 
 Replace `.venv2` with your chosen Windows venv name (`.venv-windows` by default).
-Repeat the setting in each new terminal. If already inside a venv's `Scripts` folder,
-return to `src/` first. Do not use `uv run python main.py --active`: that passes the option
-to your Python program, not uv.
+Repeat the setting in each new terminal. Do not use `uv run python main.py --active`: that passes
+the option to your Python program, not uv.
 
 winget may request installer approval or elevation. If winget, downloads or PowerShell scripts are
 blocked by company policy, ask IT to approve/pre-install the tools; do not change the company policy.
@@ -513,7 +515,7 @@ available models in its version. Use the instructor's deployment name if differe
 `WORKSHOP_RESOURCE_PREFIX` keeps your agent separate from other participants' agents in a shared
 project. Use `lab-` followed by 2-8 lowercase letters or digits, for example `lab-jdoe`.
 
-Sign in and run the preflight check:
+Sign in and run [src/preflight.py](../src/preflight.py) from the `src/` directory:
 
 ```bash
 az login --tenant <your-tenant>

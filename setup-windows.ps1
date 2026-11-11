@@ -174,17 +174,16 @@ try {
     $null = Invoke-SetupCheckpoint 5 'Lab preflight' {
         Invoke-SetupCommand uv @('run', '--no-sync', 'python', 'preflight.py')
     }
-    Write-Host 'Setup complete. Paste these commands into PowerShell, including in any new terminal:'
-    $srcLiteral = (Get-Location).Path.Replace("'", "''")
+    Write-Host 'Setup complete. Open PowerShell in the repository root (the folder containing setup-windows.ps1), then paste:'
     $venvLiteral = $env:UV_PROJECT_ENVIRONMENT.Replace("'", "''")
-    Write-Host "Set-Location '$srcLiteral'"
+    Write-Host "if (-not (Test-Path '.\setup-windows.ps1')) { throw 'Open PowerShell in the repository root first.' }"
     Write-Host "`$env:UV_PROJECT_ENVIRONMENT = '$venvLiteral'"
     if ($PackageIndexUrl) {
         Write-Host "`$env:UV_DEFAULT_INDEX = '$($PackageIndexUrl.Replace("'", "''"))'"
     }
-    Write-Host 'uv run python main.py'
+    Write-Host 'uv run --directory src python main.py'
     Write-Host 'Do not run from the venv Scripts folder or share a venv between Windows and the devcontainer.'
-    Write-Host 'To use an already activated Windows venv instead, run from src: uv run --active python main.py'
+    Write-Host 'To use an already activated Windows venv instead, run from the repository root: uv run --directory src --active python main.py'
 }
 finally {
     Pop-Location

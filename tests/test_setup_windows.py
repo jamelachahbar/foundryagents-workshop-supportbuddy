@@ -288,8 +288,9 @@ def test_selected_venv_is_used_and_printed_for_new_terminals(run_setup, venv_pat
     assert all(item["venv"] == expected for item in uv_commands)
     escaped = expected.replace("'", "''")
     assert f"$env:UV_PROJECT_ENVIRONMENT = '{escaped}'" in result["output"]
-    assert f"Set-Location '{src}'" in result["output"]
-    assert "uv run --active python main.py" in result["output"]
+    assert "Open PowerShell in the repository root" in result["output"]
+    assert "Set-Location" not in result["output"]
+    assert "uv run --directory src python main.py" in result["output"]
 
 
 @pytest.mark.parametrize("index", ["http://example.invalid/simple", "not-a-url"])
