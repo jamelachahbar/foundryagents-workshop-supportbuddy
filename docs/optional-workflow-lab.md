@@ -24,6 +24,61 @@ The workflow has explicit executors for data collection and decisioning, plus th
 
 Deterministic executors (`identify`, `line`, `incidents`, `equipment`, `collect`, `decide`) enforce rule gates and action safety.
 
+## MAF patterns and this lab
+
+MAF documentation names five built-in multi-agent orchestration patterns. They describe how agents
+coordinate; they are distinct from the lower-level workflow graph, executor, and edge APIs used here.
+
+| MAF pattern | General shape | Used in this lab? |
+| --- | --- | --- |
+| Sequential | Participants run in a defined order, passing work forward. | **Yes, as graph stages:** intake, identify, collect, diagnose, decide, then answer when applicable. |
+| Concurrent | Participants run in parallel and their results are collected. | **Partly:** the `line`, `incidents`, and `equipment` deterministic executors fan out and join. These are not three agent calls. |
+| Handoff | Agents transfer control to another agent based on the conversation or task. | **No.** CUST-1004's human support handover is a deterministic backend action, not MAF's agent-to-agent Handoff pattern. |
+| Group Chat | Multiple agents collaborate through a shared conversation. | **No.** Each agent has a fixed role and receives a fresh, typed input; agents do not chat with one another. |
+| Magentic | A manager dynamically plans work and delegates to specialist agents. | **No.** The graph and routes are predefined; no manager agent plans or delegates tasks. |
+
+### What this workflow combines
+
+This example mixes model judgment with deterministic control. The graph decides **when** each step runs;
+agents interpret or phrase information at three bounded points:
+
+| Step | Kind | Responsibility |
+| --- | --- | --- |
+| `intake` | Agent | Extract explicit identifiers, symptom, language, and scope as structured data. |
+| `identify` | Deterministic executor | Validate intake and customer identity; stop before diagnostics if input is invalid, missing, or out of scope. |
+| `line`, `incidents`, `equipment` | Deterministic executors, concurrent | Read synthetic evidence in parallel. |
+| `collect` | Deterministic executor | Merge evidence into one case for diagnosis. |
+| `diagnose` | Mixed | Its executor retrieves runbooks once; its agent returns a typed verdict. |
+| `decide` | Deterministic executor | Check the verdict against evidence and runbook IDs, then send the case to `answer`, request approval, or perform a human handover. |
+| `answer` | Agent | Produce the cited customer response only after the deterministic route selects it. |
+
+The restart branch uses MAF's `request_info` pause/resume capability for human approval. That is a
+workflow interaction capability, not a fourth agent or a separate agent orchestration pattern. See the
+[MAF workflow orchestration catalog](https://learn.microsoft.com/en-us/agent-framework/workflows/orchestrations/)
+for the named patterns and their broader use cases.
+
+### Checkpoint storage and resume
+
+A checkpoint is MAF's saved execution position and continuation data. It lets a paused workflow resume
+at the outstanding request instead of starting the whole graph again. In this lab, `DecideExecutor`
+calls `request_info` when a modem restart needs human approval; DevUI stores the checkpoint and resumes
+that run after the approval is submitted.
+
+`build_workflow()` accepts an optional checkpoint store and otherwise builds the workflow with
+`InMemoryCheckpointStorage()`. This is process-local, temporary storage: it is not Azure Storage or a
+database, and it does not survive stopping the process. In DevUI, the server provides a separate
+conversation-scoped checkpoint store at run time, so one conversation's paused run is not another
+conversation's checkpoint. Starting a new session starts a new conversation scope.
+
+Keep these concepts separate:
+
+- **Workflow state** is application data set by executors with `ctx.set_state()` (for example, the
+  current case and decision). It is part of the execution context needed as the workflow progresses.
+- **Checkpoint storage** holds the execution snapshot used to continue a paused run. In this lab it
+  is in memory, so a process restart loses it.
+- **Events and traces** help inspect execution; they are observability data, not a checkpoint store
+  and cannot resume a run.
+
 ```mermaid
 flowchart TD
   U[User message] --> I[intake agent]

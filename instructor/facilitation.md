@@ -196,6 +196,12 @@ from the numbered participant stages and uses the existing Foundry model deploym
 and runbook knowledge base. It creates no Azure resources and adds no dependencies. The workflow uses
 three code-first MAF agents; it does not use the Stage 10 Foundry Prompt Agent.
 
+Teaching distinction: the [pattern comparison in the participant guide](../docs/optional-workflow-lab.md#maf-patterns-and-this-lab)
+shows which MAF orchestrations this graph uses. It demonstrates sequential stages, concurrent
+deterministic evidence collection, conditional routing, and request-info approval. It does not use
+Group Chat, Magentic, or agent-to-agent Handoff; its CUST-1004 support handover is a deterministic
+business action.
+
 ### Before the session
 
 1. Use an instructor-owned working copy with the optional workflow files present. Do not copy these
@@ -241,6 +247,11 @@ three code-first MAF agents; it does not use the Stage 10 Foundry Prompt Agent.
 | `I'm CUST-1002, my internet is down` | `intake` + `diagnose` + `decide`; approval pause; then `answer`; restart, RB-02 | Human approval gates the synthetic restart. Explain the effect before approving. |
 | `I'm CUST-1003, my Wi-Fi is slow` | `intake` + evidence collection + `diagnose` + `answer`; Wi-Fi advice, RB-03 | Contrasts a local Wi-Fi issue with an access-line outage. |
 | `I'm CUST-1004, my internet is unstable` | `intake` + evidence collection + `diagnose` + handover; line fault, RB-07 | At least two agents run; deterministic decision routes to a human instead of `answer`. |
+
+When CUST-1002 pauses for approval, point out DevUI's checkpoint selector. The saved checkpoint lets
+the workflow resume at the pending request after approval rather than rerunning earlier diagnostics.
+This demo uses in-memory, conversation-scoped checkpoints; restarting the server loses them. They are
+not production-durable storage.
 
 All customers and backend effects are synthetic. Approving CUST-1002 writes a local synthetic restart
 action record; CUST-1004 writes a synthetic handover record. Neither restarts real equipment nor
