@@ -188,3 +188,96 @@ uncertainty/checks, red blocks and green verified code assertions or platform ev
 A normal platform-run response means NOT DEMONSTRATED, not a simulated block. The third layer does
 not isolate instructions from the model's built-in behavior. These probes do not prove the separate
 toolbox Indirect Attack filter ran. Other Azure errors are errors, not evidence of protection.
+
+## Optional workflow lab: instructor demo
+
+Use this extension after Stage 9 to demonstrate explicit MAF workflow orchestration. It is separate
+from the numbered participant stages and uses the existing Foundry model deployment, Stage 9 toolbox,
+and runbook knowledge base. It creates no Azure resources and adds no dependencies. The workflow uses
+three code-first MAF agents; it does not use the Stage 10 Foundry Prompt Agent.
+
+### Before the session
+
+1. Use an instructor-owned working copy with the optional workflow files present. Do not copy these
+   files over participant `main.py` or instruction files.
+2. Verify `src/.env` has the project endpoint, model deployment, knowledge-base settings, and toolbox
+   configuration used by Stage 9. Sign in with `az login` and confirm the Stage 9 toolbox/runbooks work.
+3. From `src/`, run the workflow-specific tests if you want an offline check:
+
+   ```powershell
+   uv run pytest -c pyproject.toml ../tests/test_workflow_lab.py -q
+   ```
+
+### Run the DevUI demonstration
+
+1. From `src/`, start the workflow:
+
+   ```powershell
+   uv run python workflow_lab.py
+   ```
+
+2. Open the printed DevUI URL (default `http://localhost:8090`) and authenticate with the token
+   printed in the terminal. If port 8090 is occupied, set `DEVUI_PORT` to an available port before
+   launching.
+3. In DevUI, select **Workflows** and open **supportbuddy-workflow**. Choose **Configure & Run**.
+4. In the structured input form, enter:
+
+   | Field | Value |
+   | --- | --- |
+   | `role` | `user` |
+   | `contents` | `I'm CUST-1001, my internet is down` |
+   | `author_name`, `message_id`, `additional_properties`, `raw_representation` | Leave blank |
+
+   Here `role` is the chat-message speaker, not the name of an agent. Click **Run Workflow**.
+5. Point out the executor events as they run. The graph exposes `intake`, `identify`, parallel
+   `line` / `incidents` / `equipment` checks, `collect`, `diagnose`, `decide`, and, for answerable
+   cases, `answer`. Runbook retrieval occurs inside `diagnose`, not as a separate executor.
+
+### Suggested live scenarios
+
+| Message in `contents` | Expected route | Teaching point |
+| --- | --- | --- |
+| `I'm CUST-1001, my internet is down` | `intake` + evidence collection + `diagnose` + `answer`; outage, RB-09 | Normal evidence fan-out and grounded answer; all three judgment agents run. |
+| `I'm CUST-1002, my internet is down` | `intake` + `diagnose` + `decide`; approval pause; then `answer`; restart, RB-02 | Human approval gates the synthetic restart. Explain the effect before approving. |
+| `I'm CUST-1003, my Wi-Fi is slow` | `intake` + evidence collection + `diagnose` + `answer`; Wi-Fi advice, RB-03 | Contrasts a local Wi-Fi issue with an access-line outage. |
+| `I'm CUST-1004, my internet is unstable` | `intake` + evidence collection + `diagnose` + handover; line fault, RB-07 | At least two agents run; deterministic decision routes to a human instead of `answer`. |
+
+All customers and backend effects are synthetic. Approving CUST-1002 writes a local synthetic restart
+action record; CUST-1004 writes a synthetic handover record. Neither restarts real equipment nor
+creates a real support case. For a read-only first demo, use CUST-1001 or CUST-1003.
+
+### Agent count and source locations
+
+The workflow has **three distinct code-first MAF agents**, each with its own instructions:
+
+| Agent | Role | Construction |
+| --- | --- | --- |
+| `supportbuddy-workflow-intake` | Extract customer ID, symptom, language, and scope | `src/workflow_lab.py`, `build_workflow()` |
+| `supportbuddy-workflow-diagnose` | Synthesize evidence into a typed verdict after deterministic runbook retrieval | `src/workflow_lab.py`, `DiagnoseExecutor` and `build_workflow()` |
+| `supportbuddy-workflow-answer` | Write the customer-facing, cited response | `src/workflow_lab.py`, `build_workflow()` |
+
+Their prompt files are `src/workflow_lab.intake.instructions.md`,
+`src/workflow_lab.diagnose.instructions.md`, and `src/workflow_lab.answer.instructions.md`.
+The executor graph, fan-out/fan-in, and routes are assembled in `build_workflow()` in
+`src/workflow_lab.py`. `Identify`, `Line`, `Incidents`, `Equipment`, `Collect`, and `Decide` are
+deterministic executors, not additional model agents. Most diagnosed customer cases invoke all three
+agents; the line-fault case invokes two and hands over. Out-of-scope or unidentified requests may stop
+after `intake`.
+
+### Scope and troubleshooting
+
+- This demo is DevUI-only. The contact-centre UI currently wraps agents or the Stage 10 Prompt Agent;
+  it does not host this `Workflow` graph.
+- DevUI presents a workflow runner rather than a persistent customer chat. Start a new run for each
+  scenario; its workflow event view is where executor steps appear.
+- If the workflow entity is missing, restart the process with `uv run python workflow_lab.py` and
+  select **Workflows**. If execution fails during runbook retrieval, verify the Stage 9 knowledge-base
+  settings and access; do not change shared Azure resources during the demo.
+- Compare with the Stage 9 single-agent reference only when time permits:
+
+  ```powershell
+  uv run python workflow_lab.py --compare CUST-1002
+  ```
+
+  This runs both live paths and prompts for approval. Approve only after explaining the synthetic
+   action, or decline at the prompt.

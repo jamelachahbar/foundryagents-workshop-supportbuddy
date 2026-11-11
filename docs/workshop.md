@@ -260,6 +260,9 @@ What is **not** an agent: the contact centre (a web app that routes each convers
 a person, with no model), the MCP server, the toolbox and the knowledge base (tools the agents call). The
 agents never call each other: there is no multi-agent orchestration in this lab.
 
+Optional carve-out: [optional workflow orchestration lab](optional-workflow-lab.md) demonstrates explicit
+MAF workflow graph orchestration as a separate, independent extension after Stage 9.
+
 </details>
 
 ---

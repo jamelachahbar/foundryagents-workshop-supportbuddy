@@ -27,6 +27,9 @@ Optional extension after Stage 9: [live evidence-panel lab and working solution]
 (`--evidence-panel`), driven by AG-UI events. Run `uv run python -m contact_centre ag_ui_lab --evidence-panel`
 from `src/`; its dedicated instructions leave your current stage untouched.
 
+Optional extension after Stage 9: [explicit multi-step workflow orchestration lab](docs/optional-workflow-lab.md)
+(`workflow_lab.py`), showing fan-out/fan-in, typed branch decisions, and approval pause/resume in MAF.
+
 ## The use case, and what is synthetic
 
 The scenario is one that every connectivity provider knows: a customer contacts support and says
