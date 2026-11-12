@@ -30,6 +30,10 @@ from `src/`; its dedicated instructions leave your current stage untouched.
 Optional extension after Stage 9: [explicit multi-step workflow orchestration lab](docs/optional-workflow-lab.md)
 (`workflow_lab.py`), showing fan-out/fan-in, typed branch decisions, and approval pause/resume in MAF.
 
+Instructor extension after Stage 14: [Contact Center Intelligence demo](instructor/cci-demo.md),
+placing a customer-facing intake agent in front of hosted SupportBuddy, with an architecture diagram,
+setup instructions, and a demo script. CCI preview access and channel configuration are separate prerequisites.
+
 ## The use case, and what is synthetic
 
 The scenario is one that every connectivity provider knows: a customer contacts support and says

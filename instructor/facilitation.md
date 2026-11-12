@@ -13,6 +13,12 @@ an independent exercise. All data must remain synthetic.
 For the optional network MCP identity demonstration, see the [secure MCP instructor guide](secure-mcp-demo.md).
 Its role-enforcement path is experimental and requires additional live verification before a workshop.
 
+For an optional extension after Stage 14, see the [Contact Center Intelligence instructor demo](cci-demo.md).
+It places a CCI Customer Assist Agent in front of hosted SupportBuddy for intake and specialist invocation,
+with setup steps, copy-ready instructions, an architecture diagram, and a 10-15 minute demo script.
+CCI preview access and channel configuration are separate from workshop provisioning. A synthetic
+SupportBuddy handover record is not a live CCI representative transfer.
+
 ## Stage 8: retrieval effort and output mode
 
 This extension is optional and is not required for the participant Stage 8 checkpoint. Complete
