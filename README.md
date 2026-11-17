@@ -15,7 +15,9 @@ Hands-on lab and workshop. You build one agent, **SupportBuddy**, with
 chatbot into an enterprise support agent that collects evidence from several capabilities, uses MCP,
 and hands the case to a human when it cannot resolve it.
 
-**Start here: [docs/workshop.md](docs/workshop.md)**
+**Start here: [interactive lab manual](https://jamelachahbar.github.io/foundryagents-workshop-supportbuddy/)**:
+one page per stage with commands to copy, prompts to try, checkpoints and progress saved in your browser.
+The full explanations stay in [docs/workshop.md](docs/workshop.md); each stage in the manual links to them.
 
 Quick reference for resuming after closing terminals: [participant terminal cheatsheet](docs/participant-terminal-cheatsheet.md).
 

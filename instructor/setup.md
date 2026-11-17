@@ -731,3 +731,18 @@ Assign the roles in the table under Option A. Each participant creates, in the s
 `lab-<alias>-supportbuddy-tools`, a prompt agent `lab-<alias>-supportbuddy-prompt`, a hosted agent
 `lab-<alias>-supportbuddy-hosted`, memories in scopes `lab-<alias>_CUST-*`, and evaluation runs.
 Delete them, or delete the project, after the workshop.
+
+## Interactive lab manual (GitHub Pages)
+
+`lab-manual/` is a pre-built, static participant manual. `.github/workflows/lab-manual-pages.yml`
+publishes it to <https://jamelachahbar.github.io/foundryagents-workshop-supportbuddy/> on every push
+to `main` that changes it.
+
+- One-time setup: **Settings > Pages > Build and deployment > Source = GitHub Actions**, then run the
+  workflow once from the **Actions** tab (or push a change to `lab-manual/`).
+- The site is public to anyone with the URL. It makes no network requests; ticks, progress and the
+  alias are stored only in each participant's browser.
+- The manual is a build output, not source: its text is compiled into `lab-manual/assets/*.js`. When
+  `docs/workshop.md` changes a command, file name or expected result, rebuild the manual and replace
+  the whole `lab-manual/` folder, or the two will disagree.
+
