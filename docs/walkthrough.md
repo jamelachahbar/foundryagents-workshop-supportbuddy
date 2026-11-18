@@ -516,6 +516,13 @@ that Lea sent the restart, and tells the customer to wait and test. It does not 
 
 ![After the hand-back: SupportBuddy knows what the advisor did](assets/walkthrough/stage-07-chat-after-handback.png)
 
+> **Improve it yourself (optional):** SupportBuddy only knows the restart is done from a note in the
+> conversation; its instructions say nothing about advisor actions. Add a sentence to the
+> **Follow-up on a handover** section of `main.instructions.md`, for example: *"When a human advisor already
+> took a confirmed action, such as a remote restart, tell the customer what was done and do not run or offer
+> it again; for a restart, ask them to wait about 3 minutes and test."* Restart the contact centre and run
+> Scenario B again. See the [workshop guide](workshop.md#scenario-b-a-live-handover) for the full wording.
+
 **Scenario C, the customer approves.** Click **New conversation**, then the suggestion
 `I'm CUST-1002, my modem doesn't respond since this morning. Please restart it remotely for me.`
 The approval card appears in the **customer** chat.

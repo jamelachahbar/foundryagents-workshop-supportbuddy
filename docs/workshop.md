@@ -1520,6 +1520,23 @@ Now play the advisor, on the **Operator desk**:
    resolved, retaining the action note and your last message for later `get_handover_status` lookups.
    A restart command does not prove that connectivity is fixed.
 
+> **🟢 Tip: improve the instructions yourself**
+>
+> The only thing that tells SupportBuddy "the restart is already done" is a note the contact centre adds to
+> the conversation. Nothing in `main.instructions.md` says what to do with it, so the model can still offer
+> a second restart; the approval card then stops it from running unasked. Try making the right behaviour
+> more likely: add a sentence to the **Follow-up on a handover** section, for example
+>
+> ```text
+> When the conversation shows that a human advisor already took an action and it is confirmed (for example
+> "Lea sent a remote restart command"), tell the customer what was done, by whom and when. Do not run or
+> offer that action again. Give the next step that goes with it: for a restart, wait about 3 minutes, then
+> test the connection. If the problem persists after that, hand over again.
+> ```
+>
+> Restart the contact centre, run Scenario B again and compare the answer to the last question. Stage 12
+> shows how to measure a change like this instead of judging one run.
+
 #### Scenario C: approve an action (customer chat)
 
 ```text
