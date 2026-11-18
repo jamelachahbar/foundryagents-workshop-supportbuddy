@@ -1478,6 +1478,10 @@ a "What I checked" list, no restart advice, no handover.
 
 #### Scenario B: a live handover
 
+Scenario B is **one conversation** from start to finish: do not click **New conversation** again until
+step 6 is done. SupportBuddy can only report what the advisor did if the follow-up question is asked in the
+same conversation as the handover.
+
 Click **New conversation** (top right of the customer chat), then:
 
 ```text
@@ -1503,10 +1507,18 @@ Now play the advisor, on the **Operator desk**:
   the restart command was sent and by whom. The confirmed action is saved in the handover record,
   and the restart appears under **Approved actions**. A rejected or failed restart must not claim success.
 5. Wait for advisor assist to finish; **Hand back to SupportBuddy** is disabled while it is working.
-  Then hand back and, as the customer, ask `What did Lea do?`: SupportBuddy can retrieve the confirmed
-  action from the handover record without restarting the modem a second time. The case stays
-  **in progress** until **Close** marks it resolved, retaining the action note and your last message
-  for later `get_handover_status` lookups. A restart command does not prove that connectivity is fixed.
+   Then click **Hand back to SupportBuddy**.
+6. Back in the **customer chat**, in the same conversation, ask:
+
+   ```text
+   Thanks. What did Lea do, and what should I do now?
+   ```
+
+   **Expected:** SupportBuddy says that Lea sent the restart and tells the customer to wait and test. It
+   does not offer a second restart, and no new approval card appears. The confirmed action is in the
+   conversation and in the handover record. The case stays **in progress** until **Close** marks it
+   resolved, retaining the action note and your last message for later `get_handover_status` lookups.
+   A restart command does not prove that connectivity is fixed.
 
 #### Scenario C: approve an action (customer chat)
 
@@ -1547,6 +1559,8 @@ Use this as a checklist for any production design:
 - [ ] Scenario A answers with the incident; Scenario B hands over with a `HO-...` reference.
 - [ ] After the handover, the advisor and the customer chat live, and SupportBuddy stays silent until the
       advisor hands back.
+- [ ] After the hand-back, in the same conversation, SupportBuddy says what the advisor did and does not
+      offer or run a second restart.
 - [ ] A state-changing tool never runs without an explicit approval, from the customer or the advisor.
 
 ### Instructions are not a control

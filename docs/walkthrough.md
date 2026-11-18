@@ -486,6 +486,9 @@ check while SupportBuddy works, then the answer.
 SupportBuddy hands over with a `HO-...` reference. Then write `Is someone there?`: the message waits for the
 advisor; SupportBuddy stays silent.
 
+> Stay in this **one conversation** until the end of Scenario B. Do not click **New conversation** before
+> the last question below, or SupportBuddy cannot see what the advisor did.
+
 ![Scenario B: handover with a reference; the customer waits for an advisor](assets/walkthrough/stage-07-chat-scenario-b-handover.png)
 
 On the **Operator desk**, select the conversation at the top of the queue. You see SupportBuddy's structured
@@ -506,8 +509,10 @@ Click **Restart modem** in the assist panel. The approval card appears on **your
 
 ![After approval: approved actions list, the customer is informed](assets/walkthrough/stage-07-desk-approved.png)
 
-Click **Hand back to SupportBuddy**. As the customer, write `Thanks. What did Lea do, and what should I do now?`:
-SupportBuddy continues with the whole history, and does not restart the modem a second time.
+Wait until **Advisor assist** has finished (the hand-back button is disabled while it works), then click
+**Hand back to SupportBuddy**. Back in the customer chat, in the **same conversation**, write
+`Thanks. What did Lea do, and what should I do now?`: SupportBuddy continues with the whole history, says
+that Lea sent the restart, and tells the customer to wait and test. It does not offer a second restart.
 
 ![After the hand-back: SupportBuddy knows what the advisor did](assets/walkthrough/stage-07-chat-after-handback.png)
 
@@ -520,7 +525,8 @@ The approval card appears in the **customer** chat.
 ![Scenario C after approval](assets/walkthrough/stage-07-chat-scenario-c-approved.png)
 
 **Check:** A answers with the incident; B hands over with a `HO-...` reference and the advisor and customer chat
-live; no state-changing tool runs without an explicit approval. Stop the contact centre (`Ctrl+C`) before
+live; after the hand-back, SupportBuddy says what Lea did without offering a second restart; no state-changing
+tool runs without an explicit approval. Stop the contact centre (`Ctrl+C`) before
 Stage 9; it must restart to pick up a new `main.py`.
 
 **Optional extension, available after Stage 9:** [AG-UI topology lab](#optional-ag-ui-topology-lab-after-stage-9).
