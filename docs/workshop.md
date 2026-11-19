@@ -21,7 +21,7 @@ case to a human.
 
 ## Contents
 
-[Terminal cheatsheet](participant-terminal-cheatsheet.md) · [Codespaces](#running-in-github-codespaces) · [Run the agent](#how-you-will-run-the-agent) ·
+[Terminal cheatsheet](participant-terminal-cheatsheet.md) · [How the code talks to Azure](how-it-works.md) · [Codespaces](#running-in-github-codespaces) · [Run the agent](#how-you-will-run-the-agent) ·
 [Restart after edits](#after-changing-code-or-instructions) · [Catch up](#if-you-fall-behind) ·
 [Troubleshooting](#troubleshooting)
 
@@ -3102,7 +3102,8 @@ not whether the team follows engineering practices. See [Prompt agents](https://
 
 > **Concept:** the agent remembers the customer across conversations, and the memory lives **outside** the agent runtime, in **Foundry Memory** (preview) \
 > **You change:** `src/main.py`, `src/main.instructions.md` \
-> **Reference:** `src/solutions/stage_11_memory.*`, `src/memory_store.py`
+> **Reference:** `src/solutions/stage_11_memory.*`, `src/memory_store.py` \
+> **Behind the scenes:** [what the code sends to Foundry Memory, and when](how-it-works.md#memory-stage-11)
 
 <details>
 <summary><strong>Stage 11 lab</strong> &middot; Memory scope, tasks and checkpoint</summary>

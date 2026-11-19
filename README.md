@@ -21,6 +21,8 @@ The full explanations stay in [docs/workshop.md](docs/workshop.md); each stage i
 
 Quick reference for resuming after closing terminals: [participant terminal cheatsheet](docs/participant-terminal-cheatsheet.md).
 
+Behind the scenes: [how the code talks to Azure](docs/how-it-works.md) - model calls, tools, memory, guardrails, tracing and what leaves your laptop.
+
 Optional Copilot skills and references: [.github/skills/README.md](.github/skills/README.md).
 
 Visual architecture guide: [AG-UI in SupportBuddy](docs/ag-ui.md) - streaming, approvals and human handover.

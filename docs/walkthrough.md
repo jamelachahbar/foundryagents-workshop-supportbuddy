@@ -27,6 +27,7 @@ See [The scenario clock](workshop.md#the-scenario-clock) and the
 [instructor preparation checklist](../instructor/setup.md#reusable-scenario-time).
 
 > **Quick reference:** [Participant terminal cheatsheet](participant-terminal-cheatsheet.md) covers reopening terminals and restarting local servers.
+> **Behind the scenes:** [How the code talks to Azure](how-it-works.md) shows what runs where and what each stage sends to Foundry.
 
 ## Contents
 
