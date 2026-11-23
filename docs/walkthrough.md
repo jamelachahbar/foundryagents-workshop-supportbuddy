@@ -27,6 +27,7 @@ See [The scenario clock](workshop.md#the-scenario-clock) and the
 [instructor preparation checklist](../instructor/setup.md#reusable-scenario-time).
 
 > **Quick reference:** [Participant terminal cheatsheet](participant-terminal-cheatsheet.md) covers reopening terminals and restarting local servers.
+> **Behind the scenes:** [How the code talks to Azure](how-it-works.md) shows what runs where and what each stage sends to Foundry.
 
 ## Contents
 
@@ -688,6 +689,14 @@ Agent: Votre ligne est bien synchronisée, il n'y a pas d'incident connu dans vo
 code except the toolbox endpoint. For the local fallback, network calls remain unprefixed and the local
 network URL is also used. The [Stage 9 exercise](workshop.md#stage-9-foundry-toolbox) repeats all four test
 prompts and expected outcomes.
+
+> **Improve it yourself (optional):** the instructions say "Most of your tools come from a Foundry Toolbox", but
+> the model only needs what each tool is for and the names it sees. Try replacing that sentence with
+> *"Some tool names carry a prefix: network___ for the network diagnostics and runbooks___ for the runbooks.
+> These instructions name them without the prefix."*, and drop "(Foundry IQ knowledge base)" from the
+> `knowledge_base_retrieve` line. Keep the approval and untrusted-data rules. Why, and the research behind it:
+> [workshop guide](workshop.md#stage-9-foundry-toolbox), [Foundry tool best practices](https://learn.microsoft.com/azure/foundry/agents/concepts/tool-best-practice),
+> [Writing effective tools for agents](https://www.anthropic.com/research/writing-tools-for-agents).
 
 > [!TIP]
 > No network MCP server on Azure in your lab environment? Your instructor tells you to add
