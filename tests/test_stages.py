@@ -149,6 +149,17 @@ def test_memory_scope_only_accepts_a_customer_id(customer_id):
         memory_scope(customer_id)
 
 
+def test_memory_namespace_isolates_eval_runs(monkeypatch):
+    from lab_agent import MEMORY_NAMESPACE_ENV, memory_scope
+
+    monkeypatch.delenv(MEMORY_NAMESPACE_ENV, raising=False)
+    chat_scope = memory_scope("CUST-1002")
+    monkeypatch.setenv(MEMORY_NAMESPACE_ENV, "eval")
+    assert memory_scope("CUST-1002") == chat_scope.replace("_CUST-1002", "_eval_CUST-1002")
+    monkeypatch.setenv(MEMORY_NAMESPACE_ENV, "bad_ns")
+    with pytest.raises(SystemExit):
+        memory_scope("CUST-1002")
+
 def test_memory_needs_an_embedding_deployment(monkeypatch):
     from lab_agent import memory_settings
 

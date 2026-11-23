@@ -764,7 +764,7 @@ async def test_foundry_scores_only_quality_cases_and_preserves_repetitions(
     request = harness.judged[0]
     quality = [case for case in harness.cases if case["category"] == "quality"]
     assert request["queries"] == [case["query"] for case in quality for _ in range(repeat)]
-    assert len(request["responses"]) == 6 * repeat
+    assert len(request["responses"]) == len(quality) * repeat
     assert request["agent"] is harness.agents[quality[-1]["id"]]
     query_messages, response_messages = request["conversation_split"]([
         Message("user", [quality[0]["query"]]), Message("assistant", ["Answer"]),
@@ -780,10 +780,10 @@ async def test_foundry_scores_only_quality_cases_and_preserves_repetitions(
     ]
     assert all("[blocked by guardrail]" not in response.text for response in request["responses"])
     output = capsys.readouterr().out
-    assert "9/9 cases passed every run." in output
+    assert f"{len(harness.cases)}/{len(harness.cases)} cases passed every run." in output
     assert "Safety cases (local checks only): 3 case(s)" in output
     assert f"S2-jailbreak: {repeat}/{repeat} runs passed; {repeat}/{repeat} blocked;" in output
-    assert f"6 quality case(s) x {repeat} run(s) = {6 * repeat} items" in output
+    assert f"{len(quality)} quality case(s) x {repeat} run(s) = {len(quality) * repeat} items" in output
 
 
 @pytest.mark.anyio
@@ -889,7 +889,8 @@ async def test_safety_leak_still_fails_local_checks_and_exit_code(evaluation_har
     harness = evaluation_harness
     harness.overrides["S1-other-customer"] = "Anna"
     assert await evaluate.main_async("main", 1, True) == 1
-    assert len(harness.judged[0]["responses"]) == 6
+    quality_count = sum(case["category"] == "quality" for case in harness.cases)
+    assert len(harness.judged[0]["responses"]) == quality_count
     assert "S1-other-customer: 0/1 runs passed; 0/1 blocked; 0/1 forbidden-content checks passed" in capsys.readouterr().out
 
 
@@ -898,7 +899,8 @@ async def test_blocked_quality_request_is_not_removed_or_automatically_passed(ev
     harness = evaluation_harness
     harness.blocked.add("A-outage")
     assert await evaluate.main_async("main", 1, True) == 1
-    assert len(harness.judged[0]["responses"]) == 6
+    quality_count = sum(case["category"] == "quality" for case in harness.cases)
+    assert len(harness.judged[0]["responses"]) == quality_count
     assert "[blocked by guardrail]" in harness.judged[0]["responses"][0].text
     assert "[FAIL] A-outage" in capsys.readouterr().out
 
@@ -959,11 +961,16 @@ async def test_safety_scores_both_categories_but_not_filter_placeholders(evaluat
     harness = evaluation_harness
     harness.overrides["S1-other-customer"] = "[blocked by guardrail] ordinary answer"
     assert await evaluate.main_async("main", 2, False, use_foundry_safety=True) == 0
-    assert len(harness.judged) == 1 and len(harness.judged[0]["responses"]) == 16
+    repeat = 2
+    expected_responses = (len(harness.cases) - 1) * repeat
+    assert len(harness.judged) == 1 and len(harness.judged[0]["responses"]) == expected_responses
     assert harness.created_judges[0]["evaluators"] == ["hate_unfairness", "sexual", "violence", "self_harm"]
     assert "[blocked by guardrail] ordinary answer" in [r.text for r in harness.judged[0]["responses"]]
     assert all("Synthetic content filter" not in r.text for r in harness.judged[0]["responses"])
-    assert "16 unblocked responses from both categories; 2 content-filter blocks excluded" in capsys.readouterr().out
+    assert (
+        f"{expected_responses} unblocked responses from both categories; "
+        f"{repeat} content-filter blocks excluded"
+    ) in capsys.readouterr().out
 
 
 @pytest.mark.anyio

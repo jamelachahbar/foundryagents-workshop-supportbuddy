@@ -45,10 +45,33 @@ from openai.types.eval_create_response import EvalCreateResponse
 from lingua import IsoCode639_1, LanguageDetector, LanguageDetectorBuilder
 
 from contact_centre.centre import tool_name
-from lab_agent import load_settings, open_agent, stage_agent, stage_signs_in
+from lab_agent import (
+    MEMORY_NAMESPACE_ENV,
+    load_settings,
+    memory_scope,
+    memory_settings,
+    open_agent,
+    stage_agent,
+    stage_signs_in,
+)
 
 DATASET = Path(__file__).parent / "evals" / "dataset.jsonl"
 HANDOVER_TOOL = "escalate_to_human"
+EVAL_MEMORY_NAMESPACE = "eval"
+
+
+async def reset_eval_memory(customer_id: str) -> None:
+    """Start each case with an empty eval memory scope: earlier cases (attacks included) must not leak in."""
+    settings = load_settings()
+    store = memory_settings()["FOUNDRY_MEMORY_STORE_NAME"]
+    async with AsyncAzureCliCredential() as credential:
+        async with AIProjectClient(
+            endpoint=settings["AZURE_AI_PROJECT_ENDPOINT"], credential=credential, allow_preview=True
+        ) as project:
+            try:
+                await project.beta.memory_stores.delete_scope(name=store, scope=memory_scope(customer_id))
+            except ResourceNotFoundError:
+                pass
 
 
 def judge_model_deployment(settings: dict[str, str]) -> str:
@@ -317,6 +340,7 @@ def agent_factory(module_name: str, prompt_agent: bool) -> Callable[[dict[str, A
 
         return lambda case: connect_prompt_agent()
     if stage_signs_in(module_name):
+        os.environ[MEMORY_NAMESPACE_ENV] = EVAL_MEMORY_NAMESPACE
         return lambda case: stage_agent(module_name, case["customer"])
     return lambda case: stage_agent(module_name)
 
@@ -329,6 +353,8 @@ async def run_case(
     blocked_runs = 0
     async with open_agent(agent):
         for _ in range(repeat):
+            if os.getenv(MEMORY_NAMESPACE_ENV) == EVAL_MEMORY_NAMESPACE and case.get("customer"):
+                await reset_eval_memory(case["customer"])
             try:
                 responses.append(await _run_rejecting_approvals(agent, case))
             except OpenAIContentFilterException as blocked:

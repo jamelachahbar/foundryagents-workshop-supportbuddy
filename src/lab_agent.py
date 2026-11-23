@@ -48,6 +48,8 @@ PREFIX_PATTERN = re.compile(r"^lab-[a-z0-9]{2,8}$")
 DEVUI_TOKEN_FILE = Path(__file__).parent / ".devui_token"
 CUSTOMER_ID_PATTERN = re.compile(r"^CUST-\d{4}$")
 DEFAULT_MEMORY_STORE_NAME = "supportbuddy-memory"
+MEMORY_NAMESPACE_ENV = "SUPPORTBUDDY_MEMORY_NAMESPACE"
+MEMORY_NAMESPACE_PATTERN = re.compile(r"^[a-z0-9]{1,16}$")
 DEFAULT_KNOWLEDGE_BASE_NAME = "supportbuddy-runbooks"
 SCENARIO_TIME = "2026-11-18T10:00:00Z"
 SCENARIO_CONTEXT = f"""# Synthetic scenario time
@@ -123,7 +125,12 @@ def memory_scope(customer_id: str) -> str:
     customer_id = customer_id.strip().upper()
     if not CUSTOMER_ID_PATTERN.match(customer_id):
         sys.exit(f"{customer_id!r} is not a customer ID like CUST-1002.")
-    return f"{os.environ['WORKSHOP_RESOURCE_PREFIX']}_{customer_id}"
+    # evaluate.py sets a namespace so eval runs never read or pollute the memories of your own chats.
+    namespace = os.getenv(MEMORY_NAMESPACE_ENV, "").strip().lower()
+    if namespace and not MEMORY_NAMESPACE_PATTERN.match(namespace):
+        sys.exit(f"{MEMORY_NAMESPACE_ENV}={namespace!r} must be 1-16 lowercase letters/digits.")
+    prefix = os.environ["WORKSHOP_RESOURCE_PREFIX"]
+    return f"{prefix}_{namespace}_{customer_id}" if namespace else f"{prefix}_{customer_id}"
 
 
 def signed_in_customer() -> str:
